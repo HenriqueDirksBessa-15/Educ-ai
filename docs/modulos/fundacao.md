@@ -8,7 +8,7 @@ Objetivo: iniciar web/API/banco localmente a partir de um checkout limpo, sem an
 2. Criar workspace, lockfile, scripts de desenvolvimento/build/checagem e ambiente de banco local.
 3. Definir contratos básicos de erro e autenticação; modelar tabelas/campos necessários a acesso, perfil, turma e integrações conforme o DERS.
 4. Criar migrações reproduzíveis, configuração por ambiente e exemplo sem valores secretos.
-5. Preparar adaptadores Google/OpenAI/e-mail e mecanismos de teste sem chamadas pagas por padrão.
+5. Preparar interfaces dos adaptadores Google/OpenAI/e-mail e fixtures. Não fazer chamadas externas antes de segunda, 12/10. Priorizar banco, endpoints e frontend conforme `docs/modulos/banco-front-endpoints.md`.
 6. Preparar testes separados por tipo e instruções para execução.
 
 ## Aceitação

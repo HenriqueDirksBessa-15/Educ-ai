@@ -22,3 +22,5 @@ Entidades previstas: professor, turma, aluno, matrícula, ementa, habilidade BNC
 Materiais usam armazenamento de objetos com vínculos no banco. Desenvolvimento deve disponibilizar adaptador local. Rotinas agendadas funcionam sem navegador aberto. Tentativas de sincronização, publicação e envio preservam IDs externos e evitam efeitos duplicados.
 
 Uma base de código de backend é suficiente inicialmente; rotinas podem ter processo separado sem virar microsserviços. A configuração final de hospedagem, e-mail e bibliotecas fica registrada em decisões antes do módulo afetado.
+
+Sequência vigente: até 11/10, persistência PostgreSQL, endpoints e frontend locais com interfaces/fixtures dos provedores. A partir de 12/10, integrar Google/GPT e demais envios externos. Identidade simulada fica restrita a desenvolvimento/teste; não é método de autenticação do produto.
