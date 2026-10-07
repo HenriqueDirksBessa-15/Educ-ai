@@ -2,29 +2,51 @@
 
 Atualizado em 07/10/2026.
 
-## Concluído no passo 0
+## Entrega atual - Dia 1
 
-* Acesso ao repositório `HenriqueDirksBessa-15/Educ-ai` confirmado.
-* Repositório vazio confirmado pelas consultas a conteúdos e branches.
-* DERS consultado, 14 requisitos identificados e sequência organizada.
-* Matriz inicial, arquitetura proposta, decisões pendentes e cronograma de 14 dias preparados.
-* Estrutura de diretórios e instruções para as próximas sessões preparadas.
-* Plano reorganizado: banco, frontend e endpoints locais até 11/10; APIs externas Google/GPT e envio real a partir de 12/10.
+Implementados:
 
-## Orientação vigente
+- workspace npm com web, API e contratos;
+- PostgreSQL local com volume persistente e healthcheck;
+- configuração por ambiente, validação e encerramento gracioso;
+- liveness e readiness com estados distintos;
+- primeira migração de professor, currículo/ementa/BNCC, turma, aluno/matrícula e status técnico;
+- seed idempotente com dois professores e turmas fictícias isoladas;
+- contratos iniciais de erros, paginação, identidade, perfil, currículo, turma e aluno;
+- interface mínima com carregamento, sucesso, banco indisponível e falha da API;
+- testes unitários e integração separados;
+- documentação operacional, arquitetura, decisões e matriz.
 
-Não antecipar integrações externas. Até domingo, trabalhar com contratos e fixtures identificadas, mantendo persistência e regras locais reais. Pesquisa Google já realizada serve como referência técnica; nenhum adaptador ou integração foi implementado. RF dependentes de integração continuam pendentes.
+## Verificações
 
-## Pendente
+Executadas após a estabilização:
 
-* Passo 1: projeto executável, scripts, dependências, banco, migrações e contratos.
-* Detalhar a matriz por fluxo/campo antes de implementar cada RF. As referências usam títulos RF do DERS; figuras precisam de inspeção visual no módulo correspondente.
-* Resolver decisões na ordem de bloqueio e validar integrações reais com contas de teste.
+| Verificação                                    | Resultado                                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `npm ci --ignore-scripts --no-audit --no-fund` | Aprovada; 381 pacotes instalados pelo lockfile                                                   |
+| `npm run check`                                | Aprovada; formatação, lint, tipos, 12 testes unitários/componentes e builds de API/web/contratos |
+| `npm run test:integration`                     | Aprovada; 2 testes de PostgreSQL em banco temporário                                             |
+| `npm run db:migrate` duas vezes                | Aprovada; primeira aplicação criou o esquema e segunda informou banco atualizado                 |
+| `npm run db:seed` duas vezes                   | Aprovada; permaneceram 2 professores fictícios e 2 turmas distintas                              |
+| Reinício de `postgres` sem remover volume      | Aprovada; contagem de professores fictícios permaneceu 2 antes/depois                            |
+| API com banco disponível                       | Aprovada; liveness 200 e readiness 200/`available`                                               |
+| API com banco parado                           | Aprovada; liveness 200 e readiness 503/`unavailable`                                             |
+| Retomada do banco                              | Aprovada; readiness voltou a 200/`available`                                                     |
+| API compilada recebendo `SIGINT`               | Aprovada; logs confirmaram início e conclusão do encerramento gracioso                           |
+| Interface em `http://localhost:5173`           | Aprovada no navegador; estágio, API e PostgreSQL renderizados como disponíveis                   |
 
-## Verificação
+Observações do ambiente:
 
-Nesta entrega há documentação e estrutura, sem código funcional. Verificar integridade da matriz, arquivos relativos e preparação do git. Nenhum teste de aplicação é aplicável ainda. Não marcar RF como implementado.
+- Docker Desktop estava inicialmente desligado e foi iniciado para a validação.
+- O primeiro pull da imagem PostgreSQL foi lento, mas concluiu sem erro.
+- O Docker Desktop local exigiu timeout de conexão de 10 segundos no pool; depois de aquecido, readiness respondeu normalmente.
+- npm informou que ESLint 9.38 saiu de suporte, porém ESLint 10 exige Node 20.19 ou superior. A versão 9.38 permanece fixada por compatibilidade com o Node 20.16 disponível e deve ser atualizada junto com o runtime, não isoladamente.
 
-## Próxima sessão
+## Bloqueios
 
-Ler `docs/modulos/fundacao.md` e `docs/modulos/banco-front-endpoints.md`. Implementar fundação e modelo PostgreSQL, depois endpoints e telas por módulo. Provas OAuth/Google/GPT começam a partir de segunda, 12/10. Atualizar este arquivo com comandos e resultados reais.
+- O PDF indicado pelo usuário termina antes da seção de diagramas. A cópia de 96 páginas foi usada para inspeção técnica, mas a confirmação como versão oficial permanece aberta.
+- A carga BNCC oficial não foi fornecida. A seed contém somente uma referência simulada, inequivocamente marcada como não oficial.
+
+## Próximo passo
+
+Dia 2: OAuth Google, cadastro automático do professor, sessão segura e monitoramento real de OAuth, Classroom e Forms, após disponibilização das credenciais.

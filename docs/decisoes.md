@@ -1,22 +1,26 @@
-# Decisões pendentes
+# Decisões e pendências
 
-Nenhuma mudança de requisito aprovada. Nenhum requisito adicional aprovado.
+## Decisões técnicas do Dia 1
 
-| ID | Referência | Ambiguidade ou dependência | Encaminhamento | Bloqueia |
-| --- | --- | --- | --- | --- |
-| D01 | Escopo, RF006/007/012 | Aluno indireto versus código de ingresso e interface EducAI | Henrique define canais de acesso e autenticação; não criar portal implicitamente | Ingresso e visualização pelo aluno |
-| D02 | RF008 | Bloqueio de exclusão de marco publicado versus confirmação no alternativo | Definir regra por estado/vínculo; apresentar alternativas | Exclusão de marcos vinculados |
-| D03 | RF003/009 | Ementa mantida tecnicamente versus pedido de preenchimento ao professor | Definir seleção/solicitação sem painel institucional novo | Geração sem ementa |
-| D04 | RF001/011/012 | Associação de envio Classroom e respostas Forms por aluno/questão | Prova técnica com contas de teste e contrato de reconciliação | Coleta real |
-| D05 | RF013 | Comentários particulares no Classroom e capacidades da API | Verificar documentação e acesso; apresentar canal suportado antes de mudar comportamento | Entrega externa do feedback |
-| D06 | RF014 | Origem de presença, participação e e-mail de responsáveis | Henrique define fonte e comportamento para dados ausentes | Campos/canais correspondentes do boletim |
-| D07 | RF010/013/014 e regras | Limites de armazenamento, planilha, edição, média/pesos e atrasos | Enumerar opções por módulo e fechar os valores necessários | Validações respectivas |
-| D08 | RF002 e escopo | Modelo GPT-4 citado e configuração disponível | Verificar modelo/acesso; apresentar eventual mudança | Integração real de IA |
-| D09 | Integrações | Contas de teste, projeto OAuth, permissões Google, chave IA e remetente | Configurar fora do git; mocks permitem desenvolvimento, não aceitação real | Provas externas e envio de e-mail |
-| D10 | Prazo | Prazo de 14 dias sem data final explicitada | Cronograma assume 07–20/10, contando hoje como D1; confirmar data final quando definida | Data final confirmada |
+| ID    | Data       | Decisão                                                | Impacto                                                 |
+| ----- | ---------- | ------------------------------------------------------ | ------------------------------------------------------- |
+| DT-01 | 07/10/2026 | Usar npm workspaces, React/Vite, Fastify e PostgreSQL  | Fundação simples em uma base de código                  |
+| DT-02 | 07/10/2026 | Usar migrações SQL com checksum                        | Esquema auditável e independente de ORM                 |
+| DT-03 | 07/10/2026 | Separar liveness de readiness                          | Banco indisponível não é confundido com processo parado |
+| DT-04 | 07/10/2026 | Fixtures com UUIDs fixos, `.invalid` e `is_fixture`    | Seed reproduzível e inequivocamente simulada            |
+| DT-05 | 07/10/2026 | Manter IDs internos UUID e IDs Google opcionais/únicos | Integração futura sem tornar ID externo chave primária  |
 
-## Decisão de execução aprovada
+## Pendências do DERS
 
-07/10/2026, Henrique: APIs externas ficam para segunda-feira, 12/10. Até domingo, priorizar banco, frontend e endpoints locais. Interfaces/fixtures preparam integrações; não executar chamadas reais nesse período. Mudança de ordem de execução, sem alteração do DERS nem novo requisito.
-
-Registrar cada decisão com data, responsável, opção escolhida e requisitos afetados. Verificações técnicas podem ser resolvidas pelo desenvolvimento; alterações de comportamento precisam de decisão de Henrique.
+| ID   | Prazo do plano | Pendência                                                                    | Estado                                                 |
+| ---- | -------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------ |
+| D-01 | Dia 1          | Confirmar a cópia de 96 páginas como versão técnica oficial                  | Aberta; o arquivo indicado termina antes dos diagramas |
+| D-02 | Dia 2          | Definir se o aluno possui interface própria ou permanece indireto via Google | Aberta                                                 |
+| D-03 | Dia 3          | Definir fonte e arquivo oficial da carga BNCC                                | Aberta; seed do Dia 1 é explicitamente não oficial     |
+| D-04 | Dia 4          | Fornecer o modelo padrão da planilha de alunos                               | Aberta                                                 |
+| D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Aberta                                                 |
+| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Aberta                                                 |
+| D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Aberta                                                 |
+| D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Aberta                                                 |
+| D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Aberta                                                 |
+| D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Aberta                                                 |

@@ -1,20 +1,121 @@
-# EducAI
+# EDUC.AI
 
-Sistema de apoio ao planejamento pedagógico e à correção de atividades escolares com IA.
+Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual corresponde ao Dia 1 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, migrações e dados fictícios reproduzíveis.
 
-## Estado atual
+Nenhuma integração real com Google ou OpenAI é executada nesta etapa.
 
-Passo 0: documentação e estrutura inicial. Ainda não há aplicação executável nem funcionalidades implementadas. Repositório inicialmente vazio, verificado em 07/10/2026.
+## Requisitos locais
 
-Prazo de trabalho: 14 dias, informado em 07/10/2026. Cronograma operacional assume 07–20/10, contando hoje como D1; data final é uma referência de planejamento. Até domingo, 11/10: banco, frontend e endpoints locais. APIs externas Google/GPT a partir de segunda, 12/10.
+- Node.js 20.16.x;
+- npm 10.8 ou superior;
+- Docker Desktop com Docker Compose v2.
 
-Fonte de autoridade: `Desenvolvimento_DERS_HenriqueBessa.pdf`, versão consultada de 30/09/2026, 78 páginas. O PDF não está neste repositório. Os agentes precisam receber acesso ao documento antes de interpretar campos ou fluxos não transcritos aqui.
+## Instalação
 
-## Começar
+```powershell
+npm ci
+Copy-Item .env.example .env
+```
 
-1. Ler `AGENTS.md` e `docs/progresso.md`.
-2. Consultar `docs/plano.md`, `docs/arquitetura.md` e `docs/requisitos.md`.
-3. Resolver apenas decisões que bloqueiem a entrega atual em `docs/decisoes.md`.
-4. Executar `docs/modulos/fundacao.md`, seguindo a sequência de `docs/modulos/banco-front-endpoints.md`.
+O arquivo `.env.example` contém somente valores locais. Não versione `.env`, tokens ou chaves.
 
-A estrutura está preparada para `apps/web`, `apps/api`, `packages/contracts`, `database/migrations`, `database/seeds` e testes separados por tipo. Dependências, scripts de execução e lockfile serão adicionados na fundação, após validar versões e compatibilidade.
+## Banco de dados
+
+Iniciar o PostgreSQL e aguardar o healthcheck:
+
+```powershell
+npm run db:up
+docker compose ps
+```
+
+Aplicar as migrações e a seed fictícia:
+
+```powershell
+npm run db:migrate
+npm run db:seed
+```
+
+A seed pode ser repetida sem duplicar registros. Todos os e-mails usam `example.invalid`; a referência curricular tem o código `SIM-NAO-OFICIAL-01` e está marcada como não oficial.
+
+Parar os serviços preservando o volume:
+
+```powershell
+npm run db:down
+```
+
+Para acompanhar o banco:
+
+```powershell
+npm run db:logs
+```
+
+## Desenvolvimento
+
+Com PostgreSQL iniciado, migrações aplicadas e `.env` criado:
+
+```powershell
+npm run dev
+```
+
+- Interface: <http://localhost:5173>
+- API viva: <http://localhost:3000/api/health/live>
+- API pronta: <http://localhost:3000/api/health/ready>
+
+`/api/health/live` confirma que o processo da API responde. `/api/health/ready` também consulta o PostgreSQL e retorna HTTP 503 quando o banco estiver indisponível.
+
+Para iniciar os processos separadamente:
+
+```powershell
+npm run dev:api
+npm run dev:web
+```
+
+## Qualidade e testes
+
+```powershell
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run build
+```
+
+O teste de integração cria um banco temporário no mesmo servidor PostgreSQL, aplica a migração em banco vazio, executa a seed duas vezes e remove o banco temporário ao terminar:
+
+```powershell
+npm run test:integration
+```
+
+Todas as verificações não dependentes de banco podem ser executadas juntas:
+
+```powershell
+npm run check
+```
+
+## Configuração
+
+| Variável              | Finalidade                               |
+| --------------------- | ---------------------------------------- |
+| `NODE_ENV`            | `development`, `test` ou `production`    |
+| `API_HOST`            | Interface de rede da API                 |
+| `API_PORT`            | Porta HTTP da API                        |
+| `DATABASE_URL`        | URL PostgreSQL usada somente no servidor |
+| `WEB_ORIGIN`          | Origem autorizada no CORS                |
+| `LOG_LEVEL`           | Nível de log estruturado                 |
+| `SHUTDOWN_TIMEOUT_MS` | Limite do encerramento gracioso          |
+| `VITE_API_BASE_URL`   | Prefixo público consumido pela interface |
+
+Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
+
+## Estrutura
+
+```text
+apps/web              React, TypeScript e Vite
+apps/api              Fastify, configuração, PostgreSQL e rotas técnicas
+packages/contracts    contratos Zod compartilhados
+database/migrations   esquema PostgreSQL versionado
+database/seeds        fixtures reproduzíveis e identificadas
+docs                   arquitetura, decisões, progresso e rastreabilidade
+```
+
+O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). Nenhum RF001–RF014 está concluído apenas por esta fundação.

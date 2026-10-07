@@ -1,0 +1,44 @@
+{
+  "name": "educai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fundação executável do EDUC.AI",
+  "engines": {
+    "node": ">=20.16.0 <21",
+    "npm": ">=10.8.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "predev": "npm run build -w @educai/contracts",
+    "dev": "concurrently -k -n API,WEB -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @educai/api",
+    "dev:web": "npm run dev -w @educai/web",
+    "build": "npm run build -w @educai/contracts && npm run build -w @educai/api && npm run build -w @educai/web",
+    "typecheck": "npm run typecheck -w @educai/contracts && npm run typecheck -w @educai/api && npm run typecheck -w @educai/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test:unit",
+    "test:unit": "npm run test -w @educai/contracts && npm run test -w @educai/api && npm run test -w @educai/web",
+    "test:integration": "npm run test:integration -w @educai/api",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "npm run db:migrate -w @educai/api",
+    "db:seed": "npm run db:seed -w @educai/api",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.38.0",
+    "concurrently": "9.2.1",
+    "eslint": "9.38.0",
+    "globals": "16.4.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.1"
+  }
+}
