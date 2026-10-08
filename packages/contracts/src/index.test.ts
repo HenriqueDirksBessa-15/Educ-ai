@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   apiErrorSchema,
+  authSessionSchema,
   identitySchema,
+  integrationStatusSchema,
   readyResponseSchema,
 } from "./index.js";
 
@@ -38,5 +40,33 @@ describe("shared contracts", () => {
         },
       }).error.code,
     ).toBe("VALIDATION_ERROR");
+  });
+
+  it("distinguishes anonymous and authenticated sessions", () => {
+    expect(authSessionSchema.parse({ authenticated: false })).toEqual({
+      authenticated: false,
+    });
+    expect(
+      authSessionSchema.parse({
+        authenticated: true,
+        identity: {
+          professorId: "5d73ea1d-9ab8-4384-960e-3a6f00e6328a",
+          email: "professor@example.invalid",
+          displayName: "Professor Fictício",
+          provider: "google",
+        },
+      }).authenticated,
+    ).toBe(true);
+  });
+
+  it("exposes normalized integration state without technical messages", () => {
+    const parsed = integrationStatusSchema.parse({
+      service: "google_classroom",
+      status: "inactive",
+      checkedAt: new Date().toISOString(),
+      errorCode: "GOOGLE_SERVICE_UNAVAILABLE",
+    });
+    expect(parsed.status).toBe("inactive");
+    expect(parsed).not.toHaveProperty("errorMessage");
   });
 });

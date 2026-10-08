@@ -12,3 +12,5 @@ test-results/
 .vscode/
 storage/
 *.tsbuildinfo
+*.pem
+client_secret*.json

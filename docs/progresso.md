@@ -1,52 +1,51 @@
 # Progresso
 
-Atualizado em 07/10/2026.
+Atualizado em 08/10/2026.
 
-## Entrega atual - Dia 1
+## Entrega atual - Dia 2
 
 Implementados:
 
-- workspace npm com web, API e contratos;
-- PostgreSQL local com volume persistente e healthcheck;
-- configuração por ambiente, validação e encerramento gracioso;
-- liveness e readiness com estados distintos;
-- primeira migração de professor, currículo/ementa/BNCC, turma, aluno/matrícula e status técnico;
-- seed idempotente com dois professores e turmas fictícias isoladas;
-- contratos iniciais de erros, paginação, identidade, perfil, currículo, turma e aluno;
-- interface mínima com carregamento, sucesso, banco indisponível e falha da API;
-- testes unitários e integração separados;
-- documentação operacional, arquitetura, decisões e matriz.
+- OAuth Google exclusivo com `state`, PKCE S256, callback e tratamento de negação/falha;
+- cadastro ou atualização do professor pelo `sub`, nome, e-mail verificado e imagem Google;
+- sessões opacas no PostgreSQL e cookie HTTP-only;
+- tokens cifrados com AES-256-GCM, renovação pelo cliente oficial e revogação;
+- logout, desconexão Google e shell protegido;
+- fronteira que ignora `professorId` do cliente e resolve identidade apenas pela sessão;
+- monitor de OAuth, Classroom e Forms a cada cinco minutos, com tentativa inicial e três adicionais;
+- histórico de tentativa, código normalizado e último estado por serviço;
+- tela de login, falha recuperável, carregamento e shell autenticado;
+- migração de credencial, sessão e autorização descartável;
+- contratos de sessão e status de integrações;
+- projeto Google Cloud `educai-511017`;
+- bucket privado `gs://educai-511017-test-artifacts` em São Paulo para artefatos futuros.
+
+O bucket não executa Docker e ainda não é consumido pelo produto. Nenhum deploy foi realizado.
 
 ## Verificações
 
-Executadas após a estabilização:
+| Verificação                 | Resultado                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`             | Aprovada em 08/10: formatação, lint, tipos, 23 testes unitários/componentes e builds de contratos/API/web             |
+| `npm audit --omit=dev`      | Aprovada após atualizar Fastify para 5.12.5; zero vulnerabilidades de produção                                        |
+| Migração no banco existente | Aprovada antes do reinício; `002_google_auth.sql` aplicada                                                            |
+| `npm run test:integration`  | Aprovada antes do reinício; 3 cenários em banco temporário, incluindo OAuth simulado, sessão e tokens cifrados        |
+| URL OAuth real              | Aprovada após configurar as URIs; Google abriu “Sign in with Google” para o app `educai`, sem `redirect_uri_mismatch` |
+| Callback real completo      | Não executado após o reinício porque o computador não executa Docker/PostgreSQL local                                 |
+| Classroom real              | Pendente do primeiro login/callback completo                                                                          |
+| Forms real                  | Pendente de `GOOGLE_FORMS_TEST_FORM_ID` e do primeiro login                                                           |
+| Bucket Google Cloud         | Aprovada; criado em `SOUTHAMERICA-EAST1`, acesso uniforme e prevenção de acesso público                               |
 
-| Verificação                                    | Resultado                                                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm ci --ignore-scripts --no-audit --no-fund` | Aprovada; 381 pacotes instalados pelo lockfile                                                   |
-| `npm run check`                                | Aprovada; formatação, lint, tipos, 12 testes unitários/componentes e builds de API/web/contratos |
-| `npm run test:integration`                     | Aprovada; 2 testes de PostgreSQL em banco temporário                                             |
-| `npm run db:migrate` duas vezes                | Aprovada; primeira aplicação criou o esquema e segunda informou banco atualizado                 |
-| `npm run db:seed` duas vezes                   | Aprovada; permaneceram 2 professores fictícios e 2 turmas distintas                              |
-| Reinício de `postgres` sem remover volume      | Aprovada; contagem de professores fictícios permaneceu 2 antes/depois                            |
-| API com banco disponível                       | Aprovada; liveness 200 e readiness 200/`available`                                               |
-| API com banco parado                           | Aprovada; liveness 200 e readiness 503/`unavailable`                                             |
-| Retomada do banco                              | Aprovada; readiness voltou a 200/`available`                                                     |
-| API compilada recebendo `SIGINT`               | Aprovada; logs confirmaram início e conclusão do encerramento gracioso                           |
-| Interface em `http://localhost:5173`           | Aprovada no navegador; estágio, API e PostgreSQL renderizados como disponíveis                   |
+## Restrições e bloqueios atuais
 
-Observações do ambiente:
+- O computador informado pelo usuário não executa Docker. A suíte de integração foi aprovada antes do reinício, mas não foi repetida na estabilização final.
+- A validação ponta a ponta com conta Google depende de PostgreSQL disponível para persistir `state`, professor, tokens e sessão.
+- Nenhum ID de formulário de teste foi informado; Forms permanece corretamente como não configurado, sem simulação de sucesso.
+- O PDF indicado originalmente termina antes dos diagramas; a cópia completa de 96 páginas segue como referência técnica ainda não confirmada formalmente.
+- A carga BNCC oficial ainda não foi fornecida.
 
-- Docker Desktop estava inicialmente desligado e foi iniciado para a validação.
-- O primeiro pull da imagem PostgreSQL foi lento, mas concluiu sem erro.
-- O Docker Desktop local exigiu timeout de conexão de 10 segundos no pool; depois de aquecido, readiness respondeu normalmente.
-- npm informou que ESLint 9.38 saiu de suporte, porém ESLint 10 exige Node 20.19 ou superior. A versão 9.38 permanece fixada por compatibilidade com o Node 20.16 disponível e deve ser atualizada junto com o runtime, não isoladamente.
-
-## Bloqueios
-
-- O PDF indicado pelo usuário termina antes da seção de diagramas. A cópia de 96 páginas foi usada para inspeção técnica, mas a confirmação como versão oficial permanece aberta.
-- A carga BNCC oficial não foi fornecida. A seed contém somente uma referência simulada, inequivocamente marcada como não oficial.
+RF001 e RF004 não são marcados como totalmente concluídos enquanto os fluxos reais dependentes acima não forem executados. A implementação e os testes isolados estão prontos.
 
 ## Próximo passo
 
-Dia 2: OAuth Google, cadastro automático do professor, sessão segura e monitoramento real de OAuth, Classroom e Forms, após disponibilização das credenciais.
+Dia 3: ementa/BNCC e perfil do professor, preservando a autenticação já implementada. Antes de integrar Forms, informar um formulário de teste. Para repetir testes PostgreSQL sem Docker local, decidir futuramente por runner de CI ou banco efêmero; não criar Cloud SQL pago sem autorização.

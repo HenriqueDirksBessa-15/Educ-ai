@@ -10,6 +10,16 @@
 | DT-04 | 07/10/2026 | Fixtures com UUIDs fixos, `.invalid` e `is_fixture`    | Seed reproduzível e inequivocamente simulada            |
 | DT-05 | 07/10/2026 | Manter IDs internos UUID e IDs Google opcionais/únicos | Integração futura sem tornar ID externo chave primária  |
 
+## Decisões técnicas do Dia 2
+
+| ID    | Data       | Decisão                                                       | Impacto                                                       |
+| ----- | ---------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| DT-06 | 08/10/2026 | Usar sessão opaca persistida em vez de identidade no cliente  | Revogação central e `professorId` do cliente sem autoridade   |
+| DT-07 | 08/10/2026 | Cifrar tokens Google com AES-256-GCM                          | Tokens protegidos em repouso com chave fora do banco/Git      |
+| DT-08 | 08/10/2026 | OAuth com biblioteca oficial, `state` e PKCE S256             | Callback vinculado à tentativa iniciada pelo navegador        |
+| DT-09 | 08/10/2026 | Monitor a cada cinco minutos, com no máximo quatro tentativas | Histórico explícito de OAuth, Classroom e Forms               |
+| DT-10 | 08/10/2026 | Bucket privado em São Paulo somente para artefatos de teste   | Armazenamento futuro sem confundir bucket com execução Docker |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                 |

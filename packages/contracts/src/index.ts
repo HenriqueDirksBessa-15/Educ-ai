@@ -3,6 +3,7 @@ import { z } from "zod";
 export const errorCodeSchema = z.enum([
   "CONFIGURATION_ERROR",
   "DATABASE_UNAVAILABLE",
+  "INTEGRATION_UNAVAILABLE",
   "UNAUTHENTICATED",
   "FORBIDDEN",
   "NOT_FOUND",
@@ -30,6 +31,24 @@ export const identitySchema = z.object({
   email: z.email(),
   displayName: z.string().min(1),
   provider: z.literal("google"),
+});
+
+export const authSessionSchema = z.discriminatedUnion("authenticated", [
+  z.object({ authenticated: z.literal(false) }),
+  z.object({ authenticated: z.literal(true), identity: identitySchema }),
+]);
+
+export const integrationServiceSchema = z.enum([
+  "google_oauth",
+  "google_classroom",
+  "google_forms",
+]);
+
+export const integrationStatusSchema = z.object({
+  service: integrationServiceSchema,
+  status: z.enum(["active", "inactive"]),
+  checkedAt: z.iso.datetime(),
+  errorCode: z.string().nullable(),
 });
 
 export const notificationPreferenceSchema = z.enum(["visual", "email", "both"]);
@@ -90,6 +109,9 @@ export const readyResponseSchema = z.object({
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
 export type Identity = z.infer<typeof identitySchema>;
+export type AuthSession = z.infer<typeof authSessionSchema>;
+export type IntegrationService = z.infer<typeof integrationServiceSchema>;
+export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;
 export type ProfessorProfile = z.infer<typeof professorProfileSchema>;
 export type CurriculumReference = z.infer<typeof curriculumReferenceSchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;

@@ -9,6 +9,8 @@ const validEnvironment = {
   DATABASE_URL: "postgresql://user:secret@localhost:5432/educai",
   WEB_ORIGIN: "http://localhost:5173",
   LOG_LEVEL: "silent",
+  TOKEN_ENCRYPTION_KEY:
+    "9f238e1d4c7a6b05d9e31074a2c8f61b3d0e7a95c4b1286f50d2a9e37c6148fb",
 };
 
 describe("loadConfig", () => {
@@ -43,5 +45,15 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig({ ...validEnvironment, API_PORT: "99999" }),
     ).toThrow("API_PORT");
+  });
+
+  it("requires Google client id and secret together", () => {
+    expect(() =>
+      loadConfig({ ...validEnvironment, GOOGLE_CLIENT_ID: "client-id" }),
+    ).toThrow(/GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET/);
+  });
+
+  it("accepts absent Google credentials while keeping login disabled", () => {
+    expect(loadConfig(validEnvironment).google.clientId).toBeUndefined();
   });
 });

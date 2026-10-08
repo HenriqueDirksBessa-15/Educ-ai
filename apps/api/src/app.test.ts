@@ -11,6 +11,13 @@ const config: AppConfig = {
   webOrigin: "http://localhost:5173",
   logLevel: "silent",
   shutdownTimeoutMs: 10_000,
+  google: {
+    redirectUri: "http://localhost:3000/api/auth/google/callback",
+  },
+  tokenEncryptionKey:
+    "9f238e1d4c7a6b05d9e31074a2c8f61b3d0e7a95c4b1286f50d2a9e37c6148fb",
+  sessionTtlSeconds: 28_800,
+  integrationMonitorIntervalMs: 300_000,
 };
 
 const apps: Awaited<ReturnType<typeof createApp>>[] = [];
@@ -39,7 +46,7 @@ describe("technical health endpoints", () => {
       status: "alive",
       service: "educai-api",
     });
-  });
+  }, 15_000);
 
   it("reports readiness when PostgreSQL responds", async () => {
     const app = await createApp({
@@ -81,5 +88,43 @@ describe("technical health endpoints", () => {
       expect.objectContaining({ status: "not_ready", database: "unavailable" }),
     );
     expect(response.body).not.toContain("secret connection detail");
+  });
+});
+
+describe("authentication boundary", () => {
+  it("keeps Google login unavailable when credentials are absent", async () => {
+    const app = await createApp({
+      config,
+      database: { query: vi.fn() },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/google/start",
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      error: { code: "INTEGRATION_UNAVAILABLE" },
+    });
+  });
+
+  it("rejects a protected route even when professorId is sent by the client", async () => {
+    const app = await createApp({
+      config,
+      database: { query: vi.fn() },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/professor/shell?professorId=5d73ea1d-9ab8-4384-960e-3a6f00e6328a",
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: { code: "UNAUTHENTICATED" },
+    });
   });
 });

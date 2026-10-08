@@ -1,14 +1,14 @@
 # EDUC.AI
 
-Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual corresponde ao Dia 1 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, migrações e dados fictícios reproduzíveis.
+Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1 e 2 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, identidade Google, sessões e monitoramento técnico.
 
-Nenhuma integração real com Google ou OpenAI é executada nesta etapa.
+A autenticação é exclusivamente Google. OpenAI e funcionalidades pedagógicas permanecem fora desta etapa.
 
 ## Requisitos locais
 
 - Node.js 20.16.x;
 - npm 10.8 ou superior;
-- Docker Desktop com Docker Compose v2.
+- PostgreSQL 16 acessível pela `DATABASE_URL`; Docker Compose v2 é a opção local padrão, não uma exigência da aplicação.
 
 ## Instalação
 
@@ -18,6 +18,19 @@ Copy-Item .env.example .env
 ```
 
 O arquivo `.env.example` contém somente valores locais. Não versione `.env`, tokens ou chaves.
+
+Gere uma chave local de 32 bytes em hexadecimal para `TOKEN_ENCRYPTION_KEY`. Credenciais Google devem existir apenas no `.env` local.
+
+## Google OAuth
+
+Crie um cliente OAuth do tipo aplicação Web e configure exatamente:
+
+- origem JavaScript autorizada: `http://localhost:5173`;
+- URI de redirecionamento autorizada: `http://localhost:3000/api/auth/google/callback`.
+
+Preencha `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env`. Para verificar Google Forms de forma real, informe também o identificador de um formulário de teste em `GOOGLE_FORMS_TEST_FORM_ID`.
+
+Os escopos solicitados são identidade básica, leitura de cursos do Classroom e leitura do corpo de Forms. O professor precisa revisar e autorizar o consentimento; nenhuma senha Google passa pelo EDUC.AI.
 
 ## Banco de dados
 
@@ -94,16 +107,23 @@ npm run check
 
 ## Configuração
 
-| Variável              | Finalidade                               |
-| --------------------- | ---------------------------------------- |
-| `NODE_ENV`            | `development`, `test` ou `production`    |
-| `API_HOST`            | Interface de rede da API                 |
-| `API_PORT`            | Porta HTTP da API                        |
-| `DATABASE_URL`        | URL PostgreSQL usada somente no servidor |
-| `WEB_ORIGIN`          | Origem autorizada no CORS                |
-| `LOG_LEVEL`           | Nível de log estruturado                 |
-| `SHUTDOWN_TIMEOUT_MS` | Limite do encerramento gracioso          |
-| `VITE_API_BASE_URL`   | Prefixo público consumido pela interface |
+| Variável                          | Finalidade                                |
+| --------------------------------- | ----------------------------------------- |
+| `NODE_ENV`                        | `development`, `test` ou `production`     |
+| `API_HOST`                        | Interface de rede da API                  |
+| `API_PORT`                        | Porta HTTP da API                         |
+| `DATABASE_URL`                    | URL PostgreSQL usada somente no servidor  |
+| `WEB_ORIGIN`                      | Origem autorizada no CORS                 |
+| `LOG_LEVEL`                       | Nível de log estruturado                  |
+| `SHUTDOWN_TIMEOUT_MS`             | Limite do encerramento gracioso           |
+| `VITE_API_BASE_URL`               | Prefixo público consumido pela interface  |
+| `GOOGLE_CLIENT_ID`                | ID público do cliente OAuth Web           |
+| `GOOGLE_CLIENT_SECRET`            | Segredo OAuth, somente no servidor        |
+| `GOOGLE_REDIRECT_URI`             | Callback autorizado no Google             |
+| `GOOGLE_FORMS_TEST_FORM_ID`       | Formulário opcional para monitorar Forms  |
+| `TOKEN_ENCRYPTION_KEY`            | Chave hexadecimal de 32 bytes para tokens |
+| `SESSION_TTL_SECONDS`             | Duração máxima da sessão                  |
+| `INTEGRATION_MONITOR_INTERVAL_MS` | Intervalo do monitor Google               |
 
 Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
 
@@ -118,4 +138,12 @@ database/seeds        fixtures reproduzíveis e identificadas
 docs                   arquitetura, decisões, progresso e rastreabilidade
 ```
 
-O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). Nenhum RF001–RF014 está concluído apenas por esta fundação.
+## Infraestrutura Google Cloud
+
+- projeto: `educai-511017`;
+- bucket privado de artefatos de teste: `gs://educai-511017-test-artifacts`;
+- região: `southamerica-east1`.
+
+O bucket armazena fixtures, relatórios e artefatos; ele não executa Docker. Nenhum deploy foi realizado.
+
+O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

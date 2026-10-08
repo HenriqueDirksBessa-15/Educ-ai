@@ -55,14 +55,118 @@ button:disabled {
   opacity: 0.55;
 }
 
+.primary-action {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  padding: 0.85rem 1.2rem;
+  color: #ffffff;
+  background: #087f6b;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.primary-action:hover {
+  background: #066553;
+}
+
 .page-shell {
   width: min(68rem, calc(100% - 2rem));
   margin: 0 auto;
   padding: 5rem 0 2rem;
 }
 
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5rem;
+}
+
+.brand {
+  color: #087f6b;
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.secondary-action {
+  color: #087f6b;
+  border: 1px solid #b8d8d0;
+  background: transparent;
+}
+
+.secondary-action:hover:not(:disabled) {
+  color: #ffffff;
+}
+
+.center-card {
+  max-width: 48rem;
+  min-height: 24rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.center-card p,
+.login-copy p {
+  color: #4b6661;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.login-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.8fr);
+  align-items: center;
+  gap: 4rem;
+}
+
+.login-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.login-copy h1 {
+  max-width: 48rem;
+}
+
+.login-copy small {
+  margin-top: 1rem;
+  color: #6b827d;
+}
+
+.security-card {
+  padding: 2rem;
+  border: 1px solid #d7e7e2;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1.5rem 4rem rgba(21, 51, 47, 0.08);
+}
+
+.security-card ul {
+  padding-left: 1.25rem;
+  color: #4b6661;
+  line-height: 1.8;
+}
+
 .hero {
   max-width: 46rem;
+}
+
+.hero.compact h1 {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.identity-email {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #087f6b;
+  font-weight: 800;
 }
 
 .eyebrow,
@@ -114,6 +218,10 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   margin-top: 1.5rem;
+}
+
+.status-grid.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .status-card {
@@ -198,6 +306,19 @@ footer {
   }
 
   .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-header {
+    margin-bottom: 3rem;
+  }
+
+  .login-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .status-grid.three-columns {
     grid-template-columns: 1fr;
   }
 }
