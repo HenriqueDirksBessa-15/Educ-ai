@@ -1,51 +1,41 @@
 # Progresso
 
-Atualizado em 08/10/2026.
+Atualizado em 09/10/2026.
 
-## Entrega atual - Dia 2
+## Entrega atual - Dia 3
 
 Implementados:
 
-- OAuth Google exclusivo com `state`, PKCE S256, callback e tratamento de negação/falha;
-- cadastro ou atualização do professor pelo `sub`, nome, e-mail verificado e imagem Google;
-- sessões opacas no PostgreSQL e cookie HTTP-only;
-- tokens cifrados com AES-256-GCM, renovação pelo cliente oficial e revogação;
-- logout, desconexão Google e shell protegido;
-- fronteira que ignora `professorId` do cliente e resolve identidade apenas pela sessão;
-- monitor de OAuth, Classroom e Forms a cada cinco minutos, com tentativa inicial e três adicionais;
-- histórico de tentativa, código normalizado e último estado por serviço;
-- tela de login, falha recuperável, carregamento e shell autenticado;
-- migração de credencial, sessão e autorização descartável;
-- contratos de sessão e status de integrações;
-- projeto Google Cloud `educai-511017`;
-- bucket privado `gs://educai-511017-test-artifacts` em São Paulo para artefatos futuros.
-
-O bucket não executa Docker e ainda não é consumido pelo produto. Nenhum deploy foi realizado.
+- adaptador OpenAI tipado com fixture e bloqueio de chamadas externas até 12/10;
+- estados OpenAI `missing`, `deferred`, `available` e `unavailable` normalizados;
+- estado OpenAI incluído no ciclo técnico de monitoramento sem chamada externa;
+- migração curricular com fonte, versão, checksum, estado e histórico de alterações;
+- seed curricular idempotente e explicitamente simulada;
+- consulta curricular protegida por componente, ano/série e habilidade;
+- fallback `reviewRequired` quando a habilidade não é encontrada;
+- perfil protegido com nome e preferência editáveis;
+- e-mail Google ausente da entrada de atualização e bloqueado no backend;
+- listagem de turmas do professor, incluindo estado vazio;
+- contratos e testes isolados para OpenAI, currículo e perfil.
 
 ## Verificações
 
-| Verificação                 | Resultado                                                                                                             |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `npm run check`             | Aprovada em 08/10: formatação, lint, tipos, 23 testes unitários/componentes e builds de contratos/API/web             |
-| `npm audit --omit=dev`      | Aprovada após atualizar Fastify para 5.12.5; zero vulnerabilidades de produção                                        |
-| Migração no banco existente | Aprovada antes do reinício; `002_google_auth.sql` aplicada                                                            |
-| `npm run test:integration`  | Aprovada antes do reinício; 3 cenários em banco temporário, incluindo OAuth simulado, sessão e tokens cifrados        |
-| URL OAuth real              | Aprovada após configurar as URIs; Google abriu “Sign in with Google” para o app `educai`, sem `redirect_uri_mismatch` |
-| Callback real completo      | Não executado após o reinício porque o computador não executa Docker/PostgreSQL local                                 |
-| Classroom real              | Pendente do primeiro login/callback completo                                                                          |
-| Forms real                  | Pendente de `GOOGLE_FORMS_TEST_FORM_ID` e do primeiro login                                                           |
-| Bucket Google Cloud         | Aprovada; criado em `SOUTHAMERICA-EAST1`, acesso uniforme e prevenção de acesso público                               |
+| Verificação                      | Resultado                                                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `npm run check`                  | Aprovada: formatação, lint, tipos, 7 testes de contratos, 22 testes de API, 4 testes web e builds completos |
+| `npm audit --omit=dev`           | Aprovada anteriormente; dependências de produção sem vulnerabilidades reportadas                            |
+| Testes de repositório curricular | Aprovados; agrupamento, fonte e fallback de revisão                                                         |
+| Testes de perfil                 | Aprovados; lista vazia e atualização sem e-mail                                                             |
+| Testes do adaptador OpenAI       | Aprovados; ausência, adiamento, fixture e erro normalizado                                                  |
+| Migração/seed PostgreSQL         | Não repetidos; Docker/PostgreSQL não está disponível neste computador                                       |
 
-## Restrições e bloqueios atuais
+## Limitações e decisões pendentes
 
-- O computador informado pelo usuário não executa Docker. A suíte de integração foi aprovada antes do reinício, mas não foi repetida na estabilização final.
-- A validação ponta a ponta com conta Google depende de PostgreSQL disponível para persistir `state`, professor, tokens e sessão.
-- Nenhum ID de formulário de teste foi informado; Forms permanece corretamente como não configurado, sem simulação de sucesso.
-- O PDF indicado originalmente termina antes dos diagramas; a cópia completa de 96 páginas segue como referência técnica ainda não confirmada formalmente.
-- A carga BNCC oficial ainda não foi fornecida.
-
-RF001 e RF004 não são marcados como totalmente concluídos enquanto os fluxos reais dependentes acima não forem executados. A implementação e os testes isolados estão prontos.
+- Nenhuma chamada real OpenAI foi executada, conforme a restrição até 12/10.
+- A fonte oficial da BNCC ainda não foi fornecida; a carga versionada atual continua simulada.
+- A migração `003_curriculum_profile.sql` e a seed `002_curriculum_fixtures.sql` precisam ser executadas em um PostgreSQL acessível antes da validação de integração.
+- RF002 permanece implementado com integração externa adiada; RF003 depende da fonte oficial; RF005 depende da integração de banco.
 
 ## Próximo passo
 
-Dia 3: ementa/BNCC e perfil do professor, preservando a autenticação já implementada. Antes de integrar Forms, informar um formulário de teste. Para repetir testes PostgreSQL sem Docker local, decidir futuramente por runner de CI ou banco efêmero; não criar Cloud SQL pago sem autorização.
+Executar a migração/seed em PostgreSQL de CI ou outro ambiente autorizado, validar os endpoints de perfil e currículo e, após 12/10, habilitar a verificação real do adaptador OpenAI. Depois iniciar o Dia 4 conforme o plano.

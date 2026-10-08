@@ -4,6 +4,7 @@ import { GoogleGatewayError } from "./google-gateway.js";
 import { IntegrationMonitor } from "./monitor.js";
 import type { AuthRepository } from "./repository.js";
 import type { GoogleGateway } from "./types.js";
+import type { OpenAIAdapter } from "../openai/adapter.js";
 
 function repositoryMock() {
   return {
@@ -36,17 +37,30 @@ describe("integration monitor", () => {
       300_000,
       { error: vi.fn() },
       async () => undefined,
+      {
+        checkAvailability: vi.fn().mockResolvedValue({
+          status: "deferred",
+          errorCode: "OPENAI_EXTERNAL_CHECK_DEFERRED",
+        }),
+      } satisfies OpenAIAdapter,
     );
 
     await monitor.runCycle();
 
     expect(gateway.probe).toHaveBeenCalledTimes(12);
-    expect(repository.recordIntegrationStatus).toHaveBeenCalledTimes(12);
-    expect(repository.recordIntegrationStatus).toHaveBeenLastCalledWith(
+    expect(repository.recordIntegrationStatus).toHaveBeenCalledTimes(13);
+    expect(repository.recordIntegrationStatus).toHaveBeenCalledWith(
       expect.objectContaining({
         service: "google_forms",
         attemptNumber: 4,
         errorCode: "SERVICE_DOWN",
+      }),
+    );
+    expect(repository.recordIntegrationStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: "openai",
+        status: "inactive",
+        errorCode: "OPENAI_EXTERNAL_CHECK_DEFERRED",
       }),
     );
   });

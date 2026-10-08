@@ -1,8 +1,8 @@
 # EDUC.AI
 
-Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1 e 2 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, identidade Google, sessões e monitoramento técnico.
+Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1, 2 e 3 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, identidade Google, currículo e perfil.
 
-A autenticação é exclusivamente Google. OpenAI e funcionalidades pedagógicas permanecem fora desta etapa.
+A autenticação é exclusivamente Google. O adaptador OpenAI está preparado, mas chamadas externas permanecem bloqueadas até 12/10.
 
 ## Requisitos locais
 
@@ -124,6 +124,9 @@ npm run check
 | `TOKEN_ENCRYPTION_KEY`            | Chave hexadecimal de 32 bytes para tokens |
 | `SESSION_TTL_SECONDS`             | Duração máxima da sessão                  |
 | `INTEGRATION_MONITOR_INTERVAL_MS` | Intervalo do monitor Google               |
+| `OPENAI_API_KEY`                  | Chave OpenAI, não usada antes de 12/10    |
+| `OPENAI_BASE_URL`                 | Base URL do adaptador OpenAI              |
+| `OPENAI_MODEL`                    | Modelo configurado para uso futuro        |
 
 Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
 
@@ -145,5 +148,10 @@ docs                   arquitetura, decisões, progresso e rastreabilidade
 - região: `southamerica-east1`.
 
 O bucket armazena fixtures, relatórios e artefatos; ele não executa Docker. Nenhum deploy foi realizado.
+
+Endpoints do Dia 3:
+
+- `GET /api/profile` e `PATCH /api/profile` para perfil autenticado;
+- `GET /api/curriculum?component=...&schoolYear=...&skillCode=...` para consulta curricular protegida.
 
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

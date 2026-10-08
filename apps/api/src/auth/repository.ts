@@ -252,7 +252,7 @@ export class AuthRepository {
       `SELECT DISTINCT ON (service)
          service, status, checked_at, error_code, professor_id, attempt_number
        FROM integration_status
-       WHERE service IN ('google_oauth', 'google_classroom', 'google_forms')
+       WHERE service IN ('google_oauth', 'google_classroom', 'google_forms', 'openai')
        ORDER BY service, checked_at DESC, id DESC`,
     )) as QueryResult<{
       service: IntegrationStatusRecord["service"];

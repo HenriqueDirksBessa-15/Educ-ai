@@ -168,7 +168,7 @@ async function resolveIdentity(
   return token ? repository.resolveSession(token) : null;
 }
 
-async function requireIdentity(
+export async function requireIdentity(
   request: FastifyRequest,
   reply: FastifyReply,
   repository: AuthRepository,
@@ -202,7 +202,9 @@ function redirectAuthResult(
   return reply.code(302).header("location", url.toString()).send();
 }
 
-function sessionCookieName(nodeEnvironment: AppConfig["nodeEnv"]): string {
+export function sessionCookieName(
+  nodeEnvironment: AppConfig["nodeEnv"],
+): string {
   return nodeEnvironment === "production"
     ? "__Host-educai_session"
     : "educai_session";

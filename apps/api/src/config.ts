@@ -34,6 +34,9 @@ const configSchema = z
       .url()
       .default("http://localhost:3000/api/auth/google/callback"),
     GOOGLE_FORMS_TEST_FORM_ID: optionalString,
+    OPENAI_API_KEY: optionalString,
+    OPENAI_BASE_URL: z.url().default("https://api.openai.com/v1"),
+    OPENAI_MODEL: z.string().min(1).default("gpt-5-mini"),
     TOKEN_ENCRYPTION_KEY: z
       .string()
       .regex(/^[a-fA-F0-9]{64}$/, "deve conter 32 bytes em hexadecimal"),
@@ -78,6 +81,11 @@ export type AppConfig = {
     redirectUri: string;
     formsTestFormId?: string;
   };
+  openai: {
+    apiKey?: string;
+    baseUrl: string;
+    model: string;
+  };
   tokenEncryptionKey: string;
   sessionTtlSeconds: number;
   integrationMonitorIntervalMs: number;
@@ -121,6 +129,11 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
       clientSecret: result.data.GOOGLE_CLIENT_SECRET,
       redirectUri: result.data.GOOGLE_REDIRECT_URI,
       formsTestFormId: result.data.GOOGLE_FORMS_TEST_FORM_ID,
+    },
+    openai: {
+      apiKey: result.data.OPENAI_API_KEY,
+      baseUrl: result.data.OPENAI_BASE_URL,
+      model: result.data.OPENAI_MODEL,
     },
     tokenEncryptionKey: result.data.TOKEN_ENCRYPTION_KEY,
     sessionTtlSeconds: result.data.SESSION_TTL_SECONDS,

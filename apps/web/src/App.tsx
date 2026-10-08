@@ -160,8 +160,8 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 2 de 14</span>
-        <span>Google OAuth · Classroom · Forms</span>
+        <span>Dia 3 de 14</span>
+        <span>Perfil · currículo · BNCC</span>
       </footer>
     </main>
   );

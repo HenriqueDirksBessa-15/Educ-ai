@@ -53,6 +53,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([
       "001_foundation.sql",
       "002_google_auth.sql",
+      "003_curriculum_profile.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -93,10 +94,14 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       WHERE (p.email = 'professora.ana@example.invalid' AND s.email = 'aluna.ana@example.invalid')
          OR (p.email = 'professor.beto@example.invalid' AND s.email = 'aluno.beto@example.invalid')
     `);
+    const curriculumLoads = await testPool.query<{ count: string }>(
+      "SELECT count(*) FROM curriculum_load WHERE is_fixture = true",
+    );
 
     expect(Number(professors.rows[0]?.count)).toBe(2);
     expect(Number(classes.rows[0]?.count)).toBe(2);
     expect(Number(expectedOwnership.rows[0]?.count)).toBe(2);
+    expect(Number(curriculumLoads.rows[0]?.count)).toBe(1);
   }, 60_000);
 
   it("creates a Google professor and resolves identity only from the session", async () => {
@@ -114,6 +119,10 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         clientId: "test-client",
         clientSecret: "test-secret",
         redirectUri: "http://localhost:3000/api/auth/google/callback",
+      },
+      openai: {
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-5-mini",
       },
       tokenEncryptionKey: encryptionKey,
       sessionTtlSeconds: 28_800,

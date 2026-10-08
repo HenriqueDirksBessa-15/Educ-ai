@@ -56,4 +56,8 @@ describe("loadConfig", () => {
   it("accepts absent Google credentials while keeping login disabled", () => {
     expect(loadConfig(validEnvironment).google.clientId).toBeUndefined();
   });
+
+  it("accepts absent OpenAI credentials without enabling external calls", () => {
+    expect(loadConfig(validEnvironment).openai.apiKey).toBeUndefined();
+  });
 });

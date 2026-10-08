@@ -1,6 +1,6 @@
 # Arquitetura implementada
 
-Atualizado em 08/10/2026 para a entrega do Dia 2.
+Atualizado em 09/10/2026 para a entrega do Dia 3.
 
 ## Visão geral
 
@@ -28,6 +28,7 @@ Não há microsserviços. Jobs futuros usam a mesma base de código do backend e
 | Desenvolvimento | Docker Compose                        | banco reproduzível com volume persistente e healthcheck                 |
 | OAuth           | `google-auth-library` 10.5            | cliente oficial compatível com Node 20                                  |
 | Sessão          | token opaco + cookie HTTP-only        | revogação no servidor sem expor identidade ao cliente                   |
+| OpenAI          | adaptador tipado + fixture            | prepara estados sem chamada externa antes de 12/10                      |
 
 As versões são exatas no manifesto e no lockfile. Vite 6 foi escolhido deliberadamente porque o Vite mais recente exige um runtime superior ao Node 20.16 disponível no ambiente.
 
@@ -51,6 +52,8 @@ O mesmo limite de runtime afeta o ESLint: a série 10 requer Node 20.19 ou super
 O callback verifica o ID token, exige e-mail confirmado e usa o `sub` Google como vínculo externo. O professor é criado ou atualizado no servidor. A sessão guarda apenas um token aleatório no navegador; seu hash e validade ficam no PostgreSQL.
 
 O monitor consulta OAuth, Classroom e Forms em ciclos de cinco minutos. Cada falha recebe uma tentativa inicial e até três tentativas adicionais. Somente código normalizado chega ao contrato público; resposta bruta e tokens permanecem internos. Forms exige um formulário de teste configurado para não apresentar conectividade simulada como integração validada.
+
+O adaptador OpenAI distingue chave ausente, verificação adiada, disponibilidade de fixture e indisponibilidade normalizada. Esse estado entra no ciclo técnico de cinco minutos; antes de 12/10 ele não faz requisição externa.
 
 Logout revoga a sessão atual. A rota de desconexão revoga o token Google e todas as sessões locais do professor.
 
@@ -80,6 +83,8 @@ O primeiro esquema contém somente entidades necessárias à fundação:
 - `google_oauth_credential` 1:1 `professor`, com tokens cifrados;
 - `auth_session` N:1 `professor`, com token somente em hash;
 - `oauth_authorization_state` para `state`/PKCE descartável.
+- `curriculum_load` para fonte, versão, checksum e estado da carga;
+- `curriculum_change` para histórico de entidades alteradas.
 
 IDs internos são UUIDs. Identificadores Google são opcionais e únicos, preparados sem simular integração. E-mails usam `citext`; códigos locais de turma são únicos sem distinção de caixa.
 
@@ -88,6 +93,8 @@ IDs internos são UUIDs. Identificadores Google são opcionais e únicos, prepar
 ## Infraestrutura externa preparada
 
 O projeto Google Cloud é `educai-511017`. O bucket privado `gs://educai-511017-test-artifacts`, em `southamerica-east1`, usa acesso uniforme e prevenção de acesso público para artefatos de teste futuros. O bucket não executa containers e ainda não é consumido pela aplicação.
+
+Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alterar nome e preferência, mas nunca e-mail; consultas sem habilidade retornam fallback marcado para revisão.
 
 ## Relações previstas, ainda não implementadas
 

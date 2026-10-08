@@ -20,6 +20,15 @@
 | DT-09 | 08/10/2026 | Monitor a cada cinco minutos, com no máximo quatro tentativas | Histórico explícito de OAuth, Classroom e Forms               |
 | DT-10 | 08/10/2026 | Bucket privado em São Paulo somente para artefatos de teste   | Armazenamento futuro sem confundir bucket com execução Docker |
 
+## Decisões técnicas do Dia 3
+
+| ID    | Data       | Decisão                                                     | Impacto                                                         |
+| ----- | ---------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
+| DT-11 | 09/10/2026 | Não chamar OpenAI antes de 12/10; usar adaptador e fixture  | Nenhuma integração externa é apresentada como concluída         |
+| DT-12 | 09/10/2026 | Registrar fonte, versão e checksum em cada carga curricular | Histórico e repetição idempotente                               |
+| DT-13 | 09/10/2026 | Fallback curricular exige revisão explícita                 | Ausência de habilidade não inventa BNCC oficial                 |
+| DT-14 | 09/10/2026 | Perfil resolve professor pela sessão                        | E-mail Google permanece bloqueado e `professorId` não autentica |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                 |

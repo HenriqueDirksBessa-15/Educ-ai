@@ -14,6 +14,10 @@ const config: AppConfig = {
   google: {
     redirectUri: "http://localhost:3000/api/auth/google/callback",
   },
+  openai: {
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-5-mini",
+  },
   tokenEncryptionKey:
     "9f238e1d4c7a6b05d9e31074a2c8f61b3d0e7a95c4b1286f50d2a9e37c6148fb",
   sessionTtlSeconds: 28_800,

@@ -42,6 +42,7 @@ export const integrationServiceSchema = z.enum([
   "google_oauth",
   "google_classroom",
   "google_forms",
+  "openai",
 ]);
 
 export const integrationStatusSchema = z.object({
@@ -62,12 +63,60 @@ export const professorProfileSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const professorProfileUpdateSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(100).optional(),
+    notificationPreference: notificationPreferenceSchema.optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo editável.",
+  });
+
 export const curriculumReferenceSchema = z.object({
   id: z.uuid(),
   curricularComponent: z.string().min(1),
   schoolYear: z.string().min(1),
   sourceLabel: z.string().min(1),
   isFixture: z.boolean(),
+});
+
+export const curriculumSkillSchema = z.object({
+  id: z.uuid(),
+  code: z.string().min(1),
+  thematicUnit: z.string().nullable(),
+  knowledgeObject: z.string().min(1),
+  description: z.string().min(1),
+  sourceLabel: z.string().min(1),
+  isOfficial: z.boolean(),
+  isFixture: z.boolean(),
+});
+
+export const curriculumSyllabusSchema = z.object({
+  id: z.uuid(),
+  areaName: z.string().min(1),
+  curricularComponent: z.string().min(1),
+  schoolYear: z.string().min(1),
+  description: z.string().min(1),
+  sourceLabel: z.string().min(1),
+  isFixture: z.boolean(),
+  skills: z.array(curriculumSkillSchema),
+});
+
+export const curriculumSearchQuerySchema = z.object({
+  component: z.string().trim().min(1).optional(),
+  schoolYear: z.string().trim().min(1).optional(),
+  skillCode: z.string().trim().min(1).optional(),
+});
+
+export const curriculumSearchResponseSchema = z.object({
+  data: z.array(curriculumSyllabusSchema),
+  reviewRequired: z.boolean(),
+  reason: z.enum(["SKILL_NOT_FOUND", "NO_CURRICULUM_MATCH"]).nullable(),
+});
+
+export const openAiAvailabilitySchema = z.object({
+  status: z.enum(["missing", "deferred", "available", "unavailable"]),
+  errorCode: z.string().nullable(),
 });
 
 export const classSummarySchema = z.object({
@@ -113,7 +162,17 @@ export type AuthSession = z.infer<typeof authSessionSchema>;
 export type IntegrationService = z.infer<typeof integrationServiceSchema>;
 export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;
 export type ProfessorProfile = z.infer<typeof professorProfileSchema>;
+export type ProfessorProfileUpdate = z.infer<
+  typeof professorProfileUpdateSchema
+>;
 export type CurriculumReference = z.infer<typeof curriculumReferenceSchema>;
+export type CurriculumSkill = z.infer<typeof curriculumSkillSchema>;
+export type CurriculumSyllabus = z.infer<typeof curriculumSyllabusSchema>;
+export type CurriculumSearchQuery = z.infer<typeof curriculumSearchQuerySchema>;
+export type CurriculumSearchResponse = z.infer<
+  typeof curriculumSearchResponseSchema
+>;
+export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 export type StudentSummary = z.infer<typeof studentSummarySchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;

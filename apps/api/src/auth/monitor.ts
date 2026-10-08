@@ -3,6 +3,7 @@ import type { IntegrationService } from "@educai/contracts";
 import { GoogleGatewayError } from "./google-gateway.js";
 import type { AuthRepository } from "./repository.js";
 import type { GoogleGateway } from "./types.js";
+import type { OpenAIAdapter } from "../openai/adapter.js";
 
 const SERVICES: IntegrationService[] = [
   "google_oauth",
@@ -26,6 +27,7 @@ export class IntegrationMonitor {
     private readonly wait: (
       milliseconds: number,
     ) => Promise<void> = defaultWait,
+    private readonly openAIAdapter?: OpenAIAdapter,
   ) {}
 
   start(): void {
@@ -46,10 +48,47 @@ export class IntegrationMonitor {
       for (const service of SERVICES) {
         await this.checkService(service, stored);
       }
+      if (this.openAIAdapter) await this.checkOpenAI();
     } catch (error) {
       this.logger.error({ err: error }, "integration monitor cycle failed");
     } finally {
       this.running = false;
+    }
+  }
+
+  private async checkOpenAI(): Promise<void> {
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        const result = await this.openAIAdapter!.checkAvailability();
+        if (result.status === "available") {
+          await this.repository.recordIntegrationStatus({
+            service: "openai",
+            status: "active",
+            professorId: null,
+            attemptNumber: attempt,
+          });
+          return;
+        }
+        await this.repository.recordIntegrationStatus({
+          service: "openai",
+          status: "inactive",
+          professorId: null,
+          attemptNumber: attempt,
+          errorCode: result.errorCode ?? "OPENAI_UNAVAILABLE",
+          errorMessage: "Verificação OpenAI não disponível nesta etapa.",
+        });
+        if (result.status === "missing" || result.status === "deferred") return;
+      } catch (error) {
+        await this.repository.recordIntegrationStatus({
+          service: "openai",
+          status: "inactive",
+          professorId: null,
+          attemptNumber: attempt,
+          errorCode: "OPENAI_SERVICE_UNAVAILABLE",
+          errorMessage: "Serviço OpenAI temporariamente indisponível.",
+        });
+        this.logger.error({ err: error }, "openai monitor attempt failed");
+      }
     }
   }
 

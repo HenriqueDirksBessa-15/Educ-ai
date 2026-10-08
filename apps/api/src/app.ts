@@ -10,7 +10,12 @@ import { IntegrationMonitor } from "./auth/monitor.js";
 import { AuthRepository } from "./auth/repository.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import type { GoogleGateway } from "./auth/types.js";
+import { registerCurriculumRoutes } from "./curriculum/routes.js";
+import { CurriculumRepository } from "./curriculum/repository.js";
 import { isDatabaseAvailable, type DatabaseClient } from "./database.js";
+import { ConfiguredOpenAIAdapter } from "./openai/adapter.js";
+import { registerProfileRoutes } from "./profile/routes.js";
+import { ProfileRepository } from "./profile/repository.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -41,13 +46,27 @@ export async function createApp({
     config.sessionTtlSeconds,
   );
   const gateway = googleGateway ?? new ProductionGoogleGateway(config.google);
+  const profileRepository = new ProfileRepository(database);
+  const curriculumRepository = new CurriculumRepository(database);
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
     config.integrationMonitorIntervalMs,
     app.log,
+    undefined,
+    new ConfiguredOpenAIAdapter(config.openai),
   );
   registerAuthRoutes(app, { config, repository, gateway });
+  registerProfileRoutes(app, {
+    config,
+    authRepository: repository,
+    profileRepository,
+  });
+  registerCurriculumRoutes(app, {
+    config,
+    authRepository: repository,
+    curriculumRepository,
+  });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());
 

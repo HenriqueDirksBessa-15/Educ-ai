@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   apiErrorSchema,
   authSessionSchema,
+  curriculumSearchResponseSchema,
   identitySchema,
   integrationStatusSchema,
+  professorProfileUpdateSchema,
   readyResponseSchema,
 } from "./index.js";
 
@@ -68,5 +70,23 @@ describe("shared contracts", () => {
     });
     expect(parsed.status).toBe("inactive");
     expect(parsed).not.toHaveProperty("errorMessage");
+  });
+
+  it("does not accept Google-controlled email in profile updates", () => {
+    expect(() =>
+      professorProfileUpdateSchema.parse({ email: "new@example.invalid" }),
+    ).toThrow();
+    expect(
+      professorProfileUpdateSchema.parse({ displayName: "Novo nome" }),
+    ).toEqual({ displayName: "Novo nome" });
+  });
+
+  it("represents a curricular fallback without inventing an official skill", () => {
+    const response = curriculumSearchResponseSchema.parse({
+      data: [],
+      reviewRequired: true,
+      reason: "SKILL_NOT_FOUND",
+    });
+    expect(response.reviewRequired).toBe(true);
   });
 });
