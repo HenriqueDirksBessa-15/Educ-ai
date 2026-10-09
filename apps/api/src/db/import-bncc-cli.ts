@@ -194,10 +194,17 @@ async function importSnapshot(
   if (JSON.stringify(counts) !== JSON.stringify(EXPECTED_COUNTS)) {
     throw new Error(`Contagens BNCC inesperadas: ${JSON.stringify(counts)}`);
   }
+  const snapshotChecksum = hash(files);
   if (dryRun) {
     console.log(
       JSON.stringify(
-        { dataVersion: DATA_VERSION, schemaVersion: SCHEMA_VERSION, counts },
+        {
+          dataVersion: DATA_VERSION,
+          schemaVersion: SCHEMA_VERSION,
+          snapshotChecksum,
+          counts,
+          total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+        },
         null,
         2,
       ),
@@ -490,12 +497,18 @@ async function importSnapshot(
           );
       }
     }
+    const projection = await client.query<{ project_bncc_compatibility: object }>(
+      "SELECT project_bncc_compatibility($1) AS project_bncc_compatibility",
+      [snapshotChecksum],
+    );
     await client.query("COMMIT");
     console.log(
       JSON.stringify({
         dataVersion: DATA_VERSION,
         schemaVersion: SCHEMA_VERSION,
+        snapshotChecksum,
         counts: EXPECTED_COUNTS,
+        compatibility: projection.rows[0]?.project_bncc_compatibility ?? null,
       }),
     );
   } catch (error) {
