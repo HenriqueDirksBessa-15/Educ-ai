@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   apiErrorSchema,
+  activityInputSchema,
   authSessionSchema,
   curriculumSearchResponseSchema,
   classCreateSchema,
@@ -106,5 +107,80 @@ describe("shared contracts", () => {
       googleClassroomId: "google-controlled",
     });
     expect(parsed).not.toHaveProperty("googleClassroomId");
+  });
+
+  it("validates objective, discursive and mixed activities without AI", () => {
+    const base = {
+      lessonPlanId: "11111111-1111-4111-8111-111111111111",
+      title: "Avaliação de frações",
+      description: "Responda com atenção.",
+      dueAt: "2026-10-20T18:00:00.000Z",
+      latePolicy: { mode: "blocked" as const },
+    };
+    const objective = {
+      kind: "objective" as const,
+      prompt: "Qual fração representa metade?",
+      points: 2,
+      alternatives: ["1/2", "1/3"],
+      correctAlternativeIndex: 0,
+    };
+    const discursive = {
+      kind: "discursive" as const,
+      prompt: "Explique como comparar duas frações.",
+      points: 3,
+      targetAnswer: "Usar denominadores equivalentes.",
+      criteria: "Estratégia correta e justificativa clara.",
+    };
+
+    expect(
+      activityInputSchema.parse({
+        ...base,
+        type: "objective",
+        questions: [objective],
+      }).type,
+    ).toBe("objective");
+    expect(
+      activityInputSchema.parse({
+        ...base,
+        type: "discursive",
+        questions: [discursive],
+      }).questions[0]?.kind,
+    ).toBe("discursive");
+    expect(
+      activityInputSchema.parse({
+        ...base,
+        type: "mixed",
+        latePolicy: {
+          mode: "allowed_with_penalty",
+          penaltyPercent: 10,
+        },
+        questions: [objective, discursive],
+      }).questions,
+    ).toHaveLength(2);
+  });
+
+  it("rejects a mismatched activity type and an invalid answer key", () => {
+    const base = {
+      lessonPlanId: "11111111-1111-4111-8111-111111111111",
+      title: "Avaliação",
+      description: "Descrição",
+      dueAt: "2026-10-20T18:00:00.000Z",
+      latePolicy: { mode: "blocked" as const },
+      questions: [
+        {
+          kind: "objective" as const,
+          prompt: "Questão",
+          points: 1,
+          alternatives: ["A", "B"],
+          correctAlternativeIndex: 3,
+        },
+      ],
+    };
+    expect(() =>
+      activityInputSchema.parse({ ...base, type: "discursive" }),
+    ).toThrow();
+    expect(() =>
+      activityInputSchema.parse({ ...base, type: "objective" }),
+    ).toThrow();
   });
 });

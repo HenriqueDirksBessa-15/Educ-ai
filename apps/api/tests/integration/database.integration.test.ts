@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../src/app.js";
+import { ActivitiesRepository } from "../../src/activities/repository.js";
 import { TokenCipher } from "../../src/auth/crypto.js";
 import { AuthRepository } from "../../src/auth/repository.js";
 import type { GoogleGateway } from "../../src/auth/types.js";
@@ -65,6 +66,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "012_bncc_compatibility_document_key.sql",
       "013_bncc_skill_text_width.sql",
       "014_classroom_tenant_isolation.sql",
+      "015_activities.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -84,6 +86,10 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "material",
         "lesson_plan",
         "lesson_plan_generation",
+        "activity",
+        "activity_question",
+        "activity_alternative",
+        "activity_response",
       ]),
     );
   }, 60_000);
@@ -117,6 +123,87 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(Number(classes.rows[0]?.count)).toBe(2);
     expect(Number(expectedOwnership.rows[0]?.count)).toBe(2);
     expect(Number(curriculumLoads.rows[0]?.count)).toBe(1);
+  }, 60_000);
+
+  it("persists a mixed activity and locks its structure after publication", async () => {
+    const owner = await testPool.query<{
+      professor_id: string;
+      class_id: string;
+    }>(
+      `SELECT professor.id AS professor_id, class_group.id AS class_id
+       FROM professor
+       JOIN class_group ON class_group.professor_id = professor.id
+       WHERE professor.email = 'professora.ana@example.invalid'
+       LIMIT 1`,
+    );
+    const { professor_id: professorId, class_id: classId } = owner.rows[0]!;
+    const plan = await testPool.query<{ id: string }>(
+      `INSERT INTO lesson_plan
+       (professor_id, title, curricular_component, school_year, objectives,
+        contents, methodology, evaluation_strategy)
+       VALUES ($1, 'Plano para atividade', 'Matemática', '5º ano',
+        'Compreender frações', 'Frações', 'Resolução de problemas',
+        'Avaliação formativa') RETURNING id`,
+      [professorId],
+    );
+    await testPool.query(
+      `INSERT INTO lesson_plan_class (lesson_plan_id, class_group_id)
+       VALUES ($1, $2)`,
+      [plan.rows[0]!.id, classId],
+    );
+    const repository = new ActivitiesRepository(testPool);
+    const activityId = await repository.create(professorId, {
+      lessonPlanId: plan.rows[0]!.id,
+      title: "Atividade mista de frações",
+      description: "Resolva e justifique.",
+      type: "mixed",
+      dueAt: "2026-10-20T18:00:00.000Z",
+      latePolicy: { mode: "allowed_with_penalty", penaltyPercent: 10 },
+      questions: [
+        {
+          kind: "objective",
+          prompt: "Qual opção representa metade?",
+          points: 2,
+          alternatives: ["1/2", "1/3"],
+          correctAlternativeIndex: 0,
+        },
+        {
+          kind: "discursive",
+          prompt: "Explique a comparação.",
+          points: 3,
+          targetAnswer: "Denominadores equivalentes.",
+          criteria: "Estratégia e justificativa.",
+        },
+      ],
+    });
+
+    const draft = await repository.get(professorId, activityId);
+    expect(draft).toMatchObject({
+      status: "draft",
+      type: "mixed",
+      totalPoints: 5,
+      questions: [{ kind: "objective" }, { kind: "discursive" }],
+    });
+    expect(await repository.publish(professorId, activityId)).toBe("published");
+    expect(
+      await repository.update(professorId, activityId, { title: "Alterada" }),
+    ).toBe("locked");
+    await expect(
+      testPool.query("UPDATE activity SET title = 'Forçada' WHERE id = $1", [
+        activityId,
+      ]),
+    ).rejects.toThrow("published activity structure is immutable");
+
+    await testPool.query(
+      `INSERT INTO activity_response
+       (activity_id, external_student_id, submitted_at)
+       VALUES ($1, 'student-fixture', now())`,
+      [activityId],
+    );
+    expect(await repository.archive(professorId, activityId)).toBe(true);
+    const archived = await repository.get(professorId, activityId);
+    expect(archived?.responseCount).toBe(1);
+    expect(archived?.archivedAt).not.toBeNull();
   }, 60_000);
 
   it("creates a Google professor and resolves identity only from the session", async () => {

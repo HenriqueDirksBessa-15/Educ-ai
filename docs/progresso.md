@@ -2,6 +2,35 @@
 
 Atualizado em 09/10/2026.
 
+## Entrega atual - Dia 8
+
+Implementado nesta etapa:
+
+- contratos tipados para atividades objetivas, discursivas e mistas, com
+  validação de gabarito, pontuação, resposta-alvo e critérios;
+- migração PostgreSQL para atividades, questões, alternativas e reserva de
+  respostas, com proteção estrutural no banco após a publicação;
+- endpoints autenticados para listar e filtrar, criar, visualizar, editar,
+  publicar, finalizar e arquivar atividades;
+- plano de aula obrigatório e isolado pelo professor da sessão;
+- política local de atraso por atividade: bloqueio após o prazo ou aceite com
+  penalidade percentual configurável;
+- interface responsiva para edição manual, pré-visualização, filtros e mudanças
+  de estado, sem dependência de IA;
+- arquivamento lógico que preserva respostas já registradas.
+
+Verificações da etapa:
+
+- `npm run test:unit`: 45 testes aprovados;
+- `npm run test:integration`: 4 testes PostgreSQL aprovados e smoke OpenAI
+  ignorado por ausência de chave explícita;
+- a integração criou e removeu um banco temporário, aplicou as migrações
+  `001`–`015` e comprovou atividade mista, bloqueio após publicação e
+  preservação de resposta no arquivamento;
+- Docker local permaneceu indisponível; a validação PostgreSQL usou a conexão
+  de teste já configurada;
+- lint, tipagem, formatação e build foram executados no gate final da etapa.
+
 ## Correções pós-auditoria - Etapa 1
 
 Implementado nesta etapa:

@@ -318,6 +318,133 @@ h1 {
   resize: vertical;
 }
 
+.activity-filters,
+.inline-actions,
+.questions-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.activity-filters {
+  margin-top: 1.25rem;
+}
+
+.filter-active {
+  background: #087f6b;
+  color: #ffffff;
+}
+
+.activities-layout {
+  display: grid;
+  grid-template-columns: minmax(17rem, 0.75fr) minmax(0, 1.25fr);
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.activity-form {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border-radius: 0.9rem;
+  background: #f4faf8;
+}
+
+.activity-form h3,
+.questions-heading h3 {
+  margin: 0;
+}
+
+.activity-form label,
+.question-editor label {
+  display: grid;
+  gap: 0.35rem;
+  color: #4b6661;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.activity-form input,
+.activity-form select,
+.activity-form textarea,
+.question-editor input,
+.question-editor textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #b8d8d0;
+  border-radius: 0.65rem;
+  padding: 0.65rem;
+  color: #15332f;
+  font: inherit;
+  background: #ffffff;
+}
+
+.activity-form textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.questions-heading {
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.question-editor {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  border: 1px solid #cde1dc;
+  border-radius: 0.8rem;
+  padding: 0.9rem;
+}
+
+.question-editor legend {
+  padding: 0 0.35rem;
+  color: #15332f;
+  font-weight: 800;
+}
+
+.alternatives-editor {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.alternatives-editor label {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.alternatives-editor input[type="radio"] {
+  width: auto;
+}
+
+.activity-preview {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px dashed #8cbeb3;
+  border-radius: 0.9rem;
+  background: #fbfefd;
+}
+
+.activity-preview h3,
+.activity-preview p {
+  margin-bottom: 0.5rem;
+}
+
+.activity-preview > ol {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 0;
+}
+
 .timeline-grid h3 {
   margin: 0;
   font-size: 1.1rem;
@@ -481,6 +608,11 @@ footer {
   }
 
   .plan-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .activities-layout,
+  .form-row {
     grid-template-columns: 1fr;
   }
 }

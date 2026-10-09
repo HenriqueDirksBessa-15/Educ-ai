@@ -11,6 +11,7 @@ import type {
 } from "@educai/contracts";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { ActivitiesPanel } from "./ActivitiesPanel";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -167,8 +168,8 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 7 de 14</span>
-        <span>Perfil · currículo · BNCC</span>
+        <span>Dia 8 de 14</span>
+        <span>Planos · atividades · questões</span>
       </footer>
     </main>
   );
@@ -256,6 +257,7 @@ function ProfessorShell({
         classes={classes}
       />
       <LessonPlansPanel plans={plans} classes={classes} />
+      <ActivitiesPanel plans={plans} />
     </>
   );
 }

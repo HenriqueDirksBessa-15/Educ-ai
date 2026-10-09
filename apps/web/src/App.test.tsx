@@ -67,6 +67,9 @@ describe("Google authentication screen", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Google Classroom")).toBeInTheDocument();
     expect(screen.getAllByText("Aguardando verificação")).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { name: "Atividades e questões locais" }),
+    ).toBeInTheDocument();
   });
 
   it("logs out without sending a professor identifier", async () => {

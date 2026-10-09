@@ -27,6 +27,8 @@ import { registerTimelineRoutes } from "./timeline/routes.js";
 import { TimelineRepository } from "./timeline/repository.js";
 import { registerPlansRoutes } from "./plans/routes.js";
 import { PlansRepository } from "./plans/repository.js";
+import { registerActivitiesRoutes } from "./activities/routes.js";
+import { ActivitiesRepository } from "./activities/repository.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -64,6 +66,7 @@ export async function createApp({
   const classesRepository = new ClassesRepository(database);
   const timelineRepository = new TimelineRepository(database);
   const plansRepository = new PlansRepository(database);
+  const activitiesRepository = new ActivitiesRepository(database);
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -104,6 +107,11 @@ export async function createApp({
       (config.openai.apiKey
         ? new ConfiguredOpenAIAdapter(config.openai)
         : new FixtureOpenAIAdapter()),
+  });
+  registerActivitiesRoutes(app, {
+    config,
+    authRepository: repository,
+    activitiesRepository,
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());

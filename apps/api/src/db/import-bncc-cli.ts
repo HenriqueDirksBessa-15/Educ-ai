@@ -497,10 +497,11 @@ async function importSnapshot(
           );
       }
     }
-    const projection = await client.query<{ project_bncc_compatibility: object }>(
-      "SELECT project_bncc_compatibility($1) AS project_bncc_compatibility",
-      [snapshotChecksum],
-    );
+    const projection = await client.query<{
+      project_bncc_compatibility: object;
+    }>("SELECT project_bncc_compatibility($1) AS project_bncc_compatibility", [
+      snapshotChecksum,
+    ]);
     await client.query("COMMIT");
     console.log(
       JSON.stringify({

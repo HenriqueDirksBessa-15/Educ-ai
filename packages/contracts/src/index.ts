@@ -313,6 +313,111 @@ export const lessonPlanListQuerySchema = z.object({
   archived: z.coerce.boolean().optional(),
 });
 
+export const activityStatusSchema = z.enum(["draft", "published", "finished"]);
+
+export const activityTypeSchema = z.enum(["objective", "discursive", "mixed"]);
+
+export const latePolicySchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("blocked") }),
+  z.object({
+    mode: z.literal("allowed_with_penalty"),
+    penaltyPercent: z.number().int().min(0).max(100),
+  }),
+]);
+
+const objectiveQuestionInputSchema = z.object({
+  kind: z.literal("objective"),
+  prompt: z.string().trim().min(1).max(4_000),
+  points: z.number().positive().max(1_000),
+  alternatives: z.array(z.string().trim().min(1).max(1_000)).min(2).max(10),
+  correctAlternativeIndex: z.number().int().nonnegative(),
+});
+
+const discursiveQuestionInputSchema = z.object({
+  kind: z.literal("discursive"),
+  prompt: z.string().trim().min(1).max(4_000),
+  points: z.number().positive().max(1_000),
+  targetAnswer: z.string().trim().min(1).max(8_000),
+  criteria: z.string().trim().min(1).max(8_000),
+});
+
+export const activityQuestionInputSchema = z
+  .discriminatedUnion("kind", [
+    objectiveQuestionInputSchema,
+    discursiveQuestionInputSchema,
+  ])
+  .refine(
+    (question) =>
+      question.kind !== "objective" ||
+      question.correctAlternativeIndex < question.alternatives.length,
+    { message: "O gabarito deve apontar para uma alternativa existente." },
+  );
+
+const activityInputBaseSchema = z.object({
+  lessonPlanId: z.uuid(),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(6_000),
+  type: activityTypeSchema,
+  dueAt: z.iso.datetime(),
+  latePolicy: latePolicySchema,
+  questions: z.array(activityQuestionInputSchema).min(1).max(100),
+});
+
+export const activityInputSchema = activityInputBaseSchema.superRefine(
+  (activity, context) => {
+    const kinds = new Set(activity.questions.map((question) => question.kind));
+    const matchesType =
+      (activity.type === "objective" &&
+        kinds.size === 1 &&
+        kinds.has("objective")) ||
+      (activity.type === "discursive" &&
+        kinds.size === 1 &&
+        kinds.has("discursive")) ||
+      (activity.type === "mixed" &&
+        kinds.has("objective") &&
+        kinds.has("discursive"));
+    if (!matchesType)
+      context.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "O tipo deve corresponder às questões cadastradas.",
+      });
+  },
+);
+
+export const activityUpdateSchema = activityInputBaseSchema
+  .omit({ lessonPlanId: true })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo editável.",
+  });
+
+export const activityQuestionSchema = activityQuestionInputSchema.and(
+  z.object({ id: z.uuid(), position: z.number().int().nonnegative() }),
+);
+
+export const activitySchema = activityInputBaseSchema
+  .omit({ questions: true })
+  .extend({
+    id: z.uuid(),
+    professorId: z.uuid(),
+    lessonPlanTitle: z.string().min(1),
+    status: activityStatusSchema,
+    questions: z.array(activityQuestionSchema),
+    totalPoints: z.number().nonnegative(),
+    responseCount: z.number().int().nonnegative(),
+    publishedAt: z.iso.datetime().nullable(),
+    finishedAt: z.iso.datetime().nullable(),
+    archivedAt: z.iso.datetime().nullable(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  });
+
+export const activityListQuerySchema = z.object({
+  status: activityStatusSchema.optional(),
+  archived: z.coerce.boolean().optional(),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -368,6 +473,14 @@ export type LessonPlanStatus = z.infer<typeof lessonPlanStatusSchema>;
 export type LessonPlanSuggestion = z.infer<typeof lessonPlanSuggestionSchema>;
 export type LessonPlanGeneration = z.infer<typeof lessonPlanGenerationSchema>;
 export type LessonPlanReview = z.infer<typeof lessonPlanReviewSchema>;
+export type ActivityStatus = z.infer<typeof activityStatusSchema>;
+export type ActivityType = z.infer<typeof activityTypeSchema>;
+export type LatePolicy = z.infer<typeof latePolicySchema>;
+export type ActivityQuestionInput = z.infer<typeof activityQuestionInputSchema>;
+export type ActivityInput = z.infer<typeof activityInputSchema>;
+export type ActivityUpdate = z.infer<typeof activityUpdateSchema>;
+export type ActivityQuestion = z.infer<typeof activityQuestionSchema>;
+export type Activity = z.infer<typeof activitySchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 
