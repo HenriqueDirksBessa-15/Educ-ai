@@ -2,6 +2,16 @@
 
 Atualizado em 09/10/2026.
 
+## Dia 9 - Etapa 1: contratos e persistência
+
+Implementado nesta etapa:
+
+- cenários de geração, revisão, publicação idempotente e recuperação externa;
+- dificuldade e suporte a rascunho sem questões para geração assistida;
+- contratos de geração, revisão, publicação, distribuição e agendamento;
+- persistência versionada para IA, Google Forms, Classroom e coleta futura;
+- restrições únicas para um Form por atividade e um trabalho por turma.
+
 ## Entrega atual - Dia 8
 
 Implementado nesta etapa:

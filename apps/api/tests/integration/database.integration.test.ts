@@ -67,6 +67,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "013_bncc_skill_text_width.sql",
       "014_classroom_tenant_isolation.sql",
       "015_activities.sql",
+      "016_activity_ai_publication.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -90,6 +91,10 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "activity_question",
         "activity_alternative",
         "activity_response",
+        "activity_generation",
+        "activity_publication",
+        "activity_classroom_distribution",
+        "activity_collection_job",
       ]),
     );
   }, 60_000);
@@ -157,6 +162,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       title: "Atividade mista de frações",
       description: "Resolva e justifique.",
       type: "mixed",
+      difficulty: "medium",
       dueAt: "2026-10-20T18:00:00.000Z",
       latePolicy: { mode: "allowed_with_penalty", penaltyPercent: 10 },
       questions: [

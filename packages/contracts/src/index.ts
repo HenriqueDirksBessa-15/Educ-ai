@@ -317,6 +317,8 @@ export const activityStatusSchema = z.enum(["draft", "published", "finished"]);
 
 export const activityTypeSchema = z.enum(["objective", "discursive", "mixed"]);
 
+export const activityDifficultySchema = z.enum(["easy", "medium", "hard"]);
+
 export const latePolicySchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("blocked") }),
   z.object({
@@ -358,13 +360,15 @@ const activityInputBaseSchema = z.object({
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().min(1).max(6_000),
   type: activityTypeSchema,
+  difficulty: activityDifficultySchema,
   dueAt: z.iso.datetime(),
   latePolicy: latePolicySchema,
-  questions: z.array(activityQuestionInputSchema).min(1).max(100),
+  questions: z.array(activityQuestionInputSchema).max(100),
 });
 
 export const activityInputSchema = activityInputBaseSchema.superRefine(
   (activity, context) => {
+    if (activity.questions.length === 0) return;
     const kinds = new Set(activity.questions.map((question) => question.kind));
     const matchesType =
       (activity.type === "objective" &&
@@ -416,6 +420,103 @@ export const activitySchema = activityInputBaseSchema
 export const activityListQuerySchema = z.object({
   status: activityStatusSchema.optional(),
   archived: z.coerce.boolean().optional(),
+});
+
+export const activityGenerationRequestSchema = z.object({
+  questionCount: z.number().int().min(1).max(100),
+});
+
+export const activitySuggestionSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160),
+    description: z.string().trim().min(1).max(6_000),
+    type: activityTypeSchema,
+    difficulty: activityDifficultySchema,
+    questions: z.array(activityQuestionInputSchema).min(1).max(100),
+  })
+  .superRefine((activity, context) => {
+    const kinds = new Set(activity.questions.map((question) => question.kind));
+    const matchesType =
+      (activity.type === "objective" &&
+        kinds.size === 1 &&
+        kinds.has("objective")) ||
+      (activity.type === "discursive" &&
+        kinds.size === 1 &&
+        kinds.has("discursive")) ||
+      (activity.type === "mixed" &&
+        kinds.has("objective") &&
+        kinds.has("discursive"));
+    if (!matchesType)
+      context.addIssue({
+        code: "custom",
+        path: ["type"],
+        message: "O tipo deve corresponder às questões sugeridas.",
+      });
+  });
+
+export const activityGenerationStatusSchema = z.enum(["succeeded", "failed"]);
+export const activityReviewStatusSchema = z.enum([
+  "generated",
+  "reviewed",
+  "approved",
+]);
+
+export const activityGenerationSchema = z.object({
+  id: z.uuid(),
+  activityId: z.uuid(),
+  version: z.number().int().positive(),
+  model: z.string().min(1),
+  origin: z.enum(["fixture", "openai"]),
+  status: activityGenerationStatusSchema,
+  reviewStatus: activityReviewStatusSchema.nullable(),
+  suggestion: activitySuggestionSchema.nullable(),
+  errorCode: z.string().nullable(),
+  reviewedAt: z.iso.datetime().nullable(),
+  approvedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const activityReviewSchema = z.object({
+  generationId: z.uuid(),
+  suggestion: activitySuggestionSchema,
+});
+
+export const activityPublicationStatusSchema = z.enum([
+  "pending",
+  "creating_form",
+  "distributing",
+  "published",
+  "failed",
+  "reconciliation_required",
+]);
+
+export const activityDistributionStatusSchema = z.enum([
+  "pending",
+  "published",
+  "failed",
+]);
+
+export const activityDistributionSchema = z.object({
+  classId: z.uuid(),
+  className: z.string().min(1),
+  googleClassroomId: z.string().nullable(),
+  googleCourseWorkId: z.string().nullable(),
+  alternateLink: z.url().nullable(),
+  status: activityDistributionStatusSchema,
+  errorCode: z.string().nullable(),
+  attemptCount: z.number().int().nonnegative(),
+});
+
+export const activityPublicationSchema = z.object({
+  activityId: z.uuid(),
+  status: activityPublicationStatusSchema,
+  googleFormId: z.string().nullable(),
+  responderUri: z.url().nullable(),
+  errorCode: z.string().nullable(),
+  attemptCount: z.number().int().nonnegative(),
+  collectionScheduledAt: z.iso.datetime().nullable(),
+  lastSyncedAt: z.iso.datetime().nullable(),
+  distributions: z.array(activityDistributionSchema),
 });
 
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
@@ -475,12 +576,20 @@ export type LessonPlanGeneration = z.infer<typeof lessonPlanGenerationSchema>;
 export type LessonPlanReview = z.infer<typeof lessonPlanReviewSchema>;
 export type ActivityStatus = z.infer<typeof activityStatusSchema>;
 export type ActivityType = z.infer<typeof activityTypeSchema>;
+export type ActivityDifficulty = z.infer<typeof activityDifficultySchema>;
 export type LatePolicy = z.infer<typeof latePolicySchema>;
 export type ActivityQuestionInput = z.infer<typeof activityQuestionInputSchema>;
 export type ActivityInput = z.infer<typeof activityInputSchema>;
 export type ActivityUpdate = z.infer<typeof activityUpdateSchema>;
 export type ActivityQuestion = z.infer<typeof activityQuestionSchema>;
 export type Activity = z.infer<typeof activitySchema>;
+export type ActivitySuggestion = z.infer<typeof activitySuggestionSchema>;
+export type ActivityGenerationRequest = z.infer<
+  typeof activityGenerationRequestSchema
+>;
+export type ActivityGeneration = z.infer<typeof activityGenerationSchema>;
+export type ActivityReview = z.infer<typeof activityReviewSchema>;
+export type ActivityPublication = z.infer<typeof activityPublicationSchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 

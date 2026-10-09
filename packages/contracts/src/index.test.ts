@@ -114,6 +114,7 @@ describe("shared contracts", () => {
       lessonPlanId: "11111111-1111-4111-8111-111111111111",
       title: "Avaliação de frações",
       description: "Responda com atenção.",
+      difficulty: "medium" as const,
       dueAt: "2026-10-20T18:00:00.000Z",
       latePolicy: { mode: "blocked" as const },
     };
@@ -164,6 +165,7 @@ describe("shared contracts", () => {
       lessonPlanId: "11111111-1111-4111-8111-111111111111",
       title: "Avaliação",
       description: "Descrição",
+      difficulty: "hard" as const,
       dueAt: "2026-10-20T18:00:00.000Z",
       latePolicy: { mode: "blocked" as const },
       questions: [

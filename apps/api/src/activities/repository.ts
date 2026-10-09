@@ -17,6 +17,7 @@ type ActivityRow = {
   title: string;
   description: string;
   type: Activity["type"];
+  difficulty: Activity["difficulty"];
   due_at: Date;
   late_mode: Activity["latePolicy"]["mode"];
   late_penalty_percent: number | null;
@@ -67,6 +68,7 @@ export class ActivitiesRepository {
         input.title,
         input.description,
         input.type,
+        input.difficulty,
         input.dueAt,
         input.latePolicy.mode,
         input.latePolicy.mode === "allowed_with_penalty"
@@ -91,6 +93,7 @@ export class ActivitiesRepository {
       title: input.title ?? current.title,
       description: input.description ?? current.description,
       type: input.type ?? current.type,
+      difficulty: input.difficulty ?? current.difficulty,
       dueAt: input.dueAt ?? current.dueAt,
       latePolicy: input.latePolicy ?? current.latePolicy,
       questions:
@@ -121,6 +124,7 @@ export class ActivitiesRepository {
       merged.title,
       merged.description,
       merged.type,
+      merged.difficulty,
       merged.dueAt,
       merged.latePolicy.mode,
       merged.latePolicy.mode === "allowed_with_penalty"
@@ -220,13 +224,13 @@ export class ActivitiesRepository {
   private aggregateMutationSql(update: boolean): string {
     const activityMutation = update
       ? `UPDATE activity SET title = $3, description = $4, type = $5,
-           due_at = $6, late_mode = $7, late_penalty_percent = $8
+           difficulty = $6, due_at = $7, late_mode = $8, late_penalty_percent = $9
          WHERE id = $1 AND professor_id = $2 AND status = 'draft'
            AND archived_at IS NULL RETURNING id`
       : `INSERT INTO activity
-           (professor_id, lesson_plan_id, title, description, type, due_at,
-            late_mode, late_penalty_percent)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           (professor_id, lesson_plan_id, title, description, type, difficulty,
+            due_at, late_mode, late_penalty_percent)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id`;
     return `WITH mutated AS (${activityMutation}),
       removed AS (
@@ -235,7 +239,7 @@ export class ActivitiesRepository {
       ),
       question_input AS (
         SELECT value AS question, ordinality - 1 AS position
-        FROM jsonb_array_elements($9::jsonb) WITH ORDINALITY
+        FROM jsonb_array_elements($10::jsonb) WITH ORDINALITY
       ),
       inserted_questions AS (
         INSERT INTO activity_question
@@ -266,7 +270,7 @@ export class ActivitiesRepository {
   private activityQuery(byId = false): string {
     return `SELECT activity.id, activity.professor_id, activity.lesson_plan_id,
       lesson_plan.title AS lesson_plan_title, activity.title,
-      activity.description, activity.type, activity.due_at,
+      activity.description, activity.type, activity.difficulty, activity.due_at,
       activity.late_mode, activity.late_penalty_percent, activity.status,
       activity.published_at, activity.finished_at, activity.archived_at,
       activity.created_at, activity.updated_at,
@@ -316,6 +320,7 @@ export class ActivitiesRepository {
       title: row.title,
       description: row.description,
       type: row.type,
+      difficulty: row.difficulty,
       dueAt: row.due_at.toISOString(),
       latePolicy:
         row.late_mode === "blocked"

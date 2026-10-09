@@ -37,6 +37,8 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
   const [description, setDescription] = useState("");
   const [lessonPlanId, setLessonPlanId] = useState("");
   const [type, setType] = useState<ActivityType>("objective");
+  const [difficulty, setDifficulty] =
+    useState<Activity["difficulty"]>("medium");
   const [dueAt, setDueAt] = useState("");
   const [lateMode, setLateMode] = useState<"blocked" | "allowed_with_penalty">(
     "blocked",
@@ -75,6 +77,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setDescription("");
     setLessonPlanId(plans[0]?.id ?? "");
     setType("objective");
+    setDifficulty("medium");
     setDueAt("");
     setLateMode("blocked");
     setPenaltyPercent(0);
@@ -88,6 +91,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setDescription(activity.description);
     setLessonPlanId(activity.lessonPlanId);
     setType(activity.type);
+    setDifficulty(activity.difficulty);
     setDueAt(toLocalDateTime(activity.dueAt));
     setLateMode(activity.latePolicy.mode);
     setPenaltyPercent(
@@ -126,6 +130,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
       title,
       description,
       type,
+      difficulty,
       dueAt: new Date(dueAt).toISOString(),
       latePolicy:
         lateMode === "blocked"
@@ -148,6 +153,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                   title: input.title,
                   description: input.description,
                   type: input.type,
+                  difficulty: input.difficulty,
                   dueAt: input.dueAt,
                   latePolicy: input.latePolicy,
                   questions: input.questions,
