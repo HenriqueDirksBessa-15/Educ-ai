@@ -106,10 +106,16 @@ Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alt
 
 ## Relações implementadas e próximas
 
-Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades vinculam plano, dificuldade, questões e prazo, preservam gerações/revisões e mantêm uma máquina de publicação por Form e por turma Classroom. A conclusão agenda a coleta no prazo; submissões e correções serão preenchidas no Dia 10 em diante. Feedback e boletins preservarão histórico nas etapas seguintes.
+Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades vinculam plano, dificuldade, questões e prazo, preservam gerações/revisões e mantêm uma máquina de publicação por Form e por turma Classroom. A conclusão agenda a coleta no prazo; submissões reconciliam o aluno dentro das turmas distribuídas e preservam o detalhamento objetivo por questão. Correções discursivas, feedback e boletins preservarão histórico nas etapas seguintes.
 
 ## Publicação externa de atividades
 
 A publicação não mantém transação aberta durante chamadas Google. Cada passo é persistido antes e depois da operação externa. Um marcador derivado do UUID local permite reconciliar Forms pelo Drive e trabalhos pela descrição do Classroom. Repetições ignoram IDs já confirmados; respostas ambíguas entram em `reconciliation_required` e nunca disparam recriação cega.
 
 Uma atividade só muda de `draft` para `published` depois de existir um Form publicado e todas as turmas obrigatórias possuírem trabalho Classroom confirmado. Na mesma conclusão lógica, o plano é bloqueado e um `activity_collection_job` idempotente é criado para o prazo.
+
+## Coleta e correção objetiva
+
+O worker consulta somente trabalhos vencidos e usa uma aquisição persistida para impedir duas execuções simultâneas. A API do Forms é paginada e o `responseId` externo forma, com a atividade, a chave de idempotência. Cada nova coleta substitui atomicamente o detalhamento daquela submissão e registra uma execução com contagens e resultado.
+
+O aluno é reconciliado por e-mail apenas entre matrículas ativas das turmas presentes em `activity_classroom_distribution`. O corretor objetivo é uma função pura: compara o texto recebido com a alternativa do gabarito, soma pesos e normaliza atividades totalmente objetivas para 0–10. Questões discursivas permanecem pendentes; vazio, ausência, questão desconhecida e aluno não reconciliado exigem correção manual.

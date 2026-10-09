@@ -1,5 +1,6 @@
 import type {
   Activity,
+  ActivityCollectionSummary,
   ActivityGeneration,
   ActivityInput,
   ActivityPublication,
@@ -55,6 +56,8 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
   const [publication, setPublication] = useState<ActivityPublication | null>(
     null,
   );
+  const [collection, setCollection] =
+    useState<ActivityCollectionSummary | null>(null);
   const [questionCount, setQuestionCount] = useState(4);
 
   const loadActivities = useCallback(async () => {
@@ -91,18 +94,23 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setQuestions([emptyObjective()]);
     setGeneration(null);
     setPublication(null);
+    setCollection(null);
     setMessage(null);
   };
 
   const loadAssistState = async (activityId: string) => {
-    const [generationResponse, publicationResponse] = await Promise.all([
-      fetch(`${apiBaseUrl}/activities/${activityId}/generation`, {
-        credentials: "include",
-      }),
-      fetch(`${apiBaseUrl}/activities/${activityId}/publication`, {
-        credentials: "include",
-      }),
-    ]);
+    const [generationResponse, publicationResponse, collectionResponse] =
+      await Promise.all([
+        fetch(`${apiBaseUrl}/activities/${activityId}/generation`, {
+          credentials: "include",
+        }),
+        fetch(`${apiBaseUrl}/activities/${activityId}/publication`, {
+          credentials: "include",
+        }),
+        fetch(`${apiBaseUrl}/activities/${activityId}/collection`, {
+          credentials: "include",
+        }),
+      ]);
     if (generationResponse.ok) {
       const body =
         (await generationResponse.json()) as DataEnvelope<ActivityGeneration | null>;
@@ -112,6 +120,11 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
       const body =
         (await publicationResponse.json()) as DataEnvelope<ActivityPublication | null>;
       setPublication(body.data);
+    }
+    if (collectionResponse.ok) {
+      const body =
+        (await collectionResponse.json()) as DataEnvelope<ActivityCollectionSummary | null>;
+      setCollection(body.data);
     }
   };
 
@@ -151,6 +164,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setMessage(null);
     setGeneration(null);
     setPublication(null);
+    setCollection(null);
     void loadAssistState(activity.id);
   };
 
@@ -337,6 +351,33 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     }
   };
 
+  const collectResponses = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setMessage("Coletando e corrigindo respostas objetivas…");
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/activities/${selected.id}/collect`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!response.ok) throw new Error();
+      const body =
+        (await response.json()) as DataEnvelope<ActivityCollectionSummary>;
+      setCollection(body.data);
+      setMessage(
+        `${body.data.submissionCount} submissões processadas; ${body.data.manualReviewCount} exigem revisão manual.`,
+      );
+      await loadActivities();
+    } catch {
+      setMessage(
+        "A coleta ainda não está disponível ou falhou. A repetição não duplicará respostas.",
+      );
+      await loadAssistState(selected.id);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const updateQuestion = (index: number, question: ActivityQuestionInput) =>
     setQuestions((current) =>
       current.map((item, position) => (position === index ? question : item)),
@@ -350,7 +391,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     <section className="timeline-panel" aria-labelledby="activities-title">
       <div className="status-heading">
         <div>
-          <span className="section-label">Dia 9 · RF011 + RF001</span>
+          <span className="section-label">Dia 10 · RF012</span>
           <h2 id="activities-title">
             Atividades assistidas e publicação Google
           </h2>
@@ -829,6 +870,51 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                   )}
                 </small>
               )}
+              {publication.status === "published" &&
+                selected.status !== "draft" && (
+                  <button
+                    type="button"
+                    className="secondary-action compact-action"
+                    disabled={saving}
+                    onClick={() => void collectResponses()}
+                  >
+                    {saving ? "Processando…" : "Coletar respostas"}
+                  </button>
+                )}
+            </section>
+          )}
+          {selected && collection && (
+            <section className="publication-status" aria-label="Correções">
+              <span className="section-label">Coleta e correção objetiva</span>
+              <h3>{collectionStatusLabel(collection.status)}</h3>
+              <p>
+                {collection.submissionCount} submissões ·{" "}
+                {collection.gradedCount} corrigidas ·{" "}
+                {collection.manualReviewCount} para revisão manual
+              </p>
+              {collection.lastErrorCode && (
+                <p className="status-error">{collection.lastErrorCode}</p>
+              )}
+              <ul className="publication-targets">
+                {collection.submissions.map((submission) => (
+                  <li key={submission.id}>
+                    <strong>
+                      {submission.studentName ??
+                        submission.respondentEmail ??
+                        "Aluno não reconciliado"}
+                    </strong>
+                    <span>{submissionStatusLabel(submission.status)}</span>
+                    <small>
+                      {submission.grade === null
+                        ? "Nota pendente"
+                        : `Nota ${submission.grade.toLocaleString("pt-BR")}/10`}
+                    </small>
+                    {submission.manualReviewReason && (
+                      <small>{submission.manualReviewReason}</small>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
           {selected?.status === "draft" || !selected ? (
@@ -968,6 +1054,27 @@ function publicationMessage(publication: ActivityPublication): string {
   if (publication.errorCode)
     return publicationErrorLabel(publication.errorCode);
   return "Publicação iniciada. Consulte o estado de cada turma.";
+}
+
+function collectionStatusLabel(
+  status: ActivityCollectionSummary["status"],
+): string {
+  return {
+    pending: "Coleta agendada",
+    running: "Coleta em andamento",
+    completed: "Coleta concluída",
+    failed: "Coleta com falha recuperável",
+  }[status];
+}
+
+function submissionStatusLabel(
+  status: ActivityCollectionSummary["submissions"][number]["status"],
+): string {
+  return {
+    collected: "Objetivas corrigidas; discursivas pendentes",
+    objective_graded: "Correção objetiva concluída",
+    manual_review_required: "Correção manual necessária",
+  }[status];
 }
 
 function toLocalDateTime(value: string): string {

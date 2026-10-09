@@ -168,8 +168,8 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 9 de 14</span>
-        <span>Planos · atividades · questões</span>
+        <span>Dia 10 de 14</span>
+        <span>Coleta · correção objetiva · auditoria</span>
       </footer>
     </main>
   );

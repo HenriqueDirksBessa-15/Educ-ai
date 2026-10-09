@@ -177,6 +177,13 @@ Endpoints do Dia 9:
 - `POST /api/activities/:activityId/publish` para criação ou retomada idempotente;
 - `GET /api/activities/:activityId/publication` para estado do Form e de cada turma.
 
+Endpoints do Dia 10:
+
+- `POST /api/activities/:activityId/collect` para coletar e corrigir respostas após o prazo ou finalização;
+- `GET /api/activities/:activityId/collection` para submissões, detalhamento objetivo, nota e pendências manuais.
+
+Em produção, um worker verifica trabalhos vencidos a cada minuto, pagina respostas do Forms e usa o ID externo como chave idempotente. Atividades mistas mantêm a nota final pendente até a revisão discursiva do Dia 11.
+
 Em produção, a publicação usa as APIs reais. Em desenvolvimento e teste, o adaptador Google é uma fixture identificada. A validação externa requer uma conta docente, uma turma Classroom vinculada e novo consentimento OAuth.
 
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

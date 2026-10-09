@@ -35,6 +35,14 @@ import {
   type GoogleActivityPublisher,
 } from "./activities/google-publisher.js";
 import { ActivityPublicationService } from "./activities/publication.js";
+import {
+  FixtureGoogleResponseCollector,
+  ProductionGoogleResponseCollector,
+  type GoogleResponseCollector,
+} from "./corrections/google-response-collector.js";
+import { CorrectionsRepository } from "./corrections/repository.js";
+import { ActivityCollectionService } from "./corrections/collection.js";
+import { ActivityCollectionWorker } from "./corrections/worker.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -42,6 +50,7 @@ type AppDependencies = {
   googleGateway?: GoogleGateway;
   planGenerationAdapter?: OpenAIAdapter;
   googleActivityPublisher?: GoogleActivityPublisher;
+  googleResponseCollector?: GoogleResponseCollector;
   startMonitor?: boolean;
 };
 
@@ -51,6 +60,7 @@ export async function createApp({
   googleGateway,
   planGenerationAdapter,
   googleActivityPublisher,
+  googleResponseCollector,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -75,6 +85,7 @@ export async function createApp({
   const timelineRepository = new TimelineRepository(database);
   const plansRepository = new PlansRepository(database);
   const activitiesRepository = new ActivitiesRepository(database);
+  const correctionsRepository = new CorrectionsRepository(database);
   const openAIAdapter =
     planGenerationAdapter ??
     (config.openai.apiKey
@@ -89,6 +100,23 @@ export async function createApp({
     activitiesRepository,
     repository,
     activityPublisher,
+  );
+  const responseCollector =
+    googleResponseCollector ??
+    (config.nodeEnv === "production"
+      ? new ProductionGoogleResponseCollector(config.google)
+      : new FixtureGoogleResponseCollector());
+  const collectionService = new ActivityCollectionService(
+    activitiesRepository,
+    correctionsRepository,
+    repository,
+    responseCollector,
+  );
+  const collectionWorker = new ActivityCollectionWorker(
+    correctionsRepository,
+    collectionService,
+    Math.min(config.integrationMonitorIntervalMs, 60_000),
+    app.log,
   );
   const monitor = new IntegrationMonitor(
     repository,
@@ -134,9 +162,17 @@ export async function createApp({
     plansRepository,
     activityGenerationAdapter: openAIAdapter,
     publicationService,
+    collectionService,
+    correctionsRepository,
   });
-  if (startMonitor) monitor.start();
-  app.addHook("onClose", async () => monitor.stop());
+  if (startMonitor) {
+    monitor.start();
+    if (!responseCollector.isFixture) collectionWorker.start();
+  }
+  app.addHook("onClose", async () => {
+    monitor.stop();
+    collectionWorker.stop();
+  });
 
   app.get<{ Reply: LiveResponse }>("/api/health/live", async () => ({
     status: "alive",

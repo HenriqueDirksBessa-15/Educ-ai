@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activityCollectionSummarySchema,
   apiErrorSchema,
   activityInputSchema,
   authSessionSchema,
@@ -183,6 +184,44 @@ describe("shared contracts", () => {
     ).toThrow();
     expect(() =>
       activityInputSchema.parse({ ...base, type: "objective" }),
+    ).toThrow();
+  });
+
+  it("validates collection summaries and objective grades from 0 to 10", () => {
+    const summary = {
+      activityId: "11111111-1111-4111-8111-111111111111",
+      status: "completed",
+      scheduledAt: "2026-10-16T12:00:00.000Z",
+      attemptCount: 1,
+      lastErrorCode: null,
+      completedAt: "2026-10-16T12:01:00.000Z",
+      submissionCount: 1,
+      gradedCount: 1,
+      manualReviewCount: 0,
+      submissions: [
+        {
+          id: "21111111-1111-4111-8111-111111111111",
+          activityId: "11111111-1111-4111-8111-111111111111",
+          studentId: "31111111-1111-4111-8111-111111111111",
+          studentName: "Aluno Teste",
+          externalResponseId: "response-1",
+          respondentEmail: "aluno@example.test",
+          submittedAt: "2026-10-16T11:50:00.000Z",
+          status: "objective_graded",
+          manualReviewReason: null,
+          objectivePointsAwarded: 2,
+          objectivePointsPossible: 2,
+          grade: 10,
+          answers: [],
+        },
+      ],
+    };
+    expect(activityCollectionSummarySchema.parse(summary).gradedCount).toBe(1);
+    expect(() =>
+      activityCollectionSummarySchema.parse({
+        ...summary,
+        submissions: [{ ...summary.submissions[0], grade: 11 }],
+      }),
     ).toThrow();
   });
 });

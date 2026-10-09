@@ -523,6 +523,61 @@ export const activityPublicationSchema = z.object({
   distributions: z.array(activityDistributionSchema),
 });
 
+export const activitySubmissionStatusSchema = z.enum([
+  "collected",
+  "objective_graded",
+  "manual_review_required",
+]);
+
+export const activityAnswerStatusSchema = z.enum([
+  "graded",
+  "pending_discursive",
+  "manual_review_required",
+]);
+
+export const activitySubmissionAnswerSchema = z.object({
+  id: z.uuid(),
+  questionId: z.uuid().nullable(),
+  externalQuestionId: z.string().min(1),
+  questionPosition: z.number().int().nonnegative().nullable(),
+  prompt: z.string().nullable(),
+  answerText: z.string().nullable(),
+  status: activityAnswerStatusSchema,
+  isCorrect: z.boolean().nullable(),
+  pointsAwarded: z.number().nonnegative().nullable(),
+  pointsPossible: z.number().nonnegative().nullable(),
+  reviewReason: z.string().nullable(),
+});
+
+export const activitySubmissionSchema = z.object({
+  id: z.uuid(),
+  activityId: z.uuid(),
+  studentId: z.uuid().nullable(),
+  studentName: z.string().nullable(),
+  externalResponseId: z.string().min(1),
+  respondentEmail: z.email().nullable(),
+  submittedAt: z.iso.datetime(),
+  status: activitySubmissionStatusSchema,
+  manualReviewReason: z.string().nullable(),
+  objectivePointsAwarded: z.number().nonnegative(),
+  objectivePointsPossible: z.number().nonnegative(),
+  grade: z.number().min(0).max(10).nullable(),
+  answers: z.array(activitySubmissionAnswerSchema),
+});
+
+export const activityCollectionSummarySchema = z.object({
+  activityId: z.uuid(),
+  status: z.enum(["pending", "running", "completed", "failed"]),
+  scheduledAt: z.iso.datetime(),
+  attemptCount: z.number().int().nonnegative(),
+  lastErrorCode: z.string().nullable(),
+  completedAt: z.iso.datetime().nullable(),
+  submissionCount: z.number().int().nonnegative(),
+  gradedCount: z.number().int().nonnegative(),
+  manualReviewCount: z.number().int().nonnegative(),
+  submissions: z.array(activitySubmissionSchema),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -595,6 +650,17 @@ export type ActivityGeneration = z.infer<typeof activityGenerationSchema>;
 export type ActivityReview = z.infer<typeof activityReviewSchema>;
 export type ActivityApproval = z.infer<typeof activityApprovalSchema>;
 export type ActivityPublication = z.infer<typeof activityPublicationSchema>;
+export type ActivitySubmissionStatus = z.infer<
+  typeof activitySubmissionStatusSchema
+>;
+export type ActivityAnswerStatus = z.infer<typeof activityAnswerStatusSchema>;
+export type ActivitySubmissionAnswer = z.infer<
+  typeof activitySubmissionAnswerSchema
+>;
+export type ActivitySubmission = z.infer<typeof activitySubmissionSchema>;
+export type ActivityCollectionSummary = z.infer<
+  typeof activityCollectionSummarySchema
+>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 

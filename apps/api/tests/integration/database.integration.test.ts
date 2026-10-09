@@ -14,6 +14,8 @@ import { loadRootEnvironment } from "../../src/config.js";
 import { runMigrations } from "../../src/db/migrations.js";
 import { findRepositoryRoot } from "../../src/db/paths.js";
 import { runSeeds } from "../../src/db/seeds.js";
+import { CorrectionsRepository } from "../../src/corrections/repository.js";
+import { gradeObjectiveAnswers } from "../../src/corrections/objective-grader.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -69,6 +71,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "015_activities.sql",
       "016_activity_ai_publication.sql",
       "017_defer_activity_question_keys.sql",
+      "018_activity_submissions_objective_grading.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -96,6 +99,9 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "activity_publication",
         "activity_classroom_distribution",
         "activity_collection_job",
+        "activity_submission",
+        "activity_submission_answer",
+        "activity_collection_run",
       ]),
     );
   }, 60_000);
@@ -332,12 +338,80 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         activityId,
       ]),
     ).rejects.toThrow("published activity structure is immutable");
-
-    await testPool.query(
-      `INSERT INTO activity_response
-       (activity_id, external_student_id, submitted_at)
-       VALUES ($1, 'student-fixture', now())`,
-      [activityId],
+    expect(await repository.finish(professorId, activityId)).toBe("finished");
+    const corrections = new CorrectionsRepository(testPool);
+    const otherProfessor = await testPool.query<{ id: string }>(
+      `SELECT id FROM professor WHERE id <> $1 ORDER BY id LIMIT 1`,
+      [professorId],
+    );
+    expect(
+      await corrections.startCollection(otherProfessor.rows[0]!.id, activityId),
+    ).toBe("not_found");
+    const lease = await corrections.startCollection(professorId, activityId);
+    expect(lease).toMatchObject({ googleFormId: "form-fixture-1" });
+    const student = await testPool.query<{ email: string }>(
+      `SELECT student.email::text
+       FROM student JOIN enrollment ON enrollment.student_id = student.id
+       WHERE enrollment.class_group_id = $1 LIMIT 1`,
+      [classId],
+    );
+    const collected = {
+      externalResponseId: "response-fixture-1",
+      respondentEmail: student.rows[0]!.email,
+      submittedAt: "2026-10-20T17:00:00.000Z",
+      rawPayload: { responseId: "response-fixture-1" },
+      answers: [
+        { externalQuestionId: "q1", questionPosition: 0, answerText: "0,5" },
+        {
+          externalQuestionId: "q2",
+          questionPosition: 1,
+          answerText: "Metade do inteiro.",
+        },
+      ],
+    };
+    const published = await repository.get(professorId, activityId);
+    const reconciliation = await corrections.reconcileStudent(
+      professorId,
+      activityId,
+      collected.respondentEmail,
+    );
+    const grading = gradeObjectiveAnswers(published!, collected.answers);
+    expect(
+      await corrections.persistSubmission(
+        professorId,
+        activityId,
+        collected,
+        reconciliation,
+        grading,
+      ),
+    ).toEqual({ created: true, manualReview: false });
+    expect(
+      await corrections.persistSubmission(
+        professorId,
+        activityId,
+        collected,
+        reconciliation,
+        grading,
+      ),
+    ).toEqual({ created: false, manualReview: false });
+    await corrections.completeCollection(
+      professorId,
+      activityId,
+      (lease as { runId: string }).runId,
+      { received: 1, created: 1, updated: 0, manualReview: 0 },
+    );
+    expect(await corrections.getSummary(professorId, activityId)).toMatchObject(
+      {
+        status: "completed",
+        submissionCount: 1,
+        submissions: [
+          {
+            status: "collected",
+            grade: null,
+            objectivePointsAwarded: 2,
+          },
+        ],
+      },
     );
     expect(await repository.archive(professorId, activityId)).toBe(true);
     const archived = await repository.get(professorId, activityId);

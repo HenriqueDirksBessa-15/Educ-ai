@@ -75,6 +75,16 @@
 | DT-34 | 09/10/2026 | Aceitar somente pontuações inteiras na fronteira Google Forms         | Respeita `pointValue` da API sem alterar silenciosamente os pesos definidos      |
 | DT-35 | 09/10/2026 | Agendar coleta ao concluir a distribuição, sem coletar ainda          | Delimita o Dia 9 e prepara a execução idempotente da correção objetiva no Dia 10 |
 
+## Decisões técnicas do Dia 10
+
+| ID    | Data       | Decisão                                                                      | Impacto                                                                             |
+| ----- | ---------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| DT-36 | 09/10/2026 | Usar o ID da resposta do Forms como chave idempotente por atividade          | Coletas repetidas atualizam a mesma submissão sem duplicar nota ou detalhamento     |
+| DT-37 | 09/10/2026 | Reconciliar e-mail somente nas matrículas ativas das turmas da atividade     | Impede associação cruzada entre professores, turmas ou distribuições não vinculadas |
+| DT-38 | 09/10/2026 | Não calcular nota final de atividade mista antes da correção discursiva      | A parcela objetiva fica auditável sem antecipar a decisão pedagógica do Dia 11      |
+| DT-39 | 09/10/2026 | Encaminhar vazio, questão desconhecida e aluno não reconciliado para revisão | Dados inconsistentes são preservados sem receber correção automática inventada      |
+| DT-40 | 09/10/2026 | Executar o worker periódico apenas com o coletor Google real                 | Fixtures não marcam trabalhos como concluídos sem respostas externas reais          |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |

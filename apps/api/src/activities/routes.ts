@@ -17,6 +17,8 @@ import {
 } from "../openai/adapter.js";
 import { MissingSyllabusError } from "../plans/generation.js";
 import type { PlansRepository } from "../plans/repository.js";
+import type { ActivityCollectionService } from "../corrections/collection.js";
+import type { CorrectionsRepository } from "../corrections/repository.js";
 import { buildActivityPromptContext } from "./generation.js";
 import type { ActivityPublicationService } from "./publication.js";
 import type { ActivitiesRepository } from "./repository.js";
@@ -30,6 +32,8 @@ export function registerActivitiesRoutes(
     plansRepository: PlansRepository;
     activityGenerationAdapter: OpenAIAdapter;
     publicationService: ActivityPublicationService;
+    collectionService: ActivityCollectionService;
+    correctionsRepository: CorrectionsRepository;
   },
 ): void {
   const cookieName = sessionCookieName(dependencies.config.nodeEnv);
@@ -293,6 +297,70 @@ export function registerActivitiesRoutes(
         return lockedError(reply);
       }
       return { data: result.publication };
+    },
+  );
+
+  app.get<{ Params: { activityId: string } }>(
+    "/api/activities/:activityId/collection",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const activity = await dependencies.activitiesRepository.get(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (!activity) return notFound(reply, "Atividade não encontrada.");
+      return {
+        data: await dependencies.correctionsRepository.getSummary(
+          user.professorId,
+          request.params.activityId,
+        ),
+      };
+    },
+  );
+
+  app.post<{ Params: { activityId: string } }>(
+    "/api/activities/:activityId/collect",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const result = await dependencies.collectionService.collect(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (result.status === "not_found")
+        return notFound(reply, "Atividade não encontrada.");
+      if (result.status === "not_due")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "A coleta será liberada no prazo ou após a finalização.",
+          },
+        });
+      if (result.status === "busy")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Já existe uma coleta em andamento.",
+          },
+        });
+      if (result.status === "credential_missing")
+        return reply.code(503).send({
+          error: {
+            code: "INTEGRATION_UNAVAILABLE",
+            message: "Reconecte a conta Google para coletar as respostas.",
+          },
+        });
+      if (result.status === "failed")
+        return reply.code(503).send({
+          error: {
+            code: "INTEGRATION_UNAVAILABLE",
+            message: "A coleta falhou e poderá ser repetida sem duplicação.",
+          },
+          data: result.summary,
+        });
+      if (result.status === "collected") return { data: result.summary };
+      return lockedError(reply);
     },
   );
 

@@ -2,7 +2,44 @@
 
 Atualizado em 09/10/2026.
 
-## Entrega atual - Dia 9
+## Entrega atual - Dia 10
+
+O fluxo de correção agora coleta respostas paginadas do Google Forms no prazo, reconcilia o aluno apenas dentro das turmas da atividade, persiste submissões idempotentes e corrige questões objetivas pelo gabarito. Atividades objetivas recebem nota normalizada de 0 a 10; atividades mistas preservam a parcela discursiva para o Dia 11; dados vazios ou inconsistentes seguem para revisão manual sem decisão automática.
+
+Verificações finais:
+
+- `npm run test:unit`: 58 testes aprovados (11 contratos, 43 API e 4 web);
+- `npm run test:integration`: 4 testes PostgreSQL aprovados e smoke OpenAI ignorado por ser opt-in;
+- migrações 001–018 aplicadas em banco vazio e repetição sem novas aplicações;
+- integração PostgreSQL comprovou coleta repetida sem duplicação, reconciliação por matrícula, detalhamento por questão e preservação da correção parcial mista;
+- lint, tipagem, formatação e build de produção aprovados.
+
+Validação externa pendente: aplicar as migrações 015–018 no Cloud SQL controlado e executar uma coleta real com respostas de uma turma Google de teste após novo consentimento. Nenhuma chamada externa, deploy ou push foi executado automaticamente.
+
+## Dia 10 - Etapa 1: cenários, contratos e persistência
+
+- cenários de coleta, isolamento, repetição, inconsistência e correção objetiva;
+- contratos de submissão, resposta por questão e resumo de coleta;
+- tabelas de submissões, respostas e execuções auditáveis, com chaves externas idempotentes;
+- estados explícitos para correção concluída, parcela discursiva pendente e revisão manual.
+
+## Dia 10 - Etapa 2: coleta e reconciliação
+
+- adaptador paginado para o endpoint de respostas do Google Forms;
+- mapeamento do identificador externo da questão pela posição imutável do Form;
+- worker periódico somente quando o coletor Google real está ativo;
+- reconciliação por e-mail limitada às matrículas ativas nas turmas distribuídas da atividade;
+- falhas normalizadas preservam dados anteriores e permitem nova tentativa.
+
+## Dia 10 - Etapa 3: correção objetiva e interface
+
+- corretor puro, independente do banco, com pesos e nota normalizada entre 0 e 10;
+- respostas vazias, ausentes ou não reconciliadas seguem para correção manual;
+- atividades mistas mantêm nota final pendente até a etapa discursiva;
+- endpoints autenticados para consultar e iniciar a coleta;
+- painel com quantidades, notas, estados e motivos de revisão por submissão.
+
+## Entrega anterior - Dia 9
 
 O fluxo de atividades agora cobre geração estruturada por IA, revisão e aprovação docente, Google Forms, distribuição por turma no Classroom, retomada idempotente de falhas e agendamento da coleta. A interface apresenta dificuldade, versões geradas, estado externo por turma e links dos recursos publicados.
 
@@ -228,4 +265,4 @@ Implementados:
 
 ## Próximo passo
 
-Aplicar as migrações 015–017 no Cloud SQL controlado e executar o smoke real do Dia 9 após novo consentimento Google; em seguida iniciar a coleta e correção objetiva do Dia 10.
+Aplicar as migrações 015–018 no Cloud SQL controlado e executar o smoke Google dos Dias 9–10; em seguida iniciar sugestão discursiva, revisão docente e liberação de notas do Dia 11.
