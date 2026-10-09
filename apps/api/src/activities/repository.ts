@@ -3,6 +3,7 @@ import {
   type Activity,
   type ActivityGeneration,
   type ActivityInput,
+  type ActivityReview,
   type ActivityStatus,
   type ActivityUpdate,
 } from "@educai/contracts";
@@ -53,6 +54,11 @@ type GenerationRow = {
 };
 
 export type ActivityMutationResult = "updated" | "not_found" | "locked";
+export type ActivityReviewResult =
+  | "reviewed"
+  | "not_found"
+  | "locked"
+  | "generation_not_found";
 
 export class ActivitiesRepository {
   constructor(private readonly database: DatabaseClient) {}
@@ -165,6 +171,13 @@ export class ActivitiesRepository {
          WHERE id = $1 AND professor_id = $2 AND status = 'draft'
            AND archived_at IS NULL
            AND EXISTS (SELECT 1 FROM activity_question WHERE activity_id = activity.id)
+           AND (
+             NOT EXISTS (SELECT 1 FROM activity_generation
+               WHERE activity_id = activity.id AND status = 'succeeded')
+             OR EXISTS (SELECT 1 FROM activity_generation
+               WHERE activity_id = activity.id AND status = 'succeeded'
+                 AND review_status = 'approved')
+           )
            AND NOT EXISTS (
              SELECT 1 FROM activity_question question
              WHERE question.activity_id = activity.id
@@ -318,6 +331,72 @@ export class ActivitiesRepository {
     return Boolean(inserted.rows[0]);
   }
 
+  async reviewGeneration(
+    professorId: string,
+    activityId: string,
+    review: ActivityReview,
+  ): Promise<ActivityReviewResult> {
+    const generation = (await this.database.query(
+      `SELECT generation.id FROM activity_generation generation
+       JOIN activity ON activity.id = generation.activity_id
+       WHERE generation.id = $1 AND generation.activity_id = $2
+         AND activity.professor_id = $3 AND activity.status = 'draft'
+         AND activity.archived_at IS NULL AND generation.status = 'succeeded'`,
+      [review.generationId, activityId, professorId],
+    )) as QueryResult<{ id: string }>;
+    if (!generation.rows[0]) {
+      const activity = await this.get(professorId, activityId);
+      if (!activity) return "not_found";
+      if (activity.status !== "draft" || activity.archivedAt) return "locked";
+      return "generation_not_found";
+    }
+    const updated = await this.update(professorId, activityId, {
+      title: review.suggestion.title,
+      description: review.suggestion.description,
+      type: review.suggestion.type,
+      difficulty: review.suggestion.difficulty,
+      questions: review.suggestion.questions,
+    });
+    if (updated !== "updated") return updated;
+    const reviewed = (await this.database.query(
+      `UPDATE activity_generation SET review_status = 'reviewed',
+       reviewed_suggestion = $4::jsonb, reviewed_at = now(), approved_at = NULL
+       WHERE id = $1 AND activity_id = $2
+         AND EXISTS (SELECT 1 FROM activity
+           WHERE id = $2 AND professor_id = $3 AND status = 'draft')
+       RETURNING id`,
+      [
+        review.generationId,
+        activityId,
+        professorId,
+        JSON.stringify(review.suggestion),
+      ],
+    )) as QueryResult<{ id: string }>;
+    return reviewed.rows[0] ? "reviewed" : "generation_not_found";
+  }
+
+  async approveGeneration(
+    professorId: string,
+    activityId: string,
+    generationId: string,
+  ): Promise<"approved" | "not_found" | "review_required"> {
+    const approved = (await this.database.query(
+      `UPDATE activity_generation generation SET review_status = 'approved',
+       approved_at = now()
+       FROM activity
+       WHERE generation.id = $1 AND generation.activity_id = $2
+         AND activity.id = generation.activity_id AND activity.professor_id = $3
+         AND activity.status = 'draft' AND activity.archived_at IS NULL
+         AND generation.status = 'succeeded'
+         AND generation.review_status = 'reviewed'
+       RETURNING generation.id`,
+      [generationId, activityId, professorId],
+    )) as QueryResult<{ id: string }>;
+    if (approved.rows[0]) return "approved";
+    const activity = await this.get(professorId, activityId);
+    return activity ? "review_required" : "not_found";
+  }
+
   private async assertPlan(professorId: string, planId: string): Promise<void> {
     const result = (await this.database.query(
       `SELECT id FROM lesson_plan
@@ -339,6 +418,13 @@ export class ActivitiesRepository {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id`;
     return `WITH mutated AS (${activityMutation}),
+      invalidated_approval AS (
+        UPDATE activity_generation SET review_status = 'generated',
+          reviewed_suggestion = NULL, reviewed_at = NULL, approved_at = NULL
+        WHERE activity_id IN (SELECT id FROM mutated)
+          AND review_status IN ('reviewed', 'approved')
+        RETURNING id
+      ),
       removed AS (
         DELETE FROM activity_question
         WHERE activity_id IN (SELECT id FROM mutated) RETURNING id
@@ -358,6 +444,7 @@ export class ActivitiesRepository {
           (question->>'correctAlternativeIndex')::smallint
         FROM mutated CROSS JOIN question_input
         LEFT JOIN (SELECT count(*) FROM removed) removal_barrier ON true
+        LEFT JOIN (SELECT count(*) FROM invalidated_approval) approval_barrier ON true
         RETURNING id, activity_id, position
       ),
       inserted_alternatives AS (

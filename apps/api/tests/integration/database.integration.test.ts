@@ -68,6 +68,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "014_classroom_tenant_isolation.sql",
       "015_activities.sql",
       "016_activity_ai_publication.sql",
+      "017_defer_activity_question_keys.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -240,6 +241,50 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await repository.latestGeneration(professorId, activityId)).toEqual(
       generation,
     );
+    expect(
+      await repository.reviewGeneration(professorId, activityId, {
+        generationId: generation!.id,
+        suggestion: generation!.suggestion!,
+      }),
+    ).toBe("reviewed");
+    expect(
+      await repository.approveGeneration(
+        professorId,
+        activityId,
+        generation!.id,
+      ),
+    ).toBe("approved");
+    expect(
+      (await repository.latestGeneration(professorId, activityId))
+        ?.reviewStatus,
+    ).toBe("approved");
+    expect(
+      await repository.update(professorId, activityId, {
+        description: "Alteração posterior à aprovação.",
+      }),
+    ).toBe("updated");
+    expect(
+      (await repository.latestGeneration(professorId, activityId))
+        ?.reviewStatus,
+    ).toBe("generated");
+    expect(await repository.publish(professorId, activityId)).toBe("locked");
+    const revisedSuggestion = {
+      ...generation!.suggestion!,
+      description: "Alteração posterior à aprovação.",
+    };
+    expect(
+      await repository.reviewGeneration(professorId, activityId, {
+        generationId: generation!.id,
+        suggestion: revisedSuggestion,
+      }),
+    ).toBe("reviewed");
+    expect(
+      await repository.approveGeneration(
+        professorId,
+        activityId,
+        generation!.id,
+      ),
+    ).toBe("approved");
     expect(await repository.publish(professorId, activityId)).toBe("published");
     expect(
       await repository.update(professorId, activityId, { title: "Alterada" }),

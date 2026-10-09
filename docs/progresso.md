@@ -22,6 +22,16 @@ Implementado nesta etapa:
 - endpoints autenticados para gerar e consultar a tentativa mais recente;
 - persistência versionada de sucessos e falhas sem alterar o rascunho em erro.
 
+## Dia 9 - Etapa 3: revisão e aprovação
+
+Implementado nesta etapa:
+
+- aplicação da sugestão somente por revisão autenticada e explícita;
+- edição integral da sugestão antes de incorporá-la ao rascunho;
+- aprovação vinculada à geração revisada escolhida pelo professor;
+- invalidação automática da revisão e aprovação após edição estrutural;
+- isolamento por professor e bloqueio para atividades publicadas ou arquivadas.
+
 ## Entrega atual - Dia 8
 
 Implementado nesta etapa:

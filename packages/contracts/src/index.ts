@@ -481,6 +481,10 @@ export const activityReviewSchema = z.object({
   suggestion: activitySuggestionSchema,
 });
 
+export const activityApprovalSchema = z.object({
+  generationId: z.uuid(),
+});
+
 export const activityPublicationStatusSchema = z.enum([
   "pending",
   "creating_form",
@@ -589,6 +593,7 @@ export type ActivityGenerationRequest = z.infer<
 >;
 export type ActivityGeneration = z.infer<typeof activityGenerationSchema>;
 export type ActivityReview = z.infer<typeof activityReviewSchema>;
+export type ActivityApproval = z.infer<typeof activityApprovalSchema>;
 export type ActivityPublication = z.infer<typeof activityPublicationSchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;

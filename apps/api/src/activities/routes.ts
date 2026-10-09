@@ -1,7 +1,9 @@
 import {
+  activityApprovalSchema,
   activityGenerationRequestSchema,
   activityInputSchema,
   activityListQuerySchema,
+  activityReviewSchema,
   activityUpdateSchema,
 } from "@educai/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -206,6 +208,52 @@ export function registerActivitiesRoutes(
           },
         });
       }
+    },
+  );
+
+  app.post<{ Params: { activityId: string }; Body: unknown }>(
+    "/api/activities/:activityId/review",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const parsed = activityReviewSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const result = await dependencies.activitiesRepository.reviewGeneration(
+        user.professorId,
+        request.params.activityId,
+        parsed.data,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Atividade não encontrada.");
+      if (result === "generation_not_found")
+        return notFound(reply, "Sugestão não encontrada para esta atividade.");
+      if (result === "locked") return lockedError(reply);
+      return { data: { status: result } };
+    },
+  );
+
+  app.post<{ Params: { activityId: string }; Body: unknown }>(
+    "/api/activities/:activityId/approve",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const parsed = activityApprovalSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const result = await dependencies.activitiesRepository.approveGeneration(
+        user.professorId,
+        request.params.activityId,
+        parsed.data.generationId,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Atividade não encontrada.");
+      if (result === "review_required")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Revise a sugestão escolhida antes de aprovar.",
+          },
+        });
+      return { data: { status: result } };
     },
   );
 
