@@ -18,6 +18,7 @@ import {
 import { MissingSyllabusError } from "../plans/generation.js";
 import type { PlansRepository } from "../plans/repository.js";
 import { buildActivityPromptContext } from "./generation.js";
+import type { ActivityPublicationService } from "./publication.js";
 import type { ActivitiesRepository } from "./repository.js";
 
 export function registerActivitiesRoutes(
@@ -28,6 +29,7 @@ export function registerActivitiesRoutes(
     activitiesRepository: ActivitiesRepository;
     plansRepository: PlansRepository;
     activityGenerationAdapter: OpenAIAdapter;
+    publicationService: ActivityPublicationService;
   },
 ): void {
   const cookieName = sessionCookieName(dependencies.config.nodeEnv);
@@ -257,23 +259,58 @@ export function registerActivitiesRoutes(
     },
   );
 
-  for (const action of ["publish", "finish"] as const) {
-    app.post<{ Params: { activityId: string } }>(
-      `/api/activities/:activityId/${action}`,
-      async (request, reply) => {
-        const user = await identity(request, reply);
-        if (!user) return;
-        const result = await dependencies.activitiesRepository[action](
+  app.get<{ Params: { activityId: string } }>(
+    "/api/activities/:activityId/publication",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const activity = await dependencies.activitiesRepository.get(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (!activity) return notFound(reply, "Atividade não encontrada.");
+      return {
+        data: await dependencies.activitiesRepository.getPublication(
           user.professorId,
           request.params.activityId,
-        );
-        if (result === "not_found")
+        ),
+      };
+    },
+  );
+
+  app.post<{ Params: { activityId: string } }>(
+    "/api/activities/:activityId/publish",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const result = await dependencies.publicationService.publish(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (result.status !== "publication") {
+        if (result.status === "not_found")
           return notFound(reply, "Atividade não encontrada.");
-        if (result === "locked") return lockedError(reply);
-        return { data: { status: result } };
-      },
-    );
-  }
+        return lockedError(reply);
+      }
+      return { data: result.publication };
+    },
+  );
+
+  app.post<{ Params: { activityId: string } }>(
+    "/api/activities/:activityId/finish",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const result = await dependencies.activitiesRepository.finish(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Atividade não encontrada.");
+      if (result === "locked") return lockedError(reply);
+      return { data: { status: result } };
+    },
+  );
 
   app.post<{ Params: { activityId: string } }>(
     "/api/activities/:activityId/archive",

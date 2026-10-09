@@ -29,12 +29,19 @@ import { registerPlansRoutes } from "./plans/routes.js";
 import { PlansRepository } from "./plans/repository.js";
 import { registerActivitiesRoutes } from "./activities/routes.js";
 import { ActivitiesRepository } from "./activities/repository.js";
+import {
+  FixtureGoogleActivityPublisher,
+  ProductionGoogleActivityPublisher,
+  type GoogleActivityPublisher,
+} from "./activities/google-publisher.js";
+import { ActivityPublicationService } from "./activities/publication.js";
 
 type AppDependencies = {
   config: AppConfig;
   database: DatabaseClient;
   googleGateway?: GoogleGateway;
   planGenerationAdapter?: OpenAIAdapter;
+  googleActivityPublisher?: GoogleActivityPublisher;
   startMonitor?: boolean;
 };
 
@@ -43,6 +50,7 @@ export async function createApp({
   database,
   googleGateway,
   planGenerationAdapter,
+  googleActivityPublisher,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -72,6 +80,16 @@ export async function createApp({
     (config.openai.apiKey
       ? new ConfiguredOpenAIAdapter(config.openai)
       : new FixtureOpenAIAdapter());
+  const activityPublisher =
+    googleActivityPublisher ??
+    (config.nodeEnv === "production"
+      ? new ProductionGoogleActivityPublisher(config.google)
+      : new FixtureGoogleActivityPublisher());
+  const publicationService = new ActivityPublicationService(
+    activitiesRepository,
+    repository,
+    activityPublisher,
+  );
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -115,6 +133,7 @@ export async function createApp({
     activitiesRepository,
     plansRepository,
     activityGenerationAdapter: openAIAdapter,
+    publicationService,
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());

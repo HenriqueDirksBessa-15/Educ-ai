@@ -42,6 +42,16 @@ Implementado nesta etapa:
 - criação de trabalho Classroom por turma com prazo, pontos e link do Form;
 - reconciliação por marcador determinístico e normalização de falhas Google.
 
+## Dia 9 - Etapa 5: publicação idempotente
+
+Implementado nesta etapa:
+
+- máquina de estados persistida para criação do Form e distribuição por turma;
+- retomada que ignora Form e trabalhos Classroom já confirmados;
+- falha parcial por turma, reconsentimento e reconciliação explicitamente visíveis;
+- publicação local somente após concluir todos os destinos obrigatórios;
+- criação idempotente do agendamento de coleta no prazo da atividade.
+
 ## Entrega atual - Dia 8
 
 Implementado nesta etapa:

@@ -3,6 +3,7 @@ import {
   type Activity,
   type ActivityGeneration,
   type ActivityInput,
+  type ActivityPublication,
   type ActivityReview,
   type ActivityStatus,
   type ActivityUpdate,
@@ -51,6 +52,26 @@ type GenerationRow = {
   reviewed_at: Date | null;
   approved_at: Date | null;
   created_at: Date;
+};
+type PublicationRow = {
+  activity_id: string;
+  status: ActivityPublication["status"];
+  google_form_id: string | null;
+  responder_uri: string | null;
+  error_code: string | null;
+  attempt_count: number;
+  collection_scheduled_at: Date | null;
+  last_synced_at: Date | null;
+};
+type DistributionRow = {
+  class_group_id: string;
+  class_name: string;
+  google_classroom_id: string | null;
+  google_course_work_id: string | null;
+  alternate_link: string | null;
+  status: ActivityPublication["distributions"][number]["status"];
+  error_code: string | null;
+  attempt_count: number;
 };
 
 export type ActivityMutationResult = "updated" | "not_found" | "locked";
@@ -395,6 +416,235 @@ export class ActivitiesRepository {
     if (approved.rows[0]) return "approved";
     const activity = await this.get(professorId, activityId);
     return activity ? "review_required" : "not_found";
+  }
+
+  async preparePublication(
+    professorId: string,
+    activityId: string,
+  ): Promise<"ready" | "not_found" | "locked"> {
+    const eligible = (await this.database.query(
+      `SELECT activity.id,
+         (SELECT generation.id FROM activity_generation generation
+          WHERE generation.activity_id = activity.id
+            AND generation.status = 'succeeded'
+            AND generation.review_status = 'approved'
+          ORDER BY generation.version DESC LIMIT 1) AS generation_id,
+         EXISTS (SELECT 1 FROM activity_generation generation
+          WHERE generation.activity_id = activity.id
+            AND generation.status = 'succeeded') AS has_generation
+       FROM activity
+       WHERE activity.id = $1 AND activity.professor_id = $2
+         AND activity.status = 'draft' AND activity.archived_at IS NULL`,
+      [activityId, professorId],
+    )) as QueryResult<{
+      id: string;
+      generation_id: string | null;
+      has_generation: boolean;
+    }>;
+    const row = eligible.rows[0];
+    if (!row) {
+      const current = await this.get(professorId, activityId);
+      return current ? "locked" : "not_found";
+    }
+    if (row.has_generation && !row.generation_id) return "locked";
+    await this.database.query(
+      `INSERT INTO activity_publication (activity_id, generation_id)
+       VALUES ($1, $2)
+       ON CONFLICT (activity_id) DO UPDATE SET
+         generation_id = COALESCE(activity_publication.generation_id, EXCLUDED.generation_id)`,
+      [activityId, row.generation_id],
+    );
+    await this.database.query(
+      `INSERT INTO activity_classroom_distribution
+         (activity_id, class_group_id, google_classroom_id)
+       SELECT $1, class_group.id, class_group.google_classroom_id
+       FROM activity
+       JOIN lesson_plan_class ON lesson_plan_class.lesson_plan_id = activity.lesson_plan_id
+       JOIN class_group ON class_group.id = lesson_plan_class.class_group_id
+       WHERE activity.id = $1 AND activity.professor_id = $2
+       ON CONFLICT (activity_id, class_group_id) DO UPDATE SET
+         google_classroom_id = EXCLUDED.google_classroom_id`,
+      [activityId, professorId],
+    );
+    return "ready";
+  }
+
+  async getPublication(
+    professorId: string,
+    activityId: string,
+  ): Promise<ActivityPublication | null> {
+    const publication = (await this.database.query(
+      `SELECT publication.activity_id, publication.status,
+       publication.google_form_id, publication.responder_uri,
+       publication.error_code, publication.attempt_count,
+       collection.scheduled_at AS collection_scheduled_at,
+       publication.last_synced_at
+       FROM activity_publication publication
+       JOIN activity ON activity.id = publication.activity_id
+       LEFT JOIN activity_collection_job collection
+         ON collection.activity_id = publication.activity_id
+       WHERE publication.activity_id = $1 AND activity.professor_id = $2`,
+      [activityId, professorId],
+    )) as QueryResult<PublicationRow>;
+    const row = publication.rows[0];
+    if (!row) return null;
+    const distributions = (await this.database.query(
+      `SELECT distribution.class_group_id, class_group.name AS class_name,
+       distribution.google_classroom_id, distribution.google_course_work_id,
+       distribution.alternate_link, distribution.status,
+       distribution.error_code, distribution.attempt_count
+       FROM activity_classroom_distribution distribution
+       JOIN class_group ON class_group.id = distribution.class_group_id
+       JOIN activity ON activity.id = distribution.activity_id
+       WHERE distribution.activity_id = $1 AND activity.professor_id = $2
+       ORDER BY class_group.name`,
+      [activityId, professorId],
+    )) as QueryResult<DistributionRow>;
+    return {
+      activityId: row.activity_id,
+      status: row.status,
+      googleFormId: row.google_form_id,
+      responderUri: row.responder_uri,
+      errorCode: row.error_code,
+      attemptCount: row.attempt_count,
+      collectionScheduledAt: row.collection_scheduled_at?.toISOString() ?? null,
+      lastSyncedAt: row.last_synced_at?.toISOString() ?? null,
+      distributions: distributions.rows.map((distribution) => ({
+        classId: distribution.class_group_id,
+        className: distribution.class_name,
+        googleClassroomId: distribution.google_classroom_id,
+        googleCourseWorkId: distribution.google_course_work_id,
+        alternateLink: distribution.alternate_link,
+        status: distribution.status,
+        errorCode: distribution.error_code,
+        attemptCount: distribution.attempt_count,
+      })),
+    };
+  }
+
+  async markPublicationAttempt(
+    professorId: string,
+    activityId: string,
+    status: "creating_form" | "distributing",
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `UPDATE activity_publication publication SET status = $3,
+       error_code = NULL, attempt_count = attempt_count + 1
+       FROM activity WHERE publication.activity_id = $1
+         AND activity.id = publication.activity_id AND activity.professor_id = $2
+       RETURNING publication.activity_id`,
+      [activityId, professorId, status],
+    )) as QueryResult<{ activity_id: string }>;
+    return Boolean(result.rows[0]);
+  }
+
+  async savePublishedForm(
+    professorId: string,
+    activityId: string,
+    formId: string,
+    responderUri: string,
+  ): Promise<void> {
+    await this.database.query(
+      `UPDATE activity_publication publication
+       SET google_form_id = $3, responder_uri = $4, status = 'distributing',
+         error_code = NULL, last_synced_at = now()
+       FROM activity WHERE publication.activity_id = $1
+         AND activity.id = publication.activity_id AND activity.professor_id = $2`,
+      [activityId, professorId, formId, responderUri],
+    );
+  }
+
+  async markPublicationFailure(
+    professorId: string,
+    activityId: string,
+    errorCode: string,
+    reconciliationRequired = false,
+  ): Promise<void> {
+    await this.database.query(
+      `UPDATE activity_publication publication
+       SET status = $4, error_code = $3
+       FROM activity WHERE publication.activity_id = $1
+         AND activity.id = publication.activity_id AND activity.professor_id = $2`,
+      [
+        activityId,
+        professorId,
+        errorCode,
+        reconciliationRequired ? "reconciliation_required" : "failed",
+      ],
+    );
+  }
+
+  async saveDistribution(
+    professorId: string,
+    activityId: string,
+    classId: string,
+    courseWorkId: string,
+    alternateLink: string,
+  ): Promise<void> {
+    await this.database.query(
+      `UPDATE activity_classroom_distribution distribution
+       SET google_course_work_id = $4, alternate_link = $5,
+         status = 'published', error_code = NULL, published_at = now(),
+         attempt_count = attempt_count + 1
+       FROM activity WHERE distribution.activity_id = $1
+         AND distribution.class_group_id = $3
+         AND activity.id = distribution.activity_id AND activity.professor_id = $2`,
+      [activityId, professorId, classId, courseWorkId, alternateLink],
+    );
+  }
+
+  async markDistributionFailure(
+    professorId: string,
+    activityId: string,
+    classId: string,
+    errorCode: string,
+  ): Promise<void> {
+    await this.database.query(
+      `UPDATE activity_classroom_distribution distribution
+       SET status = 'failed', error_code = $4,
+         attempt_count = attempt_count + 1
+       FROM activity WHERE distribution.activity_id = $1
+         AND distribution.class_group_id = $3
+         AND activity.id = distribution.activity_id AND activity.professor_id = $2`,
+      [activityId, professorId, classId, errorCode],
+    );
+  }
+
+  async completeExternalPublication(
+    professorId: string,
+    activityId: string,
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `WITH completed AS (
+         UPDATE activity_publication publication
+         SET status = 'published', error_code = NULL, last_synced_at = now()
+         FROM activity
+         WHERE publication.activity_id = $1
+           AND activity.id = publication.activity_id
+           AND activity.professor_id = $2 AND activity.status = 'draft'
+           AND publication.google_form_id IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM activity_classroom_distribution distribution
+             WHERE distribution.activity_id = publication.activity_id
+               AND distribution.status <> 'published'
+           )
+         RETURNING publication.activity_id, activity.lesson_plan_id, activity.due_at
+       ), published AS (
+         UPDATE activity SET status = 'published', published_at = now()
+         WHERE id IN (SELECT activity_id FROM completed)
+         RETURNING id, lesson_plan_id, due_at
+       ), linked AS (
+         INSERT INTO published_lesson_plan_link (lesson_plan_id)
+         SELECT lesson_plan_id FROM published ON CONFLICT DO NOTHING
+       ), scheduled AS (
+         INSERT INTO activity_collection_job (activity_id, scheduled_at)
+         SELECT id, due_at FROM published
+         ON CONFLICT (activity_id) DO NOTHING
+       )
+       SELECT id FROM published`,
+      [activityId, professorId],
+    )) as QueryResult<{ id: string }>;
+    return Boolean(result.rows[0]);
   }
 
   private async assertPlan(professorId: string, planId: string): Promise<void> {

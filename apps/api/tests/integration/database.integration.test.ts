@@ -143,6 +143,11 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
        LIMIT 1`,
     );
     const { professor_id: professorId, class_id: classId } = owner.rows[0]!;
+    await testPool.query(
+      `UPDATE class_group SET google_classroom_id = 'course-fixture-1'
+       WHERE id = $1`,
+      [classId],
+    );
     const plan = await testPool.query<{ id: string }>(
       `INSERT INTO lesson_plan
        (professor_id, title, curricular_component, school_year, objectives,
@@ -285,7 +290,40 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         generation!.id,
       ),
     ).toBe("approved");
-    expect(await repository.publish(professorId, activityId)).toBe("published");
+    expect(await repository.preparePublication(professorId, activityId)).toBe(
+      "ready",
+    );
+    const prepared = await repository.getPublication(professorId, activityId);
+    expect(prepared).toMatchObject({
+      status: "pending",
+      distributions: [
+        { googleClassroomId: "course-fixture-1", status: "pending" },
+      ],
+    });
+    await repository.savePublishedForm(
+      professorId,
+      activityId,
+      "form-fixture-1",
+      "https://forms.test/form-fixture-1",
+    );
+    await repository.saveDistribution(
+      professorId,
+      activityId,
+      classId,
+      "work-fixture-1",
+      "https://classroom.test/work-fixture-1",
+    );
+    expect(
+      await repository.completeExternalPublication(professorId, activityId),
+    ).toBe(true);
+    expect(
+      await repository.getPublication(professorId, activityId),
+    ).toMatchObject({
+      status: "published",
+      googleFormId: "form-fixture-1",
+      collectionScheduledAt: "2026-10-20T18:00:00.000Z",
+      distributions: [{ status: "published" }],
+    });
     expect(
       await repository.update(professorId, activityId, { title: "Alterada" }),
     ).toBe("locked");
