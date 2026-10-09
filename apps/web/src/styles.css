@@ -201,6 +201,60 @@ h1 {
   box-shadow: 0 1.5rem 4rem rgba(21, 51, 47, 0.08);
 }
 
+.timeline-panel {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid #d7e7e2;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.timeline-count {
+  color: #087f6b;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.timeline-grid h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.empty-state {
+  color: #6b827d;
+}
+
+.resource-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.resource-list li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem;
+  border-radius: 0.75rem;
+  background: #f4faf8;
+}
+
+.resource-list span,
+.resource-list small {
+  color: #5c746f;
+}
+
+.muted-item {
+  opacity: 0.65;
+}
+
 .status-heading {
   display: flex;
   align-items: center;
@@ -319,6 +373,10 @@ footer {
   }
 
   .status-grid.three-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -175,6 +175,71 @@ export const classDetailSchema = classSummarySchema.extend({
   students: z.array(enrolledStudentSchema),
 });
 
+export const milestoneTypeSchema = z.enum([
+  "lesson",
+  "assessment",
+  "event",
+  "deadline",
+  "other",
+]);
+
+export const milestoneCreateSchema = z.object({
+  classId: z.uuid(),
+  date: z.iso.date(),
+  type: milestoneTypeSchema,
+  description: z.string().trim().min(1).max(500),
+});
+
+export const milestoneUpdateSchema = milestoneCreateSchema
+  .omit({ classId: true })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo editável.",
+  });
+
+export const milestoneSchema = milestoneCreateSchema.extend({
+  id: z.uuid(),
+  className: z.string().min(1),
+  isPast: z.boolean(),
+  isArchived: z.boolean(),
+  hasPublishedContent: z.boolean(),
+});
+
+export const materialCategorySchema = z.enum([
+  "reading",
+  "presentation",
+  "video",
+  "image",
+  "link",
+  "other",
+]);
+
+export const materialInputSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(2_000).nullable().optional(),
+  category: materialCategorySchema,
+  classIds: z.array(z.uuid()).min(1),
+  bnccSkillIds: z.array(z.uuid()).default([]),
+  url: z.url().nullable().optional(),
+  fileName: z.string().trim().max(255).nullable().optional(),
+  mimeType: z.string().trim().max(120).nullable().optional(),
+  sizeBytes: z.number().int().nonnegative().nullable().optional(),
+  storageKey: z.string().trim().max(500).nullable().optional(),
+});
+
+export const materialSchema = materialInputSchema.extend({
+  id: z.uuid(),
+  classNames: z.array(z.string().min(1)),
+  isArchived: z.boolean(),
+  hasPublishedContent: z.boolean(),
+  createdAt: z.iso.datetime(),
+});
+
+export const materialListQuerySchema = z.object({
+  category: materialCategorySchema.optional(),
+  archived: z.coerce.boolean().optional(),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -216,6 +281,13 @@ export type StudentEnrollmentInput = z.infer<
 export type EnrolledStudent = z.infer<typeof enrolledStudentSchema>;
 export type ClassDetail = z.infer<typeof classDetailSchema>;
 export type StudentSummary = z.infer<typeof studentSummarySchema>;
+export type MilestoneType = z.infer<typeof milestoneTypeSchema>;
+export type Milestone = z.infer<typeof milestoneSchema>;
+export type MilestoneCreate = z.infer<typeof milestoneCreateSchema>;
+export type MilestoneUpdate = z.infer<typeof milestoneUpdateSchema>;
+export type MaterialCategory = z.infer<typeof materialCategorySchema>;
+export type Material = z.infer<typeof materialSchema>;
+export type MaterialInput = z.infer<typeof materialInputSchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 

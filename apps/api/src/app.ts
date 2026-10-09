@@ -19,6 +19,8 @@ import { isDatabaseAvailable, type DatabaseClient } from "./database.js";
 import { ConfiguredOpenAIAdapter } from "./openai/adapter.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { ProfileRepository } from "./profile/repository.js";
+import { registerTimelineRoutes } from "./timeline/routes.js";
+import { TimelineRepository } from "./timeline/repository.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -52,6 +54,7 @@ export async function createApp({
   const profileRepository = new ProfileRepository(database);
   const curriculumRepository = new CurriculumRepository(database);
   const classesRepository = new ClassesRepository(database);
+  const timelineRepository = new TimelineRepository(database);
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -77,6 +80,11 @@ export async function createApp({
     classesRepository,
     classroomAdapter:
       config.nodeEnv === "test" ? undefined : new FixtureClassroomAdapter(),
+  });
+  registerTimelineRoutes(app, {
+    config,
+    authRepository: repository,
+    timelineRepository,
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());

@@ -1,8 +1,21 @@
 # Progresso
 
-Atualizado em 10/10/2026.
+Atualizado em 08/10/2026.
 
-## Entrega atual - Dia 4
+## Entrega atual - Dia 5
+
+Implementados no Dia 5:
+
+- contratos tipados para marcos, categorias e materiais;
+- migração PostgreSQL para linha do tempo, materiais, vínculos com turmas/BNCC e proteção de conteúdo publicado;
+- endpoints autenticados para listar, criar, editar, arquivar e excluir marcos e materiais;
+- bloqueio de edição de marcos passados;
+- confirmação obrigatória para excluir marcos vinculados a conteúdo publicado;
+- bloqueio de exclusão de materiais vinculados a conteúdo publicado;
+- validação de fonte do material, tipo, metadados e propriedade das turmas;
+- painel autenticado inicial para linha do tempo e materiais, com estados vazios.
+
+## Entrega anterior - Dia 4
 
 Implementados:
 
@@ -52,4 +65,4 @@ Implementados:
 
 ## Próximo passo
 
-Executar a suíte de integração contra o Cloud SQL quando necessário e iniciar o Dia 5 conforme o plano.
+Executar a suíte de integração contra o Cloud SQL quando necessário e iniciar o Dia 6 conforme o plano.

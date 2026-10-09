@@ -42,15 +42,15 @@
 
 ## Pendências do DERS
 
-| ID   | Prazo do plano | Pendência                                                                    | Estado                                                 |
-| ---- | -------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------ |
-| D-01 | Dia 1          | Confirmar a cópia de 96 páginas como versão técnica oficial                  | Aberta; o arquivo indicado termina antes dos diagramas |
-| D-02 | Dia 2          | Definir se o aluno possui interface própria ou permanece indireto via Google | Aberta                                                 |
-| D-03 | Dia 3          | Definir fonte e arquivo oficial da carga BNCC                                | Aberta; seed do Dia 1 é explicitamente não oficial     |
-| D-04 | Dia 4          | Fornecer o modelo padrão da planilha de alunos                               | Aberta                                                 |
-| D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Aberta                                                 |
-| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Aberta                                                 |
-| D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Aberta                                                 |
-| D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Aberta                                                 |
-| D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Aberta                                                 |
-| D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Aberta                                                 |
+| ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |
+| ---- | -------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| D-01 | Dia 1          | Confirmar a cópia de 96 páginas como versão técnica oficial                  | Aberta; o arquivo indicado termina antes dos diagramas                                     |
+| D-02 | Dia 2          | Definir se o aluno possui interface própria ou permanece indireto via Google | Aberta                                                                                     |
+| D-03 | Dia 3          | Definir fonte e arquivo oficial da carga BNCC                                | Aberta; seed do Dia 1 é explicitamente não oficial                                         |
+| D-04 | Dia 4          | Fornecer o modelo padrão da planilha de alunos                               | Aberta                                                                                     |
+| D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Resolvida: solicita confirmação explícita; conteúdo publicado continua protegido           |
+| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida: PDF, DOCX, PPT/PPTX, MP4 e imagens; links aceitos; quota permanece configurável |
+| D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Aberta                                                                                     |
+| D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Aberta                                                                                     |
+| D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Aberta                                                                                     |
+| D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Aberta                                                                                     |

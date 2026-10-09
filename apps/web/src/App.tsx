@@ -1,7 +1,10 @@
 import type {
   AuthSession,
+  ClassSummary,
   Identity,
   IntegrationStatus,
+  Material,
+  Milestone,
 } from "@educai/contracts";
 import { useCallback, useEffect, useState } from "react";
 
@@ -174,6 +177,29 @@ function ProfessorShell({
   identity: Identity;
   integrations: IntegrationStatus[];
 }) {
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+
+  useEffect(() => {
+    void Promise.all([
+      fetch(`${apiBaseUrl}/timeline/milestones`, { credentials: "include" }),
+      fetch(`${apiBaseUrl}/materials`, { credentials: "include" }),
+      fetch(`${apiBaseUrl}/classes`, { credentials: "include" }),
+    ])
+      .then(async ([milestoneResponse, materialResponse, classesResponse]) => {
+        const read = async <T,>(response: Response): Promise<T[]> => {
+          if (!response.ok) return [];
+          const body = (await response.json()) as DataEnvelope<T[]>;
+          return Array.isArray(body.data) ? body.data : [];
+        };
+        setMilestones(await read<Milestone>(milestoneResponse));
+        setMaterials(await read<Material>(materialResponse));
+        setClasses(await read<ClassSummary>(classesResponse));
+      })
+      .catch(() => undefined);
+  }, []);
+
   return (
     <>
       <section className="hero compact">
@@ -210,7 +236,77 @@ function ProfessorShell({
           )}
         </div>
       </section>
+      <TimelinePanel
+        milestones={milestones}
+        materials={materials}
+        classes={classes}
+      />
     </>
+  );
+}
+
+function TimelinePanel({
+  milestones,
+  materials,
+  classes,
+}: {
+  milestones: Milestone[];
+  materials: Material[];
+  classes: ClassSummary[];
+}) {
+  return (
+    <section className="timeline-panel" aria-labelledby="timeline-title">
+      <div className="status-heading">
+        <div>
+          <span className="section-label">Dia 5 · RF008 + RF010</span>
+          <h2 id="timeline-title">Linha do tempo e materiais</h2>
+        </div>
+        <span className="timeline-count">{classes.length} turmas</span>
+      </div>
+      <div className="timeline-grid">
+        <div>
+          <h3>Próximos marcos</h3>
+          {milestones.length === 0 ? (
+            <p className="empty-state">Nenhum marco cadastrado.</p>
+          ) : (
+            <ul className="resource-list">
+              {milestones.slice(0, 5).map((milestone) => (
+                <li
+                  key={milestone.id}
+                  className={milestone.isPast ? "muted-item" : ""}
+                >
+                  <span>
+                    {new Date(`${milestone.date}T12:00:00`).toLocaleDateString(
+                      "pt-BR",
+                    )}
+                  </span>
+                  <strong>{milestone.description}</strong>
+                  <small>
+                    {milestone.className} · {milestone.type}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3>Materiais recentes</h3>
+          {materials.length === 0 ? (
+            <p className="empty-state">Nenhum material cadastrado.</p>
+          ) : (
+            <ul className="resource-list">
+              {materials.slice(0, 5).map((material) => (
+                <li key={material.id}>
+                  <strong>{material.title}</strong>
+                  <span>{material.category}</span>
+                  <small>{material.classNames.join(", ")}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
