@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ConfiguredOpenAIAdapter,
@@ -19,17 +19,31 @@ describe("OpenAI adapter boundary", () => {
     });
   });
 
-  it("does not present a configured key as externally verified before authorization", async () => {
+  it("verifies a configured key against the models endpoint", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
     await expect(
-      new ConfiguredOpenAIAdapter({
-        apiKey: "fixture-key",
-        baseUrl: "https://api.openai.com/v1",
-        model: "gpt-5-mini",
-      }).checkAvailability(),
+      new ConfiguredOpenAIAdapter(
+        {
+          apiKey: "fixture-key",
+          baseUrl: "https://api.openai.com/v1",
+          model: "gpt-5-mini",
+        },
+        fetcher as typeof fetch,
+      ).checkAvailability(),
     ).resolves.toEqual({
-      status: "deferred",
-      errorCode: "OPENAI_EXTERNAL_CHECK_DEFERRED",
+      status: "available",
+      errorCode: null,
     });
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/models",
+      expect.objectContaining({
+        headers: { authorization: "Bearer fixture-key" },
+      }),
+    );
   });
 
   it("supports explicit fixtures and normalizes known failures", async () => {
@@ -62,5 +76,66 @@ describe("OpenAI adapter boundary", () => {
     expect(result.origin).toBe("fixture");
     expect(result.suggestion.title).toContain("Frações");
     expect(result.suggestion.objectives).toContain("EF05MA03");
+  });
+
+  it("uses Responses structured output and validates the result", async () => {
+    const suggestion = {
+      title: "Frações revisadas",
+      objectives: "Compreender frações equivalentes.",
+      contents: "Representações de frações.",
+      methodology: "Resolução colaborativa.",
+      evaluationStrategy: "Rubrica e registro.",
+    };
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: "message",
+              content: [
+                { type: "output_text", text: JSON.stringify(suggestion) },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new ConfiguredOpenAIAdapter(
+      {
+        apiKey: "fixture-key",
+        baseUrl: "https://api.openai.com/v1/",
+        model: "gpt-5-mini",
+      },
+      fetcher as typeof fetch,
+    );
+
+    await expect(
+      adapter.generateLessonPlan({
+        title: "Frações",
+        curricularComponent: "Matemática",
+        schoolYear: "5º ano",
+        objectives: "Compreender frações.",
+        contents: "Representação fracionária.",
+        methodology: "Situações-problema.",
+        evaluationStrategy: "Registro e discussão.",
+        syllabus: "Números e operações.",
+        bnccCodes: ["EF05MA03"],
+        materials: ["Guia"],
+      }),
+    ).resolves.toEqual({
+      suggestion,
+      model: "gpt-5-mini",
+      origin: "openai",
+    });
+
+    const [, request] = fetcher.mock.calls[0]!;
+    const body = JSON.parse(String(request.body)) as {
+      text: { format: { type: string; strict: boolean } };
+    };
+    expect(body.text.format).toMatchObject({
+      type: "json_schema",
+      strict: true,
+    });
   });
 });

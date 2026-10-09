@@ -57,6 +57,9 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "004_bncc_canonical.sql",
       "005_bncc_identifier_width.sql",
       "006_classes_students.sql",
+      "007_timeline_materials.sql",
+      "008_lesson_plans.sql",
+      "009_lesson_plan_ai.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -72,6 +75,10 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "google_oauth_credential",
         "auth_session",
         "oauth_authorization_state",
+        "timeline_milestone",
+        "material",
+        "lesson_plan",
+        "lesson_plan_generation",
       ]),
     );
   }, 60_000);

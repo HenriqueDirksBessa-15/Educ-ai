@@ -25,6 +25,7 @@
     "test": "npm run test:unit",
     "test:unit": "npm run test -w @educai/contracts && npm run test -w @educai/api && npm run test -w @educai/web",
     "test:integration": "npm run test:integration -w @educai/api",
+    "test:integration:openai": "npm run test:integration:openai -w @educai/api",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",

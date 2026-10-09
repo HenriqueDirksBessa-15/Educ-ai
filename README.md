@@ -2,7 +2,7 @@
 
 Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1, 2 e 3 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, identidade Google, currículo e perfil.
 
-A autenticação é exclusivamente Google. O adaptador OpenAI está preparado, mas chamadas externas permanecem bloqueadas até 12/10.
+A autenticação é exclusivamente Google. O adaptador OpenAI usa fixture sem chave e ativa a Responses API somente quando `OPENAI_API_KEY` está configurada no servidor.
 
 ## Requisitos locais
 
@@ -99,6 +99,13 @@ O teste de integração cria um banco temporário no mesmo servidor PostgreSQL, 
 npm run test:integration
 ```
 
+O smoke test real da OpenAI é opt-in porque faz uma chamada faturável. Após preencher `OPENAI_API_KEY` no `.env`, execute:
+
+```powershell
+$env:RUN_OPENAI_INTEGRATION="true"
+npm run test:integration:openai
+```
+
 Todas as verificações não dependentes de banco podem ser executadas juntas:
 
 ```powershell
@@ -124,9 +131,10 @@ npm run check
 | `TOKEN_ENCRYPTION_KEY`            | Chave hexadecimal de 32 bytes para tokens |
 | `SESSION_TTL_SECONDS`             | Duração máxima da sessão                  |
 | `INTEGRATION_MONITOR_INTERVAL_MS` | Intervalo do monitor Google               |
-| `OPENAI_API_KEY`                  | Chave OpenAI, não usada antes de 12/10    |
-| `OPENAI_BASE_URL`                 | Base URL do adaptador OpenAI              |
-| `OPENAI_MODEL`                    | Modelo configurado para uso futuro        |
+| `OPENAI_API_KEY`                  | Chave OpenAI usada somente no servidor    |
+| `OPENAI_BASE_URL`                 | Base URL da Responses API                 |
+| `OPENAI_MODEL`                    | Modelo usado para sugestões estruturadas  |
+| `RUN_OPENAI_INTEGRATION`          | Habilita o smoke test real, com custo     |
 
 Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
 

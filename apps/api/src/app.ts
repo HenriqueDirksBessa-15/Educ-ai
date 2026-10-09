@@ -101,7 +101,7 @@ export async function createApp({
     plansRepository,
     planGenerationAdapter:
       planGenerationAdapter ??
-      (config.nodeEnv === "production"
+      (config.openai.apiKey
         ? new ConfiguredOpenAIAdapter(config.openai)
         : new FixtureOpenAIAdapter()),
   });

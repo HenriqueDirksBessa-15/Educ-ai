@@ -28,7 +28,7 @@ Não há microsserviços. Jobs futuros usam a mesma base de código do backend e
 | Desenvolvimento | Docker Compose                        | banco reproduzível com volume persistente e healthcheck                 |
 | OAuth           | `google-auth-library` 10.5            | cliente oficial compatível com Node 20                                  |
 | Sessão          | token opaco + cookie HTTP-only        | revogação no servidor sem expor identidade ao cliente                   |
-| OpenAI          | adaptador tipado + fixture            | prepara estados sem chamada externa antes de 12/10                      |
+| OpenAI          | Responses API + Structured Outputs    | fixture sem chave e integração real somente no servidor                 |
 
 As versões são exatas no manifesto e no lockfile. Vite 6 foi escolhido deliberadamente porque o Vite mais recente exige um runtime superior ao Node 20.16 disponível no ambiente.
 
@@ -53,7 +53,7 @@ O callback verifica o ID token, exige e-mail confirmado e usa o `sub` Google com
 
 O monitor consulta OAuth, Classroom e Forms em ciclos de cinco minutos. Cada falha recebe uma tentativa inicial e até três tentativas adicionais. Somente código normalizado chega ao contrato público; resposta bruta e tokens permanecem internos. Forms exige um formulário de teste configurado para não apresentar conectividade simulada como integração validada.
 
-O adaptador OpenAI distingue chave ausente, verificação adiada, disponibilidade de fixture e indisponibilidade normalizada. Esse estado entra no ciclo técnico de cinco minutos; antes de 12/10 ele não faz requisição externa.
+O adaptador OpenAI distingue chave ausente, disponibilidade e falhas normalizadas. Com chave configurada, o monitor valida a conexão e a geração usa a Responses API com JSON Schema estrito; sem chave, planos continuam usando fixture local. Chaves, cabeçalhos e respostas brutas não são persistidos.
 
 Logout revoga a sessão atual. A rota de desconexão revoga o token Google e todas as sessões locais do professor.
 

@@ -24,7 +24,7 @@
 
 | ID    | Data       | Decisão                                                      | Impacto                                                                  |
 | ----- | ---------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| DT-11 | 09/10/2026 | Não chamar OpenAI antes de 12/10; usar adaptador e fixture   | Nenhuma integração externa é apresentada como concluída                  |
+| DT-11 | 09/10/2026 | Não chamar OpenAI antes de 12/10; usar adaptador e fixture   | Substituída por DT-21 após autorização explícita do usuário              |
 | DT-12 | 09/10/2026 | Registrar fonte, versão e checksum em cada carga curricular  | Histórico e repetição idempotente                                        |
 | DT-13 | 09/10/2026 | Fallback curricular exige revisão explícita                  | Ausência de habilidade não inventa BNCC oficial                          |
 | DT-14 | 09/10/2026 | Perfil resolve professor pela sessão                         | E-mail Google permanece bloqueado e `professorId` não autentica          |
@@ -39,6 +39,13 @@
 | DT-18 | 10/10/2026 | Turma Google usa código local separado do ID externo            | Código de acesso não é editado pelo Classroom                    |
 | DT-19 | 10/10/2026 | Adapter Classroom de fixture antes da integração real           | Não apresentar sincronização externa simulada como concluída     |
 | DT-20 | 10/10/2026 | Usar Cloud SQL `educai-bncc-validation` para validar PostgreSQL | Permite integração sem Docker local; cobrança por uso registrada |
+
+## Decisões técnicas do Dia 7
+
+| ID    | Data       | Decisão                                                     | Impacto                                                          |
+| ----- | ---------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| DT-21 | 09/10/2026 | Liberar OpenAI real por chave explícita e smoke test opt-in | Sem chave usa fixture; teste faturável nunca roda acidentalmente |
+| DT-22 | 09/10/2026 | Usar Responses API com Structured Outputs e validação Zod   | Sugestões respeitam contrato estrito antes de chegar ao domínio  |
 
 ## Pendências do DERS
 
