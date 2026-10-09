@@ -2,7 +2,19 @@
 
 Atualizado em 08/10/2026.
 
-## Entrega atual - Dia 5
+## Entrega atual - Dia 6
+
+Implementados no Dia 6:
+
+- contratos tipados para planos de aula e filtros de arquivamento;
+- migração PostgreSQL para planos, vínculos com turmas, BNCC, ementas e materiais;
+- histórico de revisões com snapshots versionados;
+- endpoints autenticados para listar, criar, editar, visualizar, reutilizar e arquivar planos;
+- validação de propriedade das turmas e materiais e existência da ementa;
+- bloqueio estrutural de edição após uso em conteúdo publicado;
+- interface inicial de planos manuais com estado vazio e criação de rascunho.
+
+## Entrega anterior - Dia 5
 
 Implementados no Dia 5:
 
@@ -65,4 +77,4 @@ Implementados:
 
 ## Próximo passo
 
-Executar a suíte de integração contra o Cloud SQL quando necessário e iniciar o Dia 6 conforme o plano.
+Executar a suíte de integração contra o Cloud SQL quando necessário e iniciar o Dia 7 conforme o plano.

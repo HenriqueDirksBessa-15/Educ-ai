@@ -96,6 +96,24 @@ describe("technical health endpoints", () => {
 });
 
 describe("authentication boundary", () => {
+  it("protects lesson plans with the Google session", async () => {
+    const app = await createApp({
+      config,
+      database: { query: vi.fn() },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/lesson-plans",
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: { code: "UNAUTHENTICATED" },
+    });
+  });
+
   it("keeps Google login unavailable when credentials are absent", async () => {
     const app = await createApp({
       config,

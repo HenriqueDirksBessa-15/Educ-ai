@@ -3,10 +3,12 @@ import type {
   ClassSummary,
   Identity,
   IntegrationStatus,
+  LessonPlan,
   Material,
   Milestone,
 } from "@educai/contracts";
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -163,7 +165,7 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 3 de 14</span>
+        <span>Dia 6 de 14</span>
         <span>Perfil · currículo · BNCC</span>
       </footer>
     </main>
@@ -180,23 +182,33 @@ function ProfessorShell({
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [plans, setPlans] = useState<LessonPlan[]>([]);
 
   useEffect(() => {
     void Promise.all([
       fetch(`${apiBaseUrl}/timeline/milestones`, { credentials: "include" }),
       fetch(`${apiBaseUrl}/materials`, { credentials: "include" }),
       fetch(`${apiBaseUrl}/classes`, { credentials: "include" }),
+      fetch(`${apiBaseUrl}/lesson-plans`, { credentials: "include" }),
     ])
-      .then(async ([milestoneResponse, materialResponse, classesResponse]) => {
-        const read = async <T,>(response: Response): Promise<T[]> => {
-          if (!response.ok) return [];
-          const body = (await response.json()) as DataEnvelope<T[]>;
-          return Array.isArray(body.data) ? body.data : [];
-        };
-        setMilestones(await read<Milestone>(milestoneResponse));
-        setMaterials(await read<Material>(materialResponse));
-        setClasses(await read<ClassSummary>(classesResponse));
-      })
+      .then(
+        async ([
+          milestoneResponse,
+          materialResponse,
+          classesResponse,
+          plansResponse,
+        ]) => {
+          const read = async <T,>(response: Response): Promise<T[]> => {
+            if (!response.ok) return [];
+            const body = (await response.json()) as DataEnvelope<T[]>;
+            return Array.isArray(body.data) ? body.data : [];
+          };
+          setMilestones(await read<Milestone>(milestoneResponse));
+          setMaterials(await read<Material>(materialResponse));
+          setClasses(await read<ClassSummary>(classesResponse));
+          setPlans(await read<LessonPlan>(plansResponse));
+        },
+      )
       .catch(() => undefined);
   }, []);
 
@@ -241,6 +253,7 @@ function ProfessorShell({
         materials={materials}
         classes={classes}
       />
+      <LessonPlansPanel plans={plans} classes={classes} />
     </>
   );
 }
@@ -305,6 +318,108 @@ function TimelinePanel({
             </ul>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function LessonPlansPanel({
+  plans,
+  classes,
+}: {
+  plans: LessonPlan[];
+  classes: ClassSummary[];
+}) {
+  const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const createPlan = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!classes[0] || !title.trim()) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`${apiBaseUrl}/lesson-plans`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title,
+          curricularComponent: "A definir",
+          schoolYear: classes[0].schoolYear,
+          objectives: "Objetivos a detalhar pelo professor.",
+          contents: "Conteúdos a detalhar pelo professor.",
+          methodology: "Metodologia a detalhar pelo professor.",
+          evaluationStrategy: "Estratégia de avaliação a detalhar.",
+          classIds: [classes[0].id],
+          bnccSkillIds: [],
+          materialIds: [],
+        }),
+      });
+      if (!response.ok) throw new Error();
+      setMessage("Plano criado como rascunho manual.");
+      setTitle("");
+    } catch {
+      setMessage("Não foi possível criar o plano.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="timeline-panel" aria-labelledby="plans-title">
+      <div className="status-heading">
+        <div>
+          <span className="section-label">Dia 6 · RF009 parte 1</span>
+          <h2 id="plans-title">Planos de aula manuais</h2>
+        </div>
+        <span className="timeline-count">{plans.length} planos</span>
+      </div>
+      <div className="plans-layout">
+        <div>
+          <h3>Seus planos</h3>
+          {plans.length === 0 ? (
+            <p className="empty-state">Nenhum plano criado.</p>
+          ) : (
+            <ul className="resource-list">
+              {plans.slice(0, 5).map((plan) => (
+                <li key={plan.id}>
+                  <strong>{plan.title}</strong>
+                  <span>
+                    {plan.curricularComponent} · {plan.schoolYear}
+                  </span>
+                  <small>{plan.classNames.join(", ")}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <form
+          className="plan-form"
+          onSubmit={(event) => void createPlan(event)}
+        >
+          <h3>Novo plano manual</h3>
+          <label>
+            Título
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Ex.: Frações na prática"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={saving || classes.length === 0 || !title.trim()}
+          >
+            {saving ? "Salvando…" : "Criar rascunho"}
+          </button>
+          {message && (
+            <small className="form-message" role="status">
+              {message}
+            </small>
+          )}
+        </form>
       </div>
     </section>
   );

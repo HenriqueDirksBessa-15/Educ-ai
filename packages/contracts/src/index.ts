@@ -240,6 +240,43 @@ export const materialListQuerySchema = z.object({
   archived: z.coerce.boolean().optional(),
 });
 
+export const lessonPlanInputSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  curricularComponent: z.string().trim().min(1).max(100),
+  schoolYear: z.string().trim().min(1).max(20),
+  objectives: z.string().trim().min(1).max(4_000),
+  contents: z.string().trim().min(1).max(4_000),
+  methodology: z.string().trim().min(1).max(6_000),
+  evaluationStrategy: z.string().trim().min(1).max(4_000),
+  classIds: z.array(z.uuid()).min(1),
+  syllabusId: z.uuid().nullable().optional(),
+  bnccSkillIds: z.array(z.uuid()).default([]),
+  materialIds: z.array(z.uuid()).default([]),
+});
+
+export const lessonPlanUpdateSchema = lessonPlanInputSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo editável.",
+  });
+
+export const lessonPlanSchema = lessonPlanInputSchema.extend({
+  id: z.uuid(),
+  professorId: z.uuid(),
+  classNames: z.array(z.string().min(1)),
+  syllabusDescription: z.string().nullable(),
+  bnccCodes: z.array(z.string().min(1)),
+  materialTitles: z.array(z.string().min(1)),
+  isArchived: z.boolean(),
+  isLocked: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const lessonPlanListQuerySchema = z.object({
+  archived: z.coerce.boolean().optional(),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -288,6 +325,9 @@ export type MilestoneUpdate = z.infer<typeof milestoneUpdateSchema>;
 export type MaterialCategory = z.infer<typeof materialCategorySchema>;
 export type Material = z.infer<typeof materialSchema>;
 export type MaterialInput = z.infer<typeof materialInputSchema>;
+export type LessonPlan = z.infer<typeof lessonPlanSchema>;
+export type LessonPlanInput = z.infer<typeof lessonPlanInputSchema>;
+export type LessonPlanUpdate = z.infer<typeof lessonPlanUpdateSchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 

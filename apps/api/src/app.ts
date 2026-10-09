@@ -21,6 +21,8 @@ import { registerProfileRoutes } from "./profile/routes.js";
 import { ProfileRepository } from "./profile/repository.js";
 import { registerTimelineRoutes } from "./timeline/routes.js";
 import { TimelineRepository } from "./timeline/repository.js";
+import { registerPlansRoutes } from "./plans/routes.js";
+import { PlansRepository } from "./plans/repository.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -55,6 +57,7 @@ export async function createApp({
   const curriculumRepository = new CurriculumRepository(database);
   const classesRepository = new ClassesRepository(database);
   const timelineRepository = new TimelineRepository(database);
+  const plansRepository = new PlansRepository(database);
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -85,6 +88,11 @@ export async function createApp({
     config,
     authRepository: repository,
     timelineRepository,
+  });
+  registerPlansRoutes(app, {
+    config,
+    authRepository: repository,
+    plansRepository,
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());
