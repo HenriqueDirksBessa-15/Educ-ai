@@ -16,7 +16,11 @@ import { registerClassesRoutes } from "./classes/routes.js";
 import { ClassesRepository } from "./classes/repository.js";
 import { FixtureClassroomAdapter } from "./classroom/adapter.js";
 import { isDatabaseAvailable, type DatabaseClient } from "./database.js";
-import { ConfiguredOpenAIAdapter } from "./openai/adapter.js";
+import {
+  ConfiguredOpenAIAdapter,
+  FixtureOpenAIAdapter,
+  type OpenAIAdapter,
+} from "./openai/adapter.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { ProfileRepository } from "./profile/repository.js";
 import { registerTimelineRoutes } from "./timeline/routes.js";
@@ -28,6 +32,7 @@ type AppDependencies = {
   config: AppConfig;
   database: DatabaseClient;
   googleGateway?: GoogleGateway;
+  planGenerationAdapter?: OpenAIAdapter;
   startMonitor?: boolean;
 };
 
@@ -35,6 +40,7 @@ export async function createApp({
   config,
   database,
   googleGateway,
+  planGenerationAdapter,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -93,6 +99,11 @@ export async function createApp({
     config,
     authRepository: repository,
     plansRepository,
+    planGenerationAdapter:
+      planGenerationAdapter ??
+      (config.nodeEnv === "production"
+        ? new ConfiguredOpenAIAdapter(config.openai)
+        : new FixtureOpenAIAdapter()),
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());

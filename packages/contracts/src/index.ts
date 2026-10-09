@@ -260,6 +260,38 @@ export const lessonPlanUpdateSchema = lessonPlanInputSchema
     message: "Informe ao menos um campo editável.",
   });
 
+export const lessonPlanStatusSchema = z.enum([
+  "draft",
+  "generated",
+  "reviewed",
+  "approved",
+]);
+
+export const lessonPlanSuggestionSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  objectives: z.string().trim().min(1).max(4_000),
+  contents: z.string().trim().min(1).max(4_000),
+  methodology: z.string().trim().min(1).max(6_000),
+  evaluationStrategy: z.string().trim().min(1).max(4_000),
+});
+
+export const lessonPlanGenerationSchema = z.object({
+  id: z.uuid(),
+  planId: z.uuid(),
+  version: z.number().int().positive(),
+  model: z.string().min(1),
+  origin: z.enum(["fixture", "openai"]),
+  status: z.enum(["succeeded", "failed"]),
+  suggestion: lessonPlanSuggestionSchema.nullable(),
+  errorCode: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const lessonPlanReviewSchema = z.object({
+  suggestion: lessonPlanSuggestionSchema,
+  generationId: z.uuid(),
+});
+
 export const lessonPlanSchema = lessonPlanInputSchema.extend({
   id: z.uuid(),
   professorId: z.uuid(),
@@ -269,6 +301,10 @@ export const lessonPlanSchema = lessonPlanInputSchema.extend({
   materialTitles: z.array(z.string().min(1)),
   isArchived: z.boolean(),
   isLocked: z.boolean(),
+  status: lessonPlanStatusSchema,
+  reviewedAt: z.iso.datetime().nullable(),
+  approvedAt: z.iso.datetime().nullable(),
+  latestGeneration: lessonPlanGenerationSchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -328,6 +364,10 @@ export type MaterialInput = z.infer<typeof materialInputSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type LessonPlanInput = z.infer<typeof lessonPlanInputSchema>;
 export type LessonPlanUpdate = z.infer<typeof lessonPlanUpdateSchema>;
+export type LessonPlanStatus = z.infer<typeof lessonPlanStatusSchema>;
+export type LessonPlanSuggestion = z.infer<typeof lessonPlanSuggestionSchema>;
+export type LessonPlanGeneration = z.infer<typeof lessonPlanGenerationSchema>;
+export type LessonPlanReview = z.infer<typeof lessonPlanReviewSchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 

@@ -1,8 +1,21 @@
 # Progresso
 
-Atualizado em 08/10/2026.
+Atualizado em 09/10/2026.
 
-## Entrega atual - Dia 6
+## Entrega atual - Dia 7
+
+Implementados no Dia 7:
+
+- geração estruturada de sugestões de plano por adaptador OpenAI com fixture local durante o bloqueio externo;
+- contexto de geração com ementa, habilidades BNCC e materiais permitidos;
+- bloqueio e aviso quando o plano não possui ementa;
+- persistência das tentativas, versões, modelo, origem, contexto e erros sem segredos;
+- estados `draft`, `generated`, `reviewed` e `approved`;
+- revisão explícita e editável antes da aprovação docente;
+- tratamento de resposta inválida, timeout e indisponibilidade sem sobrescrever o plano manual;
+- interface comparativa em duas colunas para plano atual e sugestão.
+
+## Entrega anterior - Dia 6
 
 Implementados no Dia 6:
 
@@ -56,7 +69,7 @@ Implementados:
 
 | Verificação                      | Resultado                                                                                                   |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `npm run check`                  | Aprovada: formatação, lint, tipos, 7 testes de contratos, 22 testes de API, 4 testes web e builds completos |
+| `npm run check`                  | Aprovada: formatação, lint, tipos, 8 testes de contratos, 28 testes de API, 4 testes web e builds completos |
 | `npm audit --omit=dev`           | Aprovada anteriormente; dependências de produção sem vulnerabilidades reportadas                            |
 | Testes de repositório curricular | Aprovados; agrupamento, fonte e fallback de revisão                                                         |
 | Testes de perfil                 | Aprovados; lista vazia e atualização sem e-mail                                                             |
@@ -77,4 +90,4 @@ Implementados:
 
 ## Próximo passo
 
-Executar a suíte de integração contra o Cloud SQL quando necessário e iniciar o Dia 7 conforme o plano.
+Aplicar as migrações dos Dias 5–7 no Cloud SQL quando disponível e iniciar o Dia 8 conforme o plano.

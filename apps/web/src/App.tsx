@@ -4,6 +4,8 @@ import type {
   Identity,
   IntegrationStatus,
   LessonPlan,
+  LessonPlanGeneration,
+  LessonPlanSuggestion,
   Material,
   Milestone,
 } from "@educai/contracts";
@@ -165,7 +167,7 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 6 de 14</span>
+        <span>Dia 7 de 14</span>
         <span>Perfil · currículo · BNCC</span>
       </footer>
     </main>
@@ -333,6 +335,14 @@ function LessonPlansPanel({
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<LessonPlan | null>(null);
+  const [generation, setGeneration] = useState<LessonPlanGeneration | null>(
+    null,
+  );
+  const [suggestion, setSuggestion] = useState<LessonPlanSuggestion | null>(
+    null,
+  );
+  const [generating, setGenerating] = useState(false);
 
   const createPlan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -367,12 +377,61 @@ function LessonPlansPanel({
     }
   };
 
+  const generateSuggestion = async (plan: LessonPlan) => {
+    setSelectedPlan(plan);
+    setSuggestion(null);
+    setGeneration(null);
+    setGenerating(true);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/lesson-plans/${plan.id}/generate`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!response.ok) throw new Error();
+      const body =
+        (await response.json()) as DataEnvelope<LessonPlanGeneration>;
+      setGeneration(body.data);
+      setSuggestion(body.data.suggestion);
+    } catch {
+      setMessage(
+        plan.syllabusDescription
+          ? "A sugestão falhou; o plano manual foi preservado."
+          : "Selecione uma ementa antes de gerar sugestões.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const reviewSuggestion = async () => {
+    if (!selectedPlan || !generation || !suggestion) return;
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/lesson-plans/${selectedPlan.id}/review`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ generationId: generation.id, suggestion }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setMessage("Sugestão revisada pelo professor e salva no plano.");
+    } catch {
+      setMessage("Não foi possível registrar a revisão.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <section className="timeline-panel" aria-labelledby="plans-title">
       <div className="status-heading">
         <div>
-          <span className="section-label">Dia 6 · RF009 parte 1</span>
-          <h2 id="plans-title">Planos de aula manuais</h2>
+          <span className="section-label">Dia 7 · RF009</span>
+          <h2 id="plans-title">Planos de aula e assistência de IA</h2>
         </div>
         <span className="timeline-count">{plans.length} planos</span>
       </div>
@@ -390,6 +449,20 @@ function LessonPlansPanel({
                     {plan.curricularComponent} · {plan.schoolYear}
                   </span>
                   <small>{plan.classNames.join(", ")}</small>
+                  <small>Estado: {plan.status}</small>
+                  <button
+                    type="button"
+                    className="secondary-action compact-action"
+                    disabled={generating || !plan.syllabusDescription}
+                    onClick={() => void generateSuggestion(plan)}
+                  >
+                    {generating && selectedPlan?.id === plan.id
+                      ? "Gerando…"
+                      : "Gerar sugestão"}
+                  </button>
+                  {!plan.syllabusDescription && (
+                    <small>Vincule uma ementa para habilitar a IA.</small>
+                  )}
                 </li>
               ))}
             </ul>
@@ -421,6 +494,84 @@ function LessonPlansPanel({
           )}
         </form>
       </div>
+      {selectedPlan && suggestion && generation && (
+        <div className="plan-comparison">
+          <article>
+            <span className="section-label">Plano atual</span>
+            <h3>{selectedPlan.title}</h3>
+            <p>{selectedPlan.objectives}</p>
+            <p>{selectedPlan.methodology}</p>
+          </article>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void reviewSuggestion();
+            }}
+          >
+            <span className="section-label">Sugestão editável</span>
+            <label>
+              Título
+              <input
+                value={suggestion.title}
+                onChange={(event) =>
+                  setSuggestion({ ...suggestion, title: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Objetivos
+              <textarea
+                value={suggestion.objectives}
+                onChange={(event) =>
+                  setSuggestion({
+                    ...suggestion,
+                    objectives: event.target.value,
+                  })
+                }
+              />
+            </label>
+            <label>
+              Conteúdos
+              <textarea
+                value={suggestion.contents}
+                onChange={(event) =>
+                  setSuggestion({ ...suggestion, contents: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Metodologia
+              <textarea
+                value={suggestion.methodology}
+                onChange={(event) =>
+                  setSuggestion({
+                    ...suggestion,
+                    methodology: event.target.value,
+                  })
+                }
+              />
+            </label>
+            <label>
+              Avaliação
+              <textarea
+                value={suggestion.evaluationStrategy}
+                onChange={(event) =>
+                  setSuggestion({
+                    ...suggestion,
+                    evaluationStrategy: event.target.value,
+                  })
+                }
+              />
+            </label>
+            <button type="submit" disabled={saving}>
+              Revisar e aplicar
+            </button>
+            <small>
+              Modelo: {generation.model} · origem: {generation.origin}
+            </small>
+          </form>
+        </div>
+      )}
     </section>
   );
 }

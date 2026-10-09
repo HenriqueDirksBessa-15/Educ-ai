@@ -44,4 +44,23 @@ describe("OpenAI adapter boundary", () => {
       errorCode: "OPENAI_API_KEY_INVALID",
     });
   });
+
+  it("returns a structured fixture suggestion without an external call", async () => {
+    const result = await new FixtureOpenAIAdapter().generateLessonPlan({
+      title: "Frações",
+      curricularComponent: "Matemática",
+      schoolYear: "5º ano",
+      objectives: "Compreender frações.",
+      contents: "Representação fracionária.",
+      methodology: "Situações-problema.",
+      evaluationStrategy: "Registro e discussão.",
+      syllabus: "Números e operações.",
+      bnccCodes: ["EF05MA03"],
+      materials: ["Guia"],
+    });
+
+    expect(result.origin).toBe("fixture");
+    expect(result.suggestion.title).toContain("Frações");
+    expect(result.suggestion.objectives).toContain("EF05MA03");
+  });
 });

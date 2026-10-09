@@ -264,6 +264,60 @@ h1 {
   color: #087f6b;
 }
 
+.compact-action {
+  width: fit-content;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.plan-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.plan-comparison article,
+.plan-comparison form {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #d7e7e2;
+  border-radius: 0.9rem;
+  background: #f4faf8;
+}
+
+.plan-comparison h3,
+.plan-comparison p {
+  margin: 0;
+}
+
+.plan-comparison label {
+  display: grid;
+  gap: 0.3rem;
+  color: #4b6661;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.plan-comparison input,
+.plan-comparison textarea {
+  width: 100%;
+  border: 1px solid #b8d8d0;
+  border-radius: 0.65rem;
+  padding: 0.65rem;
+  color: #15332f;
+  font: inherit;
+  background: #ffffff;
+}
+
+.plan-comparison textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
 .timeline-grid h3 {
   margin: 0;
   font-size: 1.1rem;
@@ -423,6 +477,10 @@ footer {
   }
 
   .plans-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-comparison {
     grid-template-columns: 1fr;
   }
 }

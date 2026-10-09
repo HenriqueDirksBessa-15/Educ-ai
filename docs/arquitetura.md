@@ -98,6 +98,6 @@ Para validação quando Docker local não estiver disponível, o projeto mantém
 
 Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alterar nome e preferência, mas nunca e-mail; consultas sem habilidade retornam fallback marcado para revisão.
 
-## Relações previstas, ainda não implementadas
+## Relações implementadas e próximas
 
-Planos vinculam turma, ementa, BNCC e materiais; atividades vinculam plano, questões e prazos; submissões vinculam aluno e respostas; correções preservam sugestão, ajuste e aprovação; feedback e boletins preservam histórico. Essas relações entram apenas nos dias dos respectivos RFs.
+Planos já vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades ainda vincularão plano, questões e prazos; submissões vincularão aluno e respostas; correções preservarão sugestão, ajuste e aprovação; feedback e boletins preservarão histórico nas etapas seguintes.

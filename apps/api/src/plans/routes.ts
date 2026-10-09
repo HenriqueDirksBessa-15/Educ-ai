@@ -1,6 +1,8 @@
 import {
   lessonPlanListQuerySchema,
   lessonPlanInputSchema,
+  lessonPlanReviewSchema,
+  lessonPlanSuggestionSchema,
   lessonPlanUpdateSchema,
 } from "@educai/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -8,6 +10,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AuthRepository } from "../auth/repository.js";
 import { requireIdentity, sessionCookieName } from "../auth/routes.js";
 import type { AppConfig } from "../config.js";
+import {
+  OpenAIPlanGenerationError,
+  type OpenAIAdapter,
+} from "../openai/adapter.js";
+import {
+  buildLessonPlanPromptContext,
+  MissingSyllabusError,
+} from "./generation.js";
 import type { PlansRepository } from "./repository.js";
 
 export function registerPlansRoutes(
@@ -16,6 +26,7 @@ export function registerPlansRoutes(
     config: AppConfig;
     authRepository: AuthRepository;
     plansRepository: PlansRepository;
+    planGenerationAdapter: OpenAIAdapter;
   },
 ): void {
   const cookieName = sessionCookieName(dependencies.config.nodeEnv);
@@ -119,6 +130,127 @@ export function registerPlansRoutes(
       );
       if (!archived) return notFound(reply, "Plano não encontrado.");
       return { data: { archived: true } };
+    },
+  );
+
+  app.post<{ Params: { planId: string } }>(
+    "/api/lesson-plans/:planId/generate",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const plan = await dependencies.plansRepository.get(
+        user.professorId,
+        request.params.planId,
+      );
+      if (!plan) return notFound(reply, "Plano não encontrado.");
+      if (plan.isArchived || plan.isLocked)
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Plano arquivado ou em uso não pode receber sugestões.",
+          },
+        });
+      let context;
+      try {
+        context = buildLessonPlanPromptContext(plan);
+      } catch (error) {
+        if (error instanceof MissingSyllabusError)
+          return reply.code(409).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Selecione uma ementa antes de gerar sugestões.",
+            },
+          });
+        throw error;
+      }
+      try {
+        const generated =
+          await dependencies.planGenerationAdapter.generateLessonPlan(context);
+        const parsed = lessonPlanSuggestionSchema.safeParse(
+          generated.suggestion,
+        );
+        if (!parsed.success)
+          throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+        const generation =
+          await dependencies.plansRepository.recordGenerationSuccess(
+            user.professorId,
+            request.params.planId,
+            context,
+            { ...generated, suggestion: parsed.data },
+          );
+        return { data: generation };
+      } catch (error) {
+        const errorCode =
+          error instanceof OpenAIPlanGenerationError
+            ? error.code
+            : error instanceof Error && error.name === "AbortError"
+              ? "OPENAI_TIMEOUT"
+              : "OPENAI_GENERATION_FAILED";
+        await dependencies.plansRepository.recordGenerationFailure(
+          user.professorId,
+          request.params.planId,
+          context,
+          dependencies.config.openai.model,
+          "openai",
+          errorCode,
+        );
+        return reply.code(503).send({
+          error: {
+            code: "INTEGRATION_UNAVAILABLE",
+            message:
+              "A sugestão não pôde ser gerada. O plano manual foi preservado.",
+          },
+        });
+      }
+    },
+  );
+
+  app.post<{ Params: { planId: string }; Body: unknown }>(
+    "/api/lesson-plans/:planId/review",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const parsed = lessonPlanReviewSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const result = await dependencies.plansRepository.reviewGeneration(
+        user.professorId,
+        request.params.planId,
+        parsed.data,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Plano não encontrado.");
+      if (result === "generation_not_found")
+        return notFound(reply, "Sugestão não encontrada para este plano.");
+      if (result === "locked")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Plano arquivado ou em uso não pode ser revisado.",
+          },
+        });
+      return { data: { status: "reviewed" } };
+    },
+  );
+
+  app.post<{ Params: { planId: string } }>(
+    "/api/lesson-plans/:planId/approve",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const result = await dependencies.plansRepository.approve(
+        user.professorId,
+        request.params.planId,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Plano não encontrado.");
+      if (result === "review_required")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Revise explicitamente a sugestão antes de aprovar.",
+          },
+        });
+      return { data: { status: "approved" } };
     },
   );
 }
