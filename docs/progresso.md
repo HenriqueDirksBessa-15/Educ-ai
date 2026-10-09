@@ -2,6 +2,30 @@
 
 Atualizado em 09/10/2026.
 
+## Correções pós-auditoria - Etapa 1
+
+Implementado nesta etapa:
+
+- identidade de turma Google passou a ser única por professor, preservando
+  co-docência sem transferir propriedade local;
+- códigos locais derivados de turmas Google incluem o professor e permanecem
+  globalmente únicos;
+- dados de aluno controlados pelo Google não podem ser sobrescritos por uma
+  matrícula de planilha ou código de acesso;
+- teste de migrações foi atualizado para incluir as migrações 010-014;
+- testes de repositório cobrem conflito de turma compartilhada e precedência da
+  origem Google.
+
+Verificações da etapa:
+
+- migração 014 validada em tabela PostgreSQL temporária com rollback: o mesmo
+  curso é permitido para professores diferentes e rejeitado quando repetido para
+  o mesmo professor;
+- `npm run lint`, `npm run typecheck`, `npm run test:unit` (42 testes) e
+  `npm run build` concluídos com sucesso;
+- Docker local estava indisponível, portanto a suíte que cria um banco temporário
+  completo não foi executada nesta etapa.
+
 ## Entrega atual - Carga BNCC direta e compatibilidade legada
 
 Implementado nesta etapa:

@@ -60,6 +60,11 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "007_timeline_materials.sql",
       "008_lesson_plans.sql",
       "009_lesson_plan_ai.sql",
+      "010_bncc_compatibility_projection.sql",
+      "011_syllabus_school_year_width.sql",
+      "012_bncc_compatibility_document_key.sql",
+      "013_bncc_skill_text_width.sql",
+      "014_classroom_tenant_isolation.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 

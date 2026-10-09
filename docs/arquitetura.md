@@ -42,6 +42,10 @@ O mesmo limite de runtime afeta o ESLint: a série 10 requer Node 20.19 ou super
 - Identidade autenticada é criada exclusivamente pelo Google; contratos não oferecem senha.
 - Um `professorId` enviado pelo cliente nunca será aceito como prova de identidade.
 - Toda consulta de domínio futura parte do professor resolvido pela sessão.
+- A identidade externa de uma turma Google é única dentro do professor, permitindo
+  co-docência sem transferir a propriedade local entre contas.
+- Dados de aluno cuja origem é Google não podem ser sobrescritos por planilha ou
+  código de acesso.
 - Fixtures são marcadas por `is_fixture` e usam dados impossíveis de confundir com produção.
 - OAuth usa `state` descartável e PKCE S256; cada `state` só pode ser consumido uma vez.
 - Cookies são HTTP-only, `SameSite=Lax` e `Secure` em produção.
@@ -86,7 +90,9 @@ O primeiro esquema contém somente entidades necessárias à fundação:
 - `curriculum_load` para fonte, versão, checksum e estado da carga;
 - `curriculum_change` para histórico de entidades alteradas.
 
-IDs internos são UUIDs. Identificadores Google são opcionais e únicos, preparados sem simular integração. E-mails usam `citext`; códigos locais de turma são únicos sem distinção de caixa.
+IDs internos são UUIDs. Identificadores Google são opcionais; o identificador de turma
+é único por professor para representar co-docência sem mistura de dados. E-mails usam
+`citext`; códigos locais de turma são únicos sem distinção de caixa.
 
 Índices foram criados para chaves estrangeiras e consultas concretas previstas: turmas por professor, ementas por componente/ano, matrículas por turma/aluno/status e último status por serviço. Nenhuma tabela vazia dos módulos posteriores foi antecipada.
 

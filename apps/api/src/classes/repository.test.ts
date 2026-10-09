@@ -44,5 +44,43 @@ describe("classes repository boundaries", () => {
       expect.stringContaining("ON CONFLICT (class_group_id, student_id)"),
       expect.any(Array),
     );
+    expect(database.query).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "student.origin = 'google' AND EXCLUDED.origin <> 'google'",
+      ),
+      expect.any(Array),
+    );
+  });
+
+  it("keeps Google course identity scoped to each professor", async () => {
+    const database = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+    };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+    const course = {
+      googleClassroomId: "shared-google-course",
+      name: "Turma compartilhada",
+      description: null,
+      schoolYear: "2026",
+    };
+
+    await repository.syncGoogleCourses(professorA, [course]);
+    await repository.syncGoogleCourses(professorB, [course]);
+
+    const [firstSql, firstValues] = database.query.mock.calls[0] as [
+      string,
+      unknown[],
+    ];
+    const [, secondValues] = database.query.mock.calls[1] as [
+      string,
+      unknown[],
+    ];
+    expect(firstSql).toContain(
+      "ON CONFLICT (professor_id, google_classroom_id)",
+    );
+    expect(firstSql).not.toContain("professor_id = EXCLUDED.professor_id");
+    expect(firstValues[5]).not.toEqual(secondValues[5]);
   });
 });

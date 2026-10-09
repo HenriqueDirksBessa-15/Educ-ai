@@ -152,8 +152,16 @@ export class ClassesRepository {
       `INSERT INTO student (name, email, origin)
        VALUES ($1, $2, $3)
        ON CONFLICT (email) DO UPDATE SET
-         name = EXCLUDED.name,
-         origin = CASE WHEN student.origin = 'google' THEN student.origin ELSE EXCLUDED.origin END
+         name = CASE
+           WHEN student.origin = 'google' AND EXCLUDED.origin <> 'google'
+             THEN student.name
+           ELSE EXCLUDED.name
+         END,
+         origin = CASE
+           WHEN student.origin = 'google' OR EXCLUDED.origin = 'google'
+             THEN 'google'::record_origin
+           ELSE EXCLUDED.origin
+         END
        RETURNING id`,
       [input.name, input.email, input.origin],
     )) as QueryResult<{ id: string }>;
@@ -174,7 +182,7 @@ export class ClassesRepository {
   ): Promise<number> {
     for (const course of courses) {
       const accessCode = `g-${createHash("sha256")
-        .update(course.googleClassroomId)
+        .update(`${professorId}:${course.googleClassroomId}`)
         .digest("hex")
         .slice(0, 24)}`;
       await this.database.query(
@@ -182,8 +190,7 @@ export class ClassesRepository {
            professor_id, google_classroom_id, name, description, school_year,
            local_access_code, origin, sync_status, last_synced_at, sync_error
          ) VALUES ($1, $2, $3, $4, $5, $6, 'google', 'active', now(), NULL)
-         ON CONFLICT (google_classroom_id) DO UPDATE SET
-           professor_id = EXCLUDED.professor_id,
+         ON CONFLICT (professor_id, google_classroom_id) DO UPDATE SET
            name = EXCLUDED.name,
            description = EXCLUDED.description,
            school_year = EXCLUDED.school_year,
