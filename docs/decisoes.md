@@ -47,16 +47,27 @@
 | DT-21 | 09/10/2026 | Liberar OpenAI real por chave explícita e smoke test opt-in | Sem chave usa fixture; teste faturável nunca roda acidentalmente |
 | DT-22 | 09/10/2026 | Usar Responses API com Structured Outputs e validação Zod   | Sugestões respeitam contrato estrito antes de chegar ao domínio  |
 
+## Decisões pós-auditoria do Dia 7
+
+| ID    | Data       | Decisão                                                                    | Impacto                                                                                  |
+| ----- | ---------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| DT-23 | 09/10/2026 | Adotar o DERS completo de 96 páginas como autoridade funcional oficial     | Encerra a incerteza documental e inclui os diagramas técnicos na referência do projeto   |
+| DT-24 | 09/10/2026 | Restringir fixtures a desenvolvimento e teste, sempre identificadas        | Produção nunca apresenta sincronização ou geração simulada como integração disponível    |
+| DT-25 | 09/10/2026 | Manter alunos sem acesso direto à aplicação web do EDUC.AI                  | A interação do aluno ocorre exclusivamente pelo Google Classroom                         |
+| DT-26 | 09/10/2026 | Arquivar logicamente marco vinculado após confirmação                      | O marco sai da linha do tempo ativa sem apagar o histórico de conteúdo publicado         |
+| DT-27 | 09/10/2026 | Padronizar planilha de alunos com nome e e-mail                             | Registros entram pendentes até validação do professor; importações Google entram ativas  |
+| DT-28 | 09/10/2026 | Manter a quota de materiais configurável e sem limite fixo nesta etapa      | Evita inventar restrição ausente no DERS e preserva configuração futura                  |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |
 | ---- | -------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| D-01 | Dia 1          | Confirmar a cópia de 96 páginas como versão técnica oficial                  | Aberta; o arquivo indicado termina antes dos diagramas                                     |
-| D-02 | Dia 2          | Definir se o aluno possui interface própria ou permanece indireto via Google | Aberta                                                                                     |
+| D-01 | Dia 1          | Confirmar a cópia de 96 páginas como versão técnica oficial                  | Resolvida por DT-23: a cópia completa é a autoridade funcional oficial                     |
+| D-02 | Dia 2          | Definir se o aluno possui interface própria ou permanece indireto via Google | Resolvida por DT-25: aluno interage exclusivamente pelo Google Classroom                   |
 | D-03 | Dia 3          | Definir fonte e arquivo oficial da carga BNCC                                | Aberta; seed do Dia 1 é explicitamente não oficial                                         |
-| D-04 | Dia 4          | Fornecer o modelo padrão da planilha de alunos                               | Aberta                                                                                     |
-| D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Resolvida: solicita confirmação explícita; conteúdo publicado continua protegido           |
-| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida: PDF, DOCX, PPT/PPTX, MP4 e imagens; links aceitos; quota permanece configurável |
+| D-04 | Dia 4          | Fornecer o modelo padrão da planilha de alunos                               | Resolvida por DT-27: colunas nome e e-mail; entrada pendente até validação                  |
+| D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Resolvida por DT-26: confirmação arquiva o marco e preserva o histórico publicado           |
+| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida por DT-28: formatos já aprovados; quota configurável sem limite fixo nesta etapa |
 | D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Aberta                                                                                     |
 | D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Aberta                                                                                     |
 | D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Aberta                                                                                     |
