@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+title: "bncc.dev: dados abertos e verificados da Base Nacional Comum Curricular"
+message: "Se você usar este dataset em pesquisa ou produto, cite-o conforme abaixo."
+type: dataset
+authors:
+  - name: "Profy"
+    website: "https://profy.com.br"
+    city: "São Paulo"
+    country: BR
+repository-code: "https://github.com/bncc-dev/bncc-dados"
+url: "https://bncc.dev"
+abstract: >-
+  A Base Nacional Comum Curricular brasileira como dados estruturados,
+  verificados e rastreáveis: 1.721 aprendizagens, sendo as 1.580 das três
+  etapas da educação básica (BNCC 2018) e as 141 do complemento de Computação
+  (Parecer CNE/CEB 2/2022). Cada registro traz competências, contextos de
+  organização e proveniência (documento oficial e página), conferido caractere
+  a caractere contra os documentos homologados. O pipeline de extração é
+  reprodutível e verificado por integração contínua.
+keywords:
+  - BNCC
+  - educação
+  - currículo
+  - Brasil
+  - dados abertos
+  - educação básica
+  - dataset
+license: CC-BY-4.0
+license-url: "https://github.com/bncc-dev/bncc-dados/blob/main/dados/LICENSE.md"
+version: "dados-2026.07.1"
+date-released: "2026-08-11"
+doi: "10.5281/zenodo.21625233"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21625233"
+    description: "DOI de conceito: resolve sempre para a versão mais recente do dataset."
+  - type: doi
+    value: "10.5281/zenodo.21881682"
+    description: "DOI da versão dados-2026.07.1."
+  - type: doi
+    value: "10.5281/zenodo.21625234"
+    description: "DOI da versão dados-2026.07."

@@ -17,6 +17,7 @@ Implementados:
 - e-mail Google ausente da entrada de atualização e bloqueado no backend;
 - listagem de turmas do professor, incluindo estado vazio;
 - contratos e testes isolados para OpenAI, currículo e perfil.
+- fonte BNCC canônica registrada em [docs/fontes-bncc.md](./fontes-bncc.md), com schemas e contagens validados em modo seco.
 
 ## Verificações
 
@@ -27,13 +28,14 @@ Implementados:
 | Testes de repositório curricular | Aprovados; agrupamento, fonte e fallback de revisão                                                         |
 | Testes de perfil                 | Aprovados; lista vazia e atualização sem e-mail                                                             |
 | Testes do adaptador OpenAI       | Aprovados; ausência, adiamento, fixture e erro normalizado                                                  |
-| Migração/seed PostgreSQL         | Não repetidos; Docker/PostgreSQL não está disponível neste computador                                       |
+| Importador BNCC em modo seco    | Aprovado; schemas e contagens canônicas validados sem gravar no banco                                    |
+| Migração/seed PostgreSQL         | Não repetidos; Docker/PostgreSQL não está disponível neste computador                                    |
 
 ## Limitações e decisões pendentes
 
 - Nenhuma chamada real OpenAI foi executada, conforme a restrição até 12/10.
-- A fonte oficial da BNCC ainda não foi fornecida; a carga versionada atual continua simulada.
-- A migração `003_curriculum_profile.sql` e a seed `002_curriculum_fixtures.sql` precisam ser executadas em um PostgreSQL acessível antes da validação de integração.
+- A fonte estruturada e a fonte oficial de validação foram registradas; a gravação completa no banco precisa ser executada em PostgreSQL acessível.
+- As migrações `003_curriculum_profile.sql`, `004_bncc_canonical.sql`, `005_bncc_identifier_width.sql` e a seed `002_curriculum_fixtures.sql` precisam ser executadas em PostgreSQL acessível antes da validação de integração.
 - RF002 permanece implementado com integração externa adiada; RF003 depende da fonte oficial; RF005 depende da integração de banco.
 
 ## Próximo passo

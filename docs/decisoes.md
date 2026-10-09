@@ -28,6 +28,7 @@
 | DT-12 | 09/10/2026 | Registrar fonte, versão e checksum em cada carga curricular | Histórico e repetição idempotente                               |
 | DT-13 | 09/10/2026 | Fallback curricular exige revisão explícita                 | Ausência de habilidade não inventa BNCC oficial                 |
 | DT-14 | 09/10/2026 | Perfil resolve professor pela sessão                        | E-mail Google permanece bloqueado e `professorId` não autentica |
+| DT-15 | 09/10/2026 | Usar bncc-dados como estrutura derivada e MEC como validação  | Proveniência preservada sem tratar dataset derivado como fonte normativa |
 
 ## Pendências do DERS
 

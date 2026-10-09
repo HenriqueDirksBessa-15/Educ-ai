@@ -1,0 +1,20 @@
+ALTER TABLE bncc_area ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_component ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_time_cut ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_field_experience ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_context ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_object ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_competency ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_axis ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_ei_alignment ALTER COLUMN id TYPE varchar(255);
+ALTER TABLE bncc_profile ALTER COLUMN id TYPE varchar(255);
+
+ALTER TABLE bncc_learning_component ALTER COLUMN component_id TYPE varchar(255);
+ALTER TABLE bncc_learning_area ALTER COLUMN area_id TYPE varchar(255);
+ALTER TABLE bncc_learning_time_cut ALTER COLUMN time_cut_id TYPE varchar(255);
+ALTER TABLE bncc_learning_field ALTER COLUMN field_id TYPE varchar(255);
+ALTER TABLE bncc_learning_context ALTER COLUMN context_id TYPE varchar(255);
+ALTER TABLE bncc_learning_object ALTER COLUMN object_id TYPE varchar(255);
+ALTER TABLE bncc_learning_competency ALTER COLUMN competency_id TYPE varchar(255);
+ALTER TABLE bncc_learning_axis ALTER COLUMN axis_id TYPE varchar(255);
+ALTER TABLE bncc_ei_alignment_member ALTER COLUMN alignment_id TYPE varchar(255);

@@ -30,6 +30,7 @@
     "db:logs": "docker compose logs -f postgres",
     "db:migrate": "npm run db:migrate -w @educai/api",
     "db:seed": "npm run db:seed -w @educai/api",
+    "db:import-bncc": "npm run db:import-bncc -w @educai/api --",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run build"
   },
   "devDependencies": {
