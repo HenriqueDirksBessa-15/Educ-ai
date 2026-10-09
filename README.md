@@ -1,6 +1,6 @@
 # EDUC.AI
 
-Fundação executável do sistema de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1, 2 e 3 do plano de 14 dias: workspace, web, API, PostgreSQL, contratos, identidade Google, currículo e perfil.
+Sistema executável de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1 a 9 do plano: identidade Google, currículo, turmas, materiais, planos, atividades, geração assistida e publicação no Google Forms/Classroom.
 
 A autenticação é exclusivamente Google. O adaptador OpenAI usa fixture sem chave e ativa a Responses API somente quando `OPENAI_API_KEY` está configurada no servidor.
 
@@ -30,7 +30,7 @@ Crie um cliente OAuth do tipo aplicação Web e configure exatamente:
 
 Preencha `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env`. Para verificar Google Forms de forma real, informe também o identificador de um formulário de teste em `GOOGLE_FORMS_TEST_FORM_ID`.
 
-Os escopos solicitados são identidade básica, leitura de cursos do Classroom e leitura do corpo de Forms. O professor precisa revisar e autorizar o consentimento; nenhuma senha Google passa pelo EDUC.AI.
+Os escopos solicitados são identidade básica, leitura de cursos, gerenciamento de trabalhos do Classroom, criação de Forms, leitura futura de respostas e acesso aos arquivos Drive criados pelo EDUC.AI. Professores que autorizaram versões anteriores precisam entrar novamente para conceder os escopos do Dia 9. Nenhuma senha Google passa pelo EDUC.AI.
 
 ## Banco de dados
 
@@ -169,5 +169,14 @@ Endpoints do Dia 4:
 - `GET/POST /api/classes` e `GET/PATCH /api/classes/:classId`;
 - `POST /api/classes/:classId/students` para matrícula idempotente;
 - `POST /api/classes/sync` para adapter Classroom de fixture.
+
+Endpoints do Dia 9:
+
+- `POST /api/activities/:activityId/generate`, `review` e `approve` para o ciclo assistido;
+- `GET /api/activities/:activityId/generation` para a versão mais recente;
+- `POST /api/activities/:activityId/publish` para criação ou retomada idempotente;
+- `GET /api/activities/:activityId/publication` para estado do Form e de cada turma.
+
+Em produção, a publicação usa as APIs reais. Em desenvolvimento e teste, o adaptador Google é uma fixture identificada. A validação externa requer uma conta docente, uma turma Classroom vinculada e novo consentimento OAuth.
 
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

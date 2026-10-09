@@ -1,6 +1,8 @@
 import type {
   Activity,
+  ActivityGeneration,
   ActivityInput,
+  ActivityPublication,
   ActivityQuestionInput,
   ActivityStatus,
   ActivityType,
@@ -49,6 +51,11 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
   ]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [generation, setGeneration] = useState<ActivityGeneration | null>(null);
+  const [publication, setPublication] = useState<ActivityPublication | null>(
+    null,
+  );
+  const [questionCount, setQuestionCount] = useState(4);
 
   const loadActivities = useCallback(async () => {
     const query = filter === "all" ? "" : `?status=${filter}`;
@@ -82,7 +89,30 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setLateMode("blocked");
     setPenaltyPercent(0);
     setQuestions([emptyObjective()]);
+    setGeneration(null);
+    setPublication(null);
     setMessage(null);
+  };
+
+  const loadAssistState = async (activityId: string) => {
+    const [generationResponse, publicationResponse] = await Promise.all([
+      fetch(`${apiBaseUrl}/activities/${activityId}/generation`, {
+        credentials: "include",
+      }),
+      fetch(`${apiBaseUrl}/activities/${activityId}/publication`, {
+        credentials: "include",
+      }),
+    ]);
+    if (generationResponse.ok) {
+      const body =
+        (await generationResponse.json()) as DataEnvelope<ActivityGeneration | null>;
+      setGeneration(body.data);
+    }
+    if (publicationResponse.ok) {
+      const body =
+        (await publicationResponse.json()) as DataEnvelope<ActivityPublication | null>;
+      setPublication(body.data);
+    }
   };
 
   const editActivity = (activity: Activity) => {
@@ -119,6 +149,9 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
       ),
     );
     setMessage(null);
+    setGeneration(null);
+    setPublication(null);
+    void loadAssistState(activity.id);
   };
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
@@ -165,7 +198,8 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
       if (!response.ok) throw new Error();
       setMessage(selected ? "Rascunho atualizado." : "Rascunho criado.");
       await loadActivities();
-      if (!selected) resetForm();
+      if (selected) await loadAssistState(selected.id);
+      else resetForm();
     } catch {
       setMessage(
         "Revise o tipo, o prazo, as questões e todos os campos obrigatórios.",
@@ -187,17 +221,117 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
         { method: "POST", credentials: "include" },
       );
       if (!response.ok) throw new Error();
-      setMessage(
-        action === "publish"
-          ? "Atividade publicada e estrutura bloqueada."
-          : action === "finish"
+      if (action === "publish") {
+        const body =
+          (await response.json()) as DataEnvelope<ActivityPublication>;
+        setPublication(body.data);
+        setMessage(publicationMessage(body.data));
+        if (body.data.status === "published")
+          setSelected({
+            ...activity,
+            status: "published",
+            publishedAt: new Date().toISOString(),
+          });
+      } else {
+        setMessage(
+          action === "finish"
             ? "Atividade finalizada."
             : "Atividade arquivada sem excluir respostas.",
-      );
-      if (selected?.id === activity.id) setSelected(null);
+        );
+      }
+      if (selected?.id === activity.id && action !== "publish")
+        setSelected(null);
       await loadActivities();
     } catch {
       setMessage("A mudança de estado não pôde ser concluída.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const generateActivity = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setMessage("Gerando uma sugestão estruturada…");
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/activities/${selected.id}/generate`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ questionCount }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      const body = (await response.json()) as DataEnvelope<ActivityGeneration>;
+      setGeneration(body.data);
+      setMessage("Sugestão gerada. Carregue-a no editor e revise cada campo.");
+    } catch {
+      setMessage("A IA não respondeu corretamente; o rascunho foi preservado.");
+      await loadAssistState(selected.id);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadSuggestion = () => {
+    if (!generation?.suggestion) return;
+    setTitle(generation.suggestion.title);
+    setDescription(generation.suggestion.description);
+    setType(generation.suggestion.type);
+    setDifficulty(generation.suggestion.difficulty);
+    setQuestions(generation.suggestion.questions);
+    setMessage(
+      "Sugestão carregada. Edite o conteúdo antes de confirmar a revisão.",
+    );
+  };
+
+  const reviewGeneration = async () => {
+    if (!selected || !generation?.suggestion) return;
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/activities/${selected.id}/review`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            generationId: generation.id,
+            suggestion: { title, description, type, difficulty, questions },
+          }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setMessage("Revisão registrada. A versão já pode ser aprovada.");
+      await loadAssistState(selected.id);
+      await loadActivities();
+    } catch {
+      setMessage("Não foi possível registrar a revisão desta sugestão.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const approveGeneration = async () => {
+    if (!selected || !generation) return;
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/activities/${selected.id}/approve`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ generationId: generation.id }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setMessage("Versão aprovada pelo professor e liberada para publicação.");
+      await loadAssistState(selected.id);
+    } catch {
+      setMessage("Revise explicitamente a sugestão antes de aprová-la.");
     } finally {
       setSaving(false);
     }
@@ -216,8 +350,10 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     <section className="timeline-panel" aria-labelledby="activities-title">
       <div className="status-heading">
         <div>
-          <span className="section-label">Dia 8 · RF011</span>
-          <h2 id="activities-title">Atividades e questões locais</h2>
+          <span className="section-label">Dia 9 · RF011 + RF001</span>
+          <h2 id="activities-title">
+            Atividades assistidas e publicação Google
+          </h2>
         </div>
         <button className="secondary-action" type="button" onClick={resetForm}>
           Nova atividade
@@ -249,7 +385,8 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                   <strong>{activity.title}</strong>
                   <span>
                     {statusLabel(activity.status)} · {typeLabel(activity.type)}{" "}
-                    · {activity.totalPoints} pontos
+                    · {difficultyLabel(activity.difficulty)} ·{" "}
+                    {activity.totalPoints} pontos
                   </span>
                   <small>
                     {activity.lessonPlanTitle} · prazo{" "}
@@ -348,6 +485,19 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
               </select>
             </label>
             <label>
+              Dificuldade
+              <select
+                value={difficulty}
+                onChange={(event) =>
+                  setDifficulty(event.target.value as Activity["difficulty"])
+                }
+              >
+                <option value="easy">Fácil</option>
+                <option value="medium">Média</option>
+                <option value="hard">Difícil</option>
+              </select>
+            </label>
+            <label>
               Prazo
               <input
                 type="datetime-local"
@@ -356,6 +506,87 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
               />
             </label>
           </div>
+
+          {selected?.status === "draft" && (
+            <section
+              className="activity-assistant"
+              aria-label="Assistente de IA"
+            >
+              <div>
+                <span className="section-label">
+                  IA com revisão obrigatória
+                </span>
+                <h3>Gerar questões a partir do plano</h3>
+                <p>
+                  A sugestão não substitui o rascunho até você carregá-la,
+                  revisar os campos e aprovar a versão.
+                </p>
+              </div>
+              <div className="form-row assistant-controls">
+                <label>
+                  Quantidade de questões
+                  <input
+                    type="number"
+                    min={type === "mixed" ? 2 : 1}
+                    max="100"
+                    value={questionCount}
+                    onChange={(event) =>
+                      setQuestionCount(Number(event.target.value))
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void generateActivity()}
+                >
+                  {saving ? "Processando…" : "Gerar sugestão"}
+                </button>
+              </div>
+              {generation && (
+                <div className="assistant-result">
+                  <strong>
+                    Versão {generation.version} · {generationStatus(generation)}
+                  </strong>
+                  <small>
+                    {generation.model} · origem {generation.origin}
+                  </small>
+                  {generation.errorCode && (
+                    <span className="status-error">{generation.errorCode}</span>
+                  )}
+                  {generation.suggestion && (
+                    <div className="inline-actions">
+                      <button
+                        type="button"
+                        className="secondary-action compact-action"
+                        onClick={loadSuggestion}
+                      >
+                        Carregar no editor
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-action compact-action"
+                        disabled={saving || questions.length === 0}
+                        onClick={() => void reviewGeneration()}
+                      >
+                        Confirmar revisão
+                      </button>
+                      {generation.reviewStatus === "reviewed" && (
+                        <button
+                          type="button"
+                          className="compact-action"
+                          disabled={saving}
+                          onClick={() => void approveGeneration()}
+                        >
+                          Aprovar versão
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
           <div className="form-row">
             <label>
               Atrasos
@@ -437,8 +668,8 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                 Pontuação
                 <input
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="1"
+                  step="1"
                   value={question.points}
                   onChange={(event) =>
                     updateQuestion(index, {
@@ -526,7 +757,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                   </label>
                 </>
               )}
-              {questions.length > 1 && (
+              {selected?.status === "draft" || !selected ? (
                 <button
                   type="button"
                   className="secondary-action compact-action"
@@ -538,9 +769,68 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                 >
                   Remover questão
                 </button>
-              )}
+              ) : null}
             </fieldset>
           ))}
+          {questions.length === 0 && (
+            <p className="empty-state">
+              Rascunho sem questões. Adicione manualmente ou use a geração por
+              IA.
+            </p>
+          )}
+          {selected && publication && (
+            <section
+              className="publication-status"
+              aria-label="Publicação Google"
+            >
+              <span className="section-label">Google Forms e Classroom</span>
+              <h3>{publicationStatusLabel(publication.status)}</h3>
+              {publication.errorCode && (
+                <p className="status-error">
+                  {publicationErrorLabel(publication.errorCode)}
+                </p>
+              )}
+              {publication.responderUri && (
+                <a
+                  href={publication.responderUri}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir formulário publicado
+                </a>
+              )}
+              <ul className="publication-targets">
+                {publication.distributions.map((distribution) => (
+                  <li key={distribution.classId}>
+                    <strong>{distribution.className}</strong>
+                    <span>{distributionStatusLabel(distribution.status)}</span>
+                    {distribution.errorCode && (
+                      <small>
+                        {publicationErrorLabel(distribution.errorCode)}
+                      </small>
+                    )}
+                    {distribution.alternateLink && (
+                      <a
+                        href={distribution.alternateLink}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Abrir no Classroom
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {publication.collectionScheduledAt && (
+                <small>
+                  Coleta agendada para{" "}
+                  {new Date(publication.collectionScheduledAt).toLocaleString(
+                    "pt-BR",
+                  )}
+                </small>
+              )}
+            </section>
+          )}
           {selected?.status === "draft" || !selected ? (
             <button type="submit" disabled={saving || !canSave}>
               {saving
@@ -617,6 +907,67 @@ function typeLabel(type: ActivityType): string {
   return { objective: "Objetiva", discursive: "Discursiva", mixed: "Mista" }[
     type
   ];
+}
+
+function difficultyLabel(difficulty: Activity["difficulty"]): string {
+  return { easy: "Fácil", medium: "Média", hard: "Difícil" }[difficulty];
+}
+
+function generationStatus(generation: ActivityGeneration): string {
+  if (generation.status === "failed") return "Falha na geração";
+  return {
+    generated: "Aguardando revisão",
+    reviewed: "Revisada",
+    approved: "Aprovada",
+  }[generation.reviewStatus ?? "generated"];
+}
+
+function publicationStatusLabel(status: ActivityPublication["status"]): string {
+  return {
+    pending: "Publicação preparada",
+    creating_form: "Criando Google Form",
+    distributing: "Distribuindo no Classroom",
+    published: "Publicada no Google",
+    failed: "Publicação incompleta",
+    reconciliation_required: "Reconciliação necessária",
+  }[status];
+}
+
+function distributionStatusLabel(
+  status: ActivityPublication["distributions"][number]["status"],
+): string {
+  return {
+    pending: "Pendente",
+    published: "Publicado",
+    failed: "Falhou",
+  }[status];
+}
+
+function publicationErrorLabel(code: string): string {
+  const labels: Record<string, string> = {
+    GOOGLE_CREDENTIAL_MISSING: "Conecte novamente sua conta Google.",
+    GOOGLE_RECONSENT_REQUIRED:
+      "Autorize os novos escopos de Forms e Classroom entrando novamente.",
+    GOOGLE_CLASSROOM_ID_MISSING:
+      "A turma ainda não possui vínculo com o Google Classroom.",
+    GOOGLE_POINTS_MUST_BE_INTEGER:
+      "O Google Forms exige pontuações inteiras em todas as questões.",
+    GOOGLE_PERMISSION_DENIED: "A conta não tem permissão para publicar.",
+    GOOGLE_RATE_LIMITED: "O limite temporário do Google foi atingido.",
+    GOOGLE_DISTRIBUTION_INCOMPLETE:
+      "Algumas turmas ainda não receberam a atividade.",
+  };
+  return labels[code] ?? `Falha externa: ${code}`;
+}
+
+function publicationMessage(publication: ActivityPublication): string {
+  if (publication.status === "published")
+    return "Atividade publicada no Forms e distribuída no Classroom.";
+  if (publication.status === "reconciliation_required")
+    return "A resposta do Google foi ambígua. Tente novamente para reconciliar sem duplicar.";
+  if (publication.errorCode)
+    return publicationErrorLabel(publication.errorCode);
+  return "Publicação iniciada. Consulte o estado de cada turma.";
 }
 
 function toLocalDateTime(value: string): string {

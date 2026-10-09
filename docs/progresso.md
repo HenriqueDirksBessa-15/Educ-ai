@@ -2,6 +2,20 @@
 
 Atualizado em 09/10/2026.
 
+## Entrega atual - Dia 9
+
+O fluxo de atividades agora cobre geração estruturada por IA, revisão e aprovação docente, Google Forms, distribuição por turma no Classroom, retomada idempotente de falhas e agendamento da coleta. A interface apresenta dificuldade, versões geradas, estado externo por turma e links dos recursos publicados.
+
+Verificações finais:
+
+- `npm run test:unit`: 52 testes aprovados (10 contratos, 38 API e 4 web);
+- `npm run test:integration`: 4 testes PostgreSQL aprovados e smoke OpenAI ignorado por ser opt-in;
+- migrações 001–017 aplicadas em banco vazio e repetição sem novas aplicações;
+- lint, tipagem, formatação e build de produção aprovados;
+- integração comprovou revisão/aprovação, invalidação após edição, publicação por turma e agendamento idempotente da coleta.
+
+Validação externa pendente: executar smoke real com uma conta docente que conceda os novos escopos e uma turma Classroom de teste. Nenhuma chamada externa, deploy ou push foi executado automaticamente.
+
 ## Dia 9 - Etapa 1: contratos e persistência
 
 Implementado nesta etapa:
@@ -214,4 +228,4 @@ Implementados:
 
 ## Próximo passo
 
-Aplicar as migrações dos Dias 5–7 no Cloud SQL quando disponível e iniciar o Dia 8 conforme o plano.
+Aplicar as migrações 015–017 no Cloud SQL controlado e executar o smoke real do Dia 9 após novo consentimento Google; em seguida iniciar a coleta e correção objetiva do Dia 10.

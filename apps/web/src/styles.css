@@ -434,6 +434,54 @@ h1 {
   background: #fbfefd;
 }
 
+.activity-assistant,
+.publication-status {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgba(88, 101, 242, 0.25);
+  border-radius: 14px;
+  background: rgba(88, 101, 242, 0.06);
+}
+
+.activity-assistant h3,
+.activity-assistant p,
+.publication-status h3,
+.publication-status p {
+  margin: 0;
+}
+
+.assistant-controls {
+  align-items: end;
+}
+
+.assistant-result {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(88, 101, 242, 0.2);
+}
+
+.publication-targets {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.publication-targets li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.status-error {
+  color: #a12b2b;
+}
+
 .activity-preview h3,
 .activity-preview p {
   margin-bottom: 0.5rem;

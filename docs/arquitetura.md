@@ -106,4 +106,10 @@ Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alt
 
 ## Relações implementadas e próximas
 
-Planos já vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades ainda vincularão plano, questões e prazos; submissões vincularão aluno e respostas; correções preservarão sugestão, ajuste e aprovação; feedback e boletins preservarão histórico nas etapas seguintes.
+Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades vinculam plano, dificuldade, questões e prazo, preservam gerações/revisões e mantêm uma máquina de publicação por Form e por turma Classroom. A conclusão agenda a coleta no prazo; submissões e correções serão preenchidas no Dia 10 em diante. Feedback e boletins preservarão histórico nas etapas seguintes.
+
+## Publicação externa de atividades
+
+A publicação não mantém transação aberta durante chamadas Google. Cada passo é persistido antes e depois da operação externa. Um marcador derivado do UUID local permite reconciliar Forms pelo Drive e trabalhos pela descrição do Classroom. Repetições ignoram IDs já confirmados; respostas ambíguas entram em `reconciliation_required` e nunca disparam recriação cega.
+
+Uma atividade só muda de `draft` para `published` depois de existir um Form publicado e todas as turmas obrigatórias possuírem trabalho Classroom confirmado. Na mesma conclusão lógica, o plano é bloqueado e um `activity_collection_job` idempotente é criado para o prazo.

@@ -532,6 +532,10 @@ export class ActivitiesRepository {
        error_code = NULL, attempt_count = attempt_count + 1
        FROM activity WHERE publication.activity_id = $1
          AND activity.id = publication.activity_id AND activity.professor_id = $2
+         AND (
+           publication.status <> $3
+           OR publication.updated_at < now() - interval '5 minutes'
+         )
        RETURNING publication.activity_id`,
       [activityId, professorId, status],
     )) as QueryResult<{ activity_id: string }>;
@@ -546,7 +550,7 @@ export class ActivitiesRepository {
   ): Promise<void> {
     await this.database.query(
       `UPDATE activity_publication publication
-       SET google_form_id = $3, responder_uri = $4, status = 'distributing',
+       SET google_form_id = $3, responder_uri = $4, status = 'pending',
          error_code = NULL, last_synced_at = now()
        FROM activity WHERE publication.activity_id = $1
          AND activity.id = publication.activity_id AND activity.professor_id = $2`,

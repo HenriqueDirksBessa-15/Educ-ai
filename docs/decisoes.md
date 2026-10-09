@@ -65,6 +65,16 @@
 | DT-29 | 09/10/2026 | Configurar atraso por atividade como bloqueado ou aceito com penalidade de 0–100%  | Torna a regra explícita e auditável sem impor política global ao professor     |
 | DT-30 | 09/10/2026 | Bloquear estrutura no banco após publicar e sempre arquivar quando houver resposta | Evita divergência entre enunciado/gabarito aplicado e o histórico do estudante |
 
+## Decisões técnicas do Dia 9
+
+| ID    | Data       | Decisão                                                               | Impacto                                                                          |
+| ----- | ---------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| DT-31 | 09/10/2026 | Usar um Form por atividade e um trabalho Classroom por turma do plano | Compartilha a avaliação e preserva rastreabilidade da distribuição por turma     |
+| DT-32 | 09/10/2026 | Reconciliar recursos Google com marcador derivado do UUID local       | Timeout não provoca recriação cega nem duplicação automática                     |
+| DT-33 | 09/10/2026 | Exigir revisão e aprovação da versão gerada antes da publicação       | Conteúdo de IA nunca é distribuído sem decisão docente explícita                 |
+| DT-34 | 09/10/2026 | Aceitar somente pontuações inteiras na fronteira Google Forms         | Respeita `pointValue` da API sem alterar silenciosamente os pesos definidos      |
+| DT-35 | 09/10/2026 | Agendar coleta ao concluir a distribuição, sem coletar ainda          | Delimita o Dia 9 e prepara a execução idempotente da correção objetiva no Dia 10 |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |

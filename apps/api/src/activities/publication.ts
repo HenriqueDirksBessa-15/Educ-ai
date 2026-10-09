@@ -80,11 +80,12 @@ export class ActivityPublicationService {
     }
 
     if (!publication.googleFormId || !publication.responderUri) {
-      await this.activities.markPublicationAttempt(
+      const acquired = await this.activities.markPublicationAttempt(
         professorId,
         activityId,
         "creating_form",
       );
+      if (!acquired) return this.current(professorId, activityId);
       try {
         const form = await this.google.ensureForm(credential, activity);
         await this.auth.saveCredential(professorId, form.credential);
@@ -109,11 +110,12 @@ export class ActivityPublicationService {
 
     publication = await this.activities.getPublication(professorId, activityId);
     if (!publication?.responderUri) return { status: "locked" };
-    await this.activities.markPublicationAttempt(
+    const acquired = await this.activities.markPublicationAttempt(
       professorId,
       activityId,
       "distributing",
     );
+    if (!acquired) return this.current(professorId, activityId);
     let failed = false;
     for (const distribution of publication.distributions) {
       if (distribution.status === "published") continue;

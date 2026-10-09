@@ -168,7 +168,7 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 8 de 14</span>
+        <span>Dia 9 de 14</span>
         <span>Planos · atividades · questões</span>
       </footer>
     </main>

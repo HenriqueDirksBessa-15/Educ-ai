@@ -88,7 +88,7 @@ describe("activity publication service", () => {
       getPublication: vi
         .fn()
         .mockImplementation(async () => publications.shift()),
-      markPublicationAttempt: vi.fn(),
+      markPublicationAttempt: vi.fn().mockResolvedValue(true),
       savePublishedForm: vi.fn(),
       saveDistribution: vi.fn(),
       markDistributionFailure: vi.fn(),
