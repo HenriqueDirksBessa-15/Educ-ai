@@ -154,4 +154,12 @@ Endpoints do Dia 3:
 - `GET /api/profile` e `PATCH /api/profile` para perfil autenticado;
 - `GET /api/curriculum?component=...&schoolYear=...&skillCode=...` para consulta curricular protegida.
 
+O PostgreSQL de validação está disponível no Cloud SQL `educai-bncc-validation` (`POSTGRES_16`, `db-f1-micro`, `southamerica-east1`) e pode ser acessado pelo Cloud SQL Auth Proxy. A instância usa cobrança por uso.
+
+Endpoints do Dia 4:
+
+- `GET/POST /api/classes` e `GET/PATCH /api/classes/:classId`;
+- `POST /api/classes/:classId/students` para matrícula idempotente;
+- `POST /api/classes/sync` para adapter Classroom de fixture.
+
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

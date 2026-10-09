@@ -127,6 +127,20 @@ export const classSummarySchema = z.object({
   source: z.enum(["local", "google"]),
 });
 
+export const classCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(500).nullable().optional(),
+  schoolYear: z.string().trim().min(1).max(20),
+  localAccessCode: z.string().trim().min(4).max(40),
+  generalNotice: z.string().trim().max(2_000).nullable().optional(),
+});
+
+export const classUpdateSchema = classCreateSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo editável.",
+  });
+
 export const enrollmentStatusSchema = z.enum([
   "active",
   "restricted",
@@ -139,6 +153,26 @@ export const studentSummarySchema = z.object({
   email: z.email(),
   origin: z.enum(["google", "spreadsheet", "access_code"]),
   status: enrollmentStatusSchema,
+});
+
+export const studentEnrollmentInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  email: z.email(),
+  origin: z.enum(["spreadsheet", "access_code"]),
+  status: enrollmentStatusSchema.optional(),
+});
+
+export const enrolledStudentSchema = studentSummarySchema.extend({
+  id: z.uuid(),
+  isInconsistent: z.boolean(),
+  inconsistencyReason: z.string().nullable(),
+});
+
+export const classDetailSchema = classSummarySchema.extend({
+  generalNotice: z.string().nullable(),
+  syncStatus: z.enum(["never", "active", "failed"]),
+  lastSyncedAt: z.iso.datetime().nullable(),
+  students: z.array(enrolledStudentSchema),
 });
 
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
@@ -174,6 +208,13 @@ export type CurriculumSearchResponse = z.infer<
 >;
 export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
+export type ClassCreate = z.infer<typeof classCreateSchema>;
+export type ClassUpdate = z.infer<typeof classUpdateSchema>;
+export type StudentEnrollmentInput = z.infer<
+  typeof studentEnrollmentInputSchema
+>;
+export type EnrolledStudent = z.infer<typeof enrolledStudentSchema>;
+export type ClassDetail = z.infer<typeof classDetailSchema>;
 export type StudentSummary = z.infer<typeof studentSummarySchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;

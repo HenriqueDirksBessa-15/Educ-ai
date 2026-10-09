@@ -22,13 +22,23 @@
 
 ## Decisões técnicas do Dia 3
 
-| ID    | Data       | Decisão                                                     | Impacto                                                         |
-| ----- | ---------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
-| DT-11 | 09/10/2026 | Não chamar OpenAI antes de 12/10; usar adaptador e fixture  | Nenhuma integração externa é apresentada como concluída         |
-| DT-12 | 09/10/2026 | Registrar fonte, versão e checksum em cada carga curricular | Histórico e repetição idempotente                               |
-| DT-13 | 09/10/2026 | Fallback curricular exige revisão explícita                 | Ausência de habilidade não inventa BNCC oficial                 |
-| DT-14 | 09/10/2026 | Perfil resolve professor pela sessão                        | E-mail Google permanece bloqueado e `professorId` não autentica |
-| DT-15 | 09/10/2026 | Usar bncc-dados como estrutura derivada e MEC como validação  | Proveniência preservada sem tratar dataset derivado como fonte normativa |
+| ID    | Data       | Decisão                                                      | Impacto                                                                  |
+| ----- | ---------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| DT-11 | 09/10/2026 | Não chamar OpenAI antes de 12/10; usar adaptador e fixture   | Nenhuma integração externa é apresentada como concluída                  |
+| DT-12 | 09/10/2026 | Registrar fonte, versão e checksum em cada carga curricular  | Histórico e repetição idempotente                                        |
+| DT-13 | 09/10/2026 | Fallback curricular exige revisão explícita                  | Ausência de habilidade não inventa BNCC oficial                          |
+| DT-14 | 09/10/2026 | Perfil resolve professor pela sessão                         | E-mail Google permanece bloqueado e `professorId` não autentica          |
+| DT-15 | 09/10/2026 | Usar bncc-dados como estrutura derivada e MEC como validação | Proveniência preservada sem tratar dataset derivado como fonte normativa |
+
+## Decisões técnicas do Dia 4
+
+| ID    | Data       | Decisão                                                         | Impacto                                                          |
+| ----- | ---------- | --------------------------------------------------------------- | ---------------------------------------------------------------- |
+| DT-16 | 10/10/2026 | Escopo de todas as consultas começa pelo professor da sessão    | Isolamento entre professores no backend                          |
+| DT-17 | 10/10/2026 | E-mail é a chave de reconciliação local do aluno                | Sincronização repetida não duplica pessoas                       |
+| DT-18 | 10/10/2026 | Turma Google usa código local separado do ID externo            | Código de acesso não é editado pelo Classroom                    |
+| DT-19 | 10/10/2026 | Adapter Classroom de fixture antes da integração real           | Não apresentar sincronização externa simulada como concluída     |
+| DT-20 | 10/10/2026 | Usar Cloud SQL `educai-bncc-validation` para validar PostgreSQL | Permite integração sem Docker local; cobrança por uso registrada |
 
 ## Pendências do DERS
 

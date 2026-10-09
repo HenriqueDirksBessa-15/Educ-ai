@@ -1,10 +1,18 @@
 # Progresso
 
-Atualizado em 09/10/2026.
+Atualizado em 10/10/2026.
 
-## Entrega atual - Dia 3
+## Entrega atual - Dia 4
 
 Implementados:
+
+- classes multi-turma com isolamento por professor da sessão;
+- criação/edição de turma local e código de acesso único;
+- adapter Classroom de fixture e sync idempotente por ID externo;
+- alunos reconciliados por e-mail e matrículas com estados ativo/restrito/pendente;
+- origem Google protegida e flags de inconsistência;
+- endpoints protegidos para turmas, detalhes e matrícula;
+- cenários e contratos do Dia 4.
 
 - adaptador OpenAI tipado com fixture e bloqueio de chamadas externas até 12/10;
 - estados OpenAI `missing`, `deferred`, `available` e `unavailable` normalizados;
@@ -28,16 +36,20 @@ Implementados:
 | Testes de repositório curricular | Aprovados; agrupamento, fonte e fallback de revisão                                                         |
 | Testes de perfil                 | Aprovados; lista vazia e atualização sem e-mail                                                             |
 | Testes do adaptador OpenAI       | Aprovados; ausência, adiamento, fixture e erro normalizado                                                  |
-| Importador BNCC em modo seco    | Aprovado; schemas e contagens canônicas validados sem gravar no banco                                    |
-| Migração/seed PostgreSQL         | Não repetidos; Docker/PostgreSQL não está disponível neste computador                                    |
+| Importador BNCC em modo seco     | Aprovado; schemas e contagens canônicas validados sem gravar no banco                                       |
+| Migração/seed Cloud SQL          | Aprovada; `006_classes_students.sql` aplicada e seeds idempotentes no PostgreSQL 16 em São Paulo            |
+| Testes unitários de turmas       | Aprovados; escopo por professor e upsert de matrícula                                                       |
+| Smoke test Cloud SQL             | Aprovado; turma isolada, matrícula repetida resultou em 1 aluno e outro professor não acessou               |
+| `npm run test:integration`       | Bloqueado no Cloud SQL: usuário IAM não tem permissão `CREATEDB`; os 3 testes foram pulados                 |
 
 ## Limitações e decisões pendentes
 
 - Nenhuma chamada real OpenAI foi executada, conforme a restrição até 12/10.
 - A fonte estruturada e a fonte oficial de validação foram registradas; a gravação completa no banco precisa ser executada em PostgreSQL acessível.
-- As migrações `003_curriculum_profile.sql`, `004_bncc_canonical.sql`, `005_bncc_identifier_width.sql` e a seed `002_curriculum_fixtures.sql` precisam ser executadas em PostgreSQL acessível antes da validação de integração.
+- A carga BNCC completa foi validada em modo seco; a execução transacional no `db-f1-micro` foi interrompida por lentidão e revertida, sem dados parciais.
 - RF002 permanece implementado com integração externa adiada; RF003 depende da fonte oficial; RF005 depende da integração de banco.
+- A migração `006_classes_students.sql` ainda precisa ser aplicada e validada no Cloud SQL.
 
 ## Próximo passo
 
-Executar a migração/seed em PostgreSQL de CI ou outro ambiente autorizado, validar os endpoints de perfil e currículo e, após 12/10, habilitar a verificação real do adaptador OpenAI. Depois iniciar o Dia 4 conforme o plano.
+Executar a suíte de integração contra o Cloud SQL quando necessário e iniciar o Dia 5 conforme o plano.

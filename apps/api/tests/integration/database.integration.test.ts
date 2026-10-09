@@ -54,6 +54,9 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "001_foundation.sql",
       "002_google_auth.sql",
       "003_curriculum_profile.sql",
+      "004_bncc_canonical.sql",
+      "005_bncc_identifier_width.sql",
+      "006_classes_students.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 

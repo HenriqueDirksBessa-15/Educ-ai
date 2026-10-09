@@ -4,6 +4,7 @@ import {
   apiErrorSchema,
   authSessionSchema,
   curriculumSearchResponseSchema,
+  classCreateSchema,
   identitySchema,
   integrationStatusSchema,
   professorProfileUpdateSchema,
@@ -88,5 +89,22 @@ describe("shared contracts", () => {
       reason: "SKILL_NOT_FOUND",
     });
     expect(response.reviewRequired).toBe(true);
+  });
+
+  it("requires a local access code and rejects Google-controlled fields", () => {
+    expect(
+      classCreateSchema.parse({
+        name: "5º ano",
+        schoolYear: "2026",
+        localAccessCode: "TURMA-2026",
+      }).localAccessCode,
+    ).toBe("TURMA-2026");
+    const parsed = classCreateSchema.parse({
+      name: "5º ano",
+      schoolYear: "2026",
+      localAccessCode: "TURMA-2026",
+      googleClassroomId: "google-controlled",
+    });
+    expect(parsed).not.toHaveProperty("googleClassroomId");
   });
 });

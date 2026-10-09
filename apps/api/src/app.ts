@@ -12,6 +12,9 @@ import { registerAuthRoutes } from "./auth/routes.js";
 import type { GoogleGateway } from "./auth/types.js";
 import { registerCurriculumRoutes } from "./curriculum/routes.js";
 import { CurriculumRepository } from "./curriculum/repository.js";
+import { registerClassesRoutes } from "./classes/routes.js";
+import { ClassesRepository } from "./classes/repository.js";
+import { FixtureClassroomAdapter } from "./classroom/adapter.js";
 import { isDatabaseAvailable, type DatabaseClient } from "./database.js";
 import { ConfiguredOpenAIAdapter } from "./openai/adapter.js";
 import { registerProfileRoutes } from "./profile/routes.js";
@@ -48,6 +51,7 @@ export async function createApp({
   const gateway = googleGateway ?? new ProductionGoogleGateway(config.google);
   const profileRepository = new ProfileRepository(database);
   const curriculumRepository = new CurriculumRepository(database);
+  const classesRepository = new ClassesRepository(database);
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -66,6 +70,13 @@ export async function createApp({
     config,
     authRepository: repository,
     curriculumRepository,
+  });
+  registerClassesRoutes(app, {
+    config,
+    authRepository: repository,
+    classesRepository,
+    classroomAdapter:
+      config.nodeEnv === "test" ? undefined : new FixtureClassroomAdapter(),
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());
