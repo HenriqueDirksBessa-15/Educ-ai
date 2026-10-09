@@ -1,10 +1,16 @@
 import {
   activityInputSchema,
   type Activity,
+  type ActivityGeneration,
   type ActivityInput,
   type ActivityStatus,
   type ActivityUpdate,
 } from "@educai/contracts";
+
+import type {
+  ActivityGenerationResult,
+  ActivityPromptContext,
+} from "../openai/adapter.js";
 
 import type { DatabaseClient } from "../database.js";
 
@@ -30,6 +36,20 @@ type ActivityRow = {
   archived_at: Date | null;
   created_at: Date;
   updated_at: Date;
+};
+type GenerationRow = {
+  id: string;
+  activity_id: string;
+  version: number;
+  model: string;
+  origin: ActivityGeneration["origin"];
+  status: ActivityGeneration["status"];
+  review_status: ActivityGeneration["reviewStatus"];
+  suggestion: ActivityGeneration["suggestion"];
+  error_code: string | null;
+  reviewed_at: Date | null;
+  approved_at: Date | null;
+  created_at: Date;
 };
 
 export type ActivityMutationResult = "updated" | "not_found" | "locked";
@@ -212,6 +232,92 @@ export class ActivitiesRepository {
     return Boolean(result.rows[0]);
   }
 
+  async latestGeneration(
+    professorId: string,
+    activityId: string,
+  ): Promise<ActivityGeneration | null> {
+    const result = (await this.database.query(
+      `SELECT generation.id, generation.activity_id, generation.version,
+       generation.model, generation.origin, generation.status,
+       generation.review_status, generation.suggestion, generation.error_code,
+       generation.reviewed_at, generation.approved_at, generation.created_at
+       FROM activity_generation generation
+       JOIN activity ON activity.id = generation.activity_id
+       WHERE generation.activity_id = $1 AND activity.professor_id = $2
+       ORDER BY generation.version DESC LIMIT 1`,
+      [activityId, professorId],
+    )) as QueryResult<GenerationRow>;
+    return result.rows[0] ? this.toGeneration(result.rows[0]) : null;
+  }
+
+  async recordGenerationSuccess(
+    professorId: string,
+    activityId: string,
+    context: ActivityPromptContext,
+    result: ActivityGenerationResult,
+  ): Promise<ActivityGeneration | null> {
+    const inserted = (await this.database.query(
+      `WITH owned AS MATERIALIZED (
+         SELECT id FROM activity
+         WHERE id = $1 AND professor_id = $2 AND status = 'draft'
+           AND archived_at IS NULL FOR UPDATE
+       ), next_version AS (
+         SELECT COALESCE(MAX(version), 0) + 1 AS version
+         FROM owned LEFT JOIN activity_generation ON activity_generation.activity_id = owned.id
+       )
+       INSERT INTO activity_generation
+         (activity_id, version, model, origin, status, review_status,
+          prompt_context, suggestion)
+       SELECT owned.id, next_version.version, $3, $4, 'succeeded', 'generated',
+         $5::jsonb, $6::jsonb
+       FROM owned CROSS JOIN next_version
+       RETURNING id, activity_id, version, model, origin, status, review_status,
+         suggestion, error_code, reviewed_at, approved_at, created_at`,
+      [
+        activityId,
+        professorId,
+        result.model,
+        result.origin,
+        JSON.stringify(context),
+        JSON.stringify(result.suggestion),
+      ],
+    )) as QueryResult<GenerationRow>;
+    return inserted.rows[0] ? this.toGeneration(inserted.rows[0]) : null;
+  }
+
+  async recordGenerationFailure(
+    professorId: string,
+    activityId: string,
+    context: ActivityPromptContext,
+    model: string,
+    origin: ActivityGeneration["origin"],
+    errorCode: string,
+  ): Promise<boolean> {
+    const inserted = (await this.database.query(
+      `WITH owned AS MATERIALIZED (
+         SELECT id FROM activity
+         WHERE id = $1 AND professor_id = $2 AND status = 'draft'
+           AND archived_at IS NULL FOR UPDATE
+       ), next_version AS (
+         SELECT COALESCE(MAX(version), 0) + 1 AS version
+         FROM owned LEFT JOIN activity_generation ON activity_generation.activity_id = owned.id
+       )
+       INSERT INTO activity_generation
+         (activity_id, version, model, origin, status, prompt_context, error_code)
+       SELECT owned.id, next_version.version, $3, $4, 'failed', $5::jsonb, $6
+       FROM owned CROSS JOIN next_version RETURNING id`,
+      [
+        activityId,
+        professorId,
+        model,
+        origin,
+        JSON.stringify(context),
+        errorCode,
+      ],
+    )) as QueryResult<{ id: string }>;
+    return Boolean(inserted.rows[0]);
+  }
+
   private async assertPlan(professorId: string, planId: string): Promise<void> {
     const result = (await this.database.query(
       `SELECT id FROM lesson_plan
@@ -338,6 +444,23 @@ export class ActivitiesRepository {
       archivedAt: row.archived_at?.toISOString() ?? null,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
+    };
+  }
+
+  private toGeneration(row: GenerationRow): ActivityGeneration {
+    return {
+      id: row.id,
+      activityId: row.activity_id,
+      version: row.version,
+      model: row.model,
+      origin: row.origin,
+      status: row.status,
+      reviewStatus: row.review_status,
+      suggestion: row.suggestion,
+      errorCode: row.error_code,
+      reviewedAt: row.reviewed_at?.toISOString() ?? null,
+      approvedAt: row.approved_at?.toISOString() ?? null,
+      createdAt: row.created_at.toISOString(),
     };
   }
 }

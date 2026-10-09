@@ -190,6 +190,56 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       totalPoints: 5,
       questions: [{ kind: "objective" }, { kind: "discursive" }],
     });
+    const generation = await repository.recordGenerationSuccess(
+      professorId,
+      activityId,
+      {
+        activityTitle: draft!.title,
+        activityDescription: draft!.description,
+        activityType: draft!.type,
+        difficulty: draft!.difficulty,
+        questionCount: 2,
+        lessonPlanTitle: "Plano de frações",
+        curricularComponent: "Matemática",
+        schoolYear: "5º ano",
+        objectives: "Compreender frações",
+        contents: "Frações equivalentes",
+        evaluationStrategy: "Atividade mista",
+        syllabus: "Números",
+        bnccCodes: [],
+        materials: [],
+      },
+      {
+        model: "fixture-activity-v1",
+        origin: "fixture",
+        suggestion: {
+          title: draft!.title,
+          description: draft!.description,
+          type: draft!.type,
+          difficulty: draft!.difficulty,
+          questions: [
+            {
+              kind: "objective",
+              prompt: "Quanto é 1/2?",
+              points: 2,
+              alternatives: ["0,5", "2"],
+              correctAlternativeIndex: 0,
+            },
+            {
+              kind: "discursive",
+              prompt: "Explique.",
+              points: 3,
+              targetAnswer: "Metade do inteiro.",
+              criteria: "Justificativa coerente.",
+            },
+          ],
+        },
+      },
+    );
+    expect(generation).toMatchObject({ version: 1, reviewStatus: "generated" });
+    expect(await repository.latestGeneration(professorId, activityId)).toEqual(
+      generation,
+    );
     expect(await repository.publish(professorId, activityId)).toBe("published");
     expect(
       await repository.update(professorId, activityId, { title: "Alterada" }),

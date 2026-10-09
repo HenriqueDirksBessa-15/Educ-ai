@@ -1,4 +1,5 @@
 import {
+  activityGenerationRequestSchema,
   activityInputSchema,
   activityListQuerySchema,
   activityUpdateSchema,
@@ -8,6 +9,13 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AuthRepository } from "../auth/repository.js";
 import { requireIdentity, sessionCookieName } from "../auth/routes.js";
 import type { AppConfig } from "../config.js";
+import {
+  OpenAIPlanGenerationError,
+  type OpenAIAdapter,
+} from "../openai/adapter.js";
+import { MissingSyllabusError } from "../plans/generation.js";
+import type { PlansRepository } from "../plans/repository.js";
+import { buildActivityPromptContext } from "./generation.js";
 import type { ActivitiesRepository } from "./repository.js";
 
 export function registerActivitiesRoutes(
@@ -16,6 +24,8 @@ export function registerActivitiesRoutes(
     config: AppConfig;
     authRepository: AuthRepository;
     activitiesRepository: ActivitiesRepository;
+    plansRepository: PlansRepository;
+    activityGenerationAdapter: OpenAIAdapter;
   },
 ): void {
   const cookieName = sessionCookieName(dependencies.config.nodeEnv);
@@ -94,6 +104,108 @@ export function registerActivitiesRoutes(
         return notFound(reply, "Atividade não encontrada.");
       if (result === "locked") return lockedError(reply);
       return { data: { updated: true } };
+    },
+  );
+
+  app.get<{ Params: { activityId: string } }>(
+    "/api/activities/:activityId/generation",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const activity = await dependencies.activitiesRepository.get(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (!activity) return notFound(reply, "Atividade não encontrada.");
+      return {
+        data: await dependencies.activitiesRepository.latestGeneration(
+          user.professorId,
+          request.params.activityId,
+        ),
+      };
+    },
+  );
+
+  app.post<{ Params: { activityId: string }; Body: unknown }>(
+    "/api/activities/:activityId/generate",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      const parsed = activityGenerationRequestSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const activity = await dependencies.activitiesRepository.get(
+        user.professorId,
+        request.params.activityId,
+      );
+      if (!activity) return notFound(reply, "Atividade não encontrada.");
+      if (activity.status !== "draft" || activity.archivedAt)
+        return lockedError(reply);
+      if (activity.type === "mixed" && parsed.data.questionCount < 2)
+        return reply.code(400).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Atividade mista exige ao menos duas questões.",
+          },
+        });
+      const plan = await dependencies.plansRepository.get(
+        user.professorId,
+        activity.lessonPlanId,
+      );
+      if (!plan) return notFound(reply, "Plano de aula não encontrado.");
+      let context;
+      try {
+        context = buildActivityPromptContext(
+          activity,
+          plan,
+          parsed.data.questionCount,
+        );
+      } catch (error) {
+        if (error instanceof MissingSyllabusError)
+          return reply.code(409).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "O plano precisa de uma ementa antes da geração.",
+            },
+          });
+        throw error;
+      }
+      try {
+        const generated =
+          await dependencies.activityGenerationAdapter.generateActivity(
+            context,
+          );
+        const generation =
+          await dependencies.activitiesRepository.recordGenerationSuccess(
+            user.professorId,
+            activity.id,
+            context,
+            generated,
+          );
+        if (!generation) return lockedError(reply);
+        return { data: generation };
+      } catch (error) {
+        const errorCode =
+          error instanceof OpenAIPlanGenerationError
+            ? error.code
+            : "OPENAI_GENERATION_FAILED";
+        await dependencies.activitiesRepository.recordGenerationFailure(
+          user.professorId,
+          activity.id,
+          context,
+          dependencies.config.openai.model,
+          dependencies.activityGenerationAdapter.isFixture
+            ? "fixture"
+            : "openai",
+          errorCode,
+        );
+        return reply.code(503).send({
+          error: {
+            code: "INTEGRATION_UNAVAILABLE",
+            message:
+              "A atividade não pôde ser gerada. O rascunho local foi preservado.",
+          },
+        });
+      }
     },
   );
 

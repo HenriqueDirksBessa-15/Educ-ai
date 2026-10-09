@@ -12,6 +12,16 @@ Implementado nesta etapa:
 - persistência versionada para IA, Google Forms, Classroom e coleta futura;
 - restrições únicas para um Form por atividade e um trabalho por turma.
 
+## Dia 9 - Etapa 2: geração estruturada
+
+Implementado nesta etapa:
+
+- prompt de atividade limitado ao plano, currículo, materiais, tipo e dificuldade;
+- Structured Outputs para questões objetivas, discursivas e mistas;
+- fixture identificada e adaptador OpenAI com validação de quantidade e formato;
+- endpoints autenticados para gerar e consultar a tentativa mais recente;
+- persistência versionada de sucessos e falhas sem alterar o rascunho em erro.
+
 ## Entrega atual - Dia 8
 
 Implementado nesta etapa:

@@ -1,16 +1,24 @@
 import type {
+  ActivitySuggestion,
   LessonPlanSuggestion,
   OpenAiAvailability,
 } from "@educai/contracts";
-import { lessonPlanSuggestionSchema } from "@educai/contracts";
+import {
+  activitySuggestionSchema,
+  lessonPlanSuggestionSchema,
+} from "@educai/contracts";
 
 import type { AppConfig } from "../config.js";
 
 export type OpenAIAdapter = {
+  readonly isFixture: boolean;
   checkAvailability(): Promise<OpenAiAvailability>;
   generateLessonPlan(
     context: LessonPlanPromptContext,
   ): Promise<LessonPlanGenerationResult>;
+  generateActivity(
+    context: ActivityPromptContext,
+  ): Promise<ActivityGenerationResult>;
 };
 
 export type LessonPlanPromptContext = {
@@ -32,6 +40,29 @@ export type LessonPlanGenerationResult = {
   origin: "fixture" | "openai";
 };
 
+export type ActivityPromptContext = {
+  activityTitle: string;
+  activityDescription: string;
+  activityType: "objective" | "discursive" | "mixed";
+  difficulty: "easy" | "medium" | "hard";
+  questionCount: number;
+  lessonPlanTitle: string;
+  curricularComponent: string;
+  schoolYear: string;
+  objectives: string;
+  contents: string;
+  evaluationStrategy: string;
+  syllabus: string;
+  bnccCodes: string[];
+  materials: string[];
+};
+
+export type ActivityGenerationResult = {
+  suggestion: ActivitySuggestion;
+  model: string;
+  origin: "fixture" | "openai";
+};
+
 export class OpenAIPlanGenerationError extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -40,6 +71,7 @@ export class OpenAIPlanGenerationError extends Error {
 }
 
 export class ConfiguredOpenAIAdapter implements OpenAIAdapter {
+  readonly isFixture = false;
   constructor(
     private readonly config: AppConfig["openai"],
     private readonly fetcher: typeof fetch = globalThis.fetch,
@@ -132,6 +164,75 @@ export class ConfiguredOpenAIAdapter implements OpenAIAdapter {
     };
   }
 
+  async generateActivity(
+    context: ActivityPromptContext,
+  ): Promise<ActivityGenerationResult> {
+    if (!this.config.apiKey)
+      throw new OpenAIPlanGenerationError("OPENAI_API_KEY_MISSING");
+
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.baseUrl()}/responses`, {
+        method: "POST",
+        headers: { ...this.headers(), "content-type": "application/json" },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({
+          model: this.config.model,
+          input: [
+            {
+              role: "developer",
+              content:
+                "Você cria avaliações para professores brasileiros. Use somente o contexto fornecido, respeite exatamente o tipo, a dificuldade e a quantidade solicitados e responda em português do Brasil.",
+            },
+            { role: "user", content: buildActivityPrompt(context) },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name: "activity_suggestion",
+              strict: true,
+              schema: activityJsonSchema,
+            },
+          },
+        }),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError")
+        throw new OpenAIPlanGenerationError("OPENAI_TIMEOUT");
+      throw new OpenAIPlanGenerationError("OPENAI_SERVICE_UNAVAILABLE");
+    }
+
+    if (!response.ok) {
+      if (response.status === 401)
+        throw new OpenAIPlanGenerationError("OPENAI_API_KEY_INVALID");
+      if (response.status === 429)
+        throw new OpenAIPlanGenerationError("OPENAI_RATE_LIMITED");
+      throw new OpenAIPlanGenerationError("OPENAI_SERVICE_UNAVAILABLE");
+    }
+
+    const payload = (await response.json()) as unknown;
+    const outputText = extractOutputText(payload);
+    if (!outputText)
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(outputText);
+    } catch {
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    }
+    const parsed = activitySuggestionSchema.safeParse(parsedJson);
+    if (
+      !parsed.success ||
+      parsed.data.questions.length !== context.questionCount
+    )
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    return {
+      suggestion: parsed.data,
+      model: this.config.model,
+      origin: "openai",
+    };
+  }
+
   private baseUrl(): string {
     return this.config.baseUrl.replace(/\/$/, "");
   }
@@ -142,6 +243,7 @@ export class ConfiguredOpenAIAdapter implements OpenAIAdapter {
 }
 
 export class FixtureOpenAIAdapter implements OpenAIAdapter {
+  readonly isFixture = true;
   constructor(
     private readonly result: OpenAiAvailability = {
       status: "available",
@@ -165,6 +267,44 @@ export class FixtureOpenAIAdapter implements OpenAIAdapter {
         contents: `${context.contents}\nReferência curricular: ${context.syllabus}`,
         methodology: `${context.methodology}\nOrganizar abertura, prática guiada e síntese com participação ativa da turma.`,
         evaluationStrategy: `${context.evaluationStrategy}\nRegistrar evidências durante a aula e revisar os resultados ao final.`,
+      },
+    };
+  }
+
+  async generateActivity(
+    context: ActivityPromptContext,
+  ): Promise<ActivityGenerationResult> {
+    const objective = (position: number) => ({
+      kind: "objective" as const,
+      prompt: `Questão objetiva ${position + 1} sobre ${context.contents}`,
+      points: 1,
+      alternatives: ["Alternativa correta", "Alternativa incorreta"],
+      correctAlternativeIndex: 0,
+    });
+    const discursive = (position: number) => ({
+      kind: "discursive" as const,
+      prompt: `Explique o conteúdo ${context.contents} na questão ${position + 1}.`,
+      points: 1,
+      targetAnswer: `Resposta fundamentada nos objetivos: ${context.objectives}`,
+      criteria: "Clareza, correção conceitual e justificativa.",
+    });
+    const questions = Array.from(
+      { length: context.questionCount },
+      (_, index) => {
+        if (context.activityType === "objective") return objective(index);
+        if (context.activityType === "discursive") return discursive(index);
+        return index % 2 === 0 ? objective(index) : discursive(index);
+      },
+    );
+    return {
+      model: "fixture-activity-v1",
+      origin: "fixture",
+      suggestion: {
+        title: context.activityTitle,
+        description: context.activityDescription,
+        type: context.activityType,
+        difficulty: context.difficulty,
+        questions,
       },
     };
   }
@@ -199,6 +339,60 @@ const lessonPlanJsonSchema = {
   },
 } as const;
 
+const activityJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "description", "type", "difficulty", "questions"],
+  properties: {
+    title: { type: "string" },
+    description: { type: "string" },
+    type: { type: "string", enum: ["objective", "discursive", "mixed"] },
+    difficulty: { type: "string", enum: ["easy", "medium", "hard"] },
+    questions: {
+      type: "array",
+      items: {
+        anyOf: [
+          {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "kind",
+              "prompt",
+              "points",
+              "alternatives",
+              "correctAlternativeIndex",
+            ],
+            properties: {
+              kind: { type: "string", enum: ["objective"] },
+              prompt: { type: "string" },
+              points: { type: "number", exclusiveMinimum: 0 },
+              alternatives: {
+                type: "array",
+                minItems: 2,
+                maxItems: 10,
+                items: { type: "string" },
+              },
+              correctAlternativeIndex: { type: "integer", minimum: 0 },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["kind", "prompt", "points", "targetAnswer", "criteria"],
+            properties: {
+              kind: { type: "string", enum: ["discursive"] },
+              prompt: { type: "string" },
+              points: { type: "number", exclusiveMinimum: 0 },
+              targetAnswer: { type: "string" },
+              criteria: { type: "string" },
+            },
+          },
+        ],
+      },
+    },
+  },
+} as const;
+
 function buildLessonPlanPrompt(context: LessonPlanPromptContext): string {
   return [
     `Título atual: ${context.title}`,
@@ -212,6 +406,26 @@ function buildLessonPlanPrompt(context: LessonPlanPromptContext): string {
     `Metodologia atual: ${context.methodology}`,
     `Avaliação atual: ${context.evaluationStrategy}`,
     "Proponha uma versão revisada e pedagogicamente coerente sem inventar habilidades BNCC ou materiais.",
+  ].join("\n\n");
+}
+
+function buildActivityPrompt(context: ActivityPromptContext): string {
+  return [
+    `Atividade: ${context.activityTitle}`,
+    `Descrição: ${context.activityDescription}`,
+    `Tipo obrigatório: ${context.activityType}`,
+    `Dificuldade obrigatória: ${context.difficulty}`,
+    `Quantidade exata de questões: ${context.questionCount}`,
+    `Plano: ${context.lessonPlanTitle}`,
+    `Componente curricular: ${context.curricularComponent}`,
+    `Ano escolar: ${context.schoolYear}`,
+    `Ementa: ${context.syllabus}`,
+    `Habilidades BNCC permitidas: ${context.bnccCodes.join(", ") || "nenhuma informada"}`,
+    `Materiais permitidos: ${context.materials.join(", ") || "nenhum informado"}`,
+    `Objetivos: ${context.objectives}`,
+    `Conteúdos: ${context.contents}`,
+    `Estratégia de avaliação: ${context.evaluationStrategy}`,
+    "Não invente habilidades BNCC nem materiais. Forneça gabarito e alternativas nas objetivas; resposta-alvo e critérios nas discursivas.",
   ].join("\n\n");
 }
 

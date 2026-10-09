@@ -67,6 +67,11 @@ export async function createApp({
   const timelineRepository = new TimelineRepository(database);
   const plansRepository = new PlansRepository(database);
   const activitiesRepository = new ActivitiesRepository(database);
+  const openAIAdapter =
+    planGenerationAdapter ??
+    (config.openai.apiKey
+      ? new ConfiguredOpenAIAdapter(config.openai)
+      : new FixtureOpenAIAdapter());
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -102,16 +107,14 @@ export async function createApp({
     config,
     authRepository: repository,
     plansRepository,
-    planGenerationAdapter:
-      planGenerationAdapter ??
-      (config.openai.apiKey
-        ? new ConfiguredOpenAIAdapter(config.openai)
-        : new FixtureOpenAIAdapter()),
+    planGenerationAdapter: openAIAdapter,
   });
   registerActivitiesRoutes(app, {
     config,
     authRepository: repository,
     activitiesRepository,
+    plansRepository,
+    activityGenerationAdapter: openAIAdapter,
   });
   if (startMonitor) monitor.start();
   app.addHook("onClose", async () => monitor.stop());

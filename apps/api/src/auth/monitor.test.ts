@@ -38,10 +38,13 @@ describe("integration monitor", () => {
       { error: vi.fn() },
       async () => undefined,
       {
+        isFixture: true,
         checkAvailability: vi.fn().mockResolvedValue({
           status: "deferred",
           errorCode: "OPENAI_EXTERNAL_CHECK_DEFERRED",
         }),
+        generateLessonPlan: vi.fn(),
+        generateActivity: vi.fn(),
       } satisfies OpenAIAdapter,
     );
 
