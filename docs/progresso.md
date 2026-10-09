@@ -9,9 +9,16 @@ Implementado nesta etapa:
 - `import-bncc-cli.ts --dry-run` valida os schemas e as 1.721 aprendizagens sem conexão com o banco, emitindo checksum SHA-256 do snapshot.
 - Migração `010_bncc_compatibility_projection.sql` instala uma projeção idempotente do modelo canônico para `curriculum_area`, `syllabus` e `bncc_skill`.
 - A projeção usa UUIDs determinísticos, registra `curriculum_load`/`curriculum_change` e roda dentro da mesma transação da carga canônica.
-- Nenhuma operação no bucket, Cloud SQL ou deploy foi executada nesta etapa.
+- Nenhuma operação no bucket ou deploy foi executada nesta etapa.
 
-Evidência local: `npm run lint`, `npm run build --workspace @educai/api`, testes do workspace e `npm run db:import-bncc --workspace @educai/api -- --dry-run` concluídos; o dry-run reportou 93 EI, 1.304 EF, 183 EM, 141 Computação e total 1.721.
+Configuração Cloud SQL concluída posteriormente nesta etapa:
+
+- instância nova `educai-dev`, PostgreSQL 16, zonal, 10 GiB SSD e backups habilitados;
+- banco `educai` e usuário dedicado `educai_app` criados; `educai-bncc-validation` permaneceu intacta;
+- migrações `001`–`013`, seeds e carga BNCC aplicadas pelo Auth Proxy na porta local `5433`;
+- smoke test autenticado de `/api/curriculum` encontrou `EF05MA03` e a repetição da carga confirmou idempotência.
+
+Evidência local: `npm run lint`, `npm run build --workspace @educai/api`, testes do workspace e `npm run db:import-bncc --workspace @educai/api -- --dry-run` concluídos; o dry-run reportou 93 EI, 1.304 EF, 183 EM, 141 Computação e total 1.721. No Cloud SQL, a carga confirmou 1.721 habilidades canônicas e legadas, 83 syllabi e um único `curriculum_load` para o checksum do snapshot.
 
 Próxima etapa operacional: aplicar migrações e executar a carga em uma conexão controlada do Cloud SQL; depois validar contagens, `EF05MA03`, `/api/curriculum` e idempotência antes de publicar o snapshot no bucket.
 

@@ -94,7 +94,7 @@ IDs internos são UUIDs. Identificadores Google são opcionais e únicos, prepar
 
 O projeto Google Cloud é `educai-511017`. O bucket privado `gs://educai-511017-test-artifacts`, em `southamerica-east1`, usa acesso uniforme e prevenção de acesso público para artefatos de teste futuros. O bucket não executa containers e ainda não é consumido pela aplicação.
 
-Para validação quando Docker local não estiver disponível, o projeto mantém a instância Cloud SQL `educai-bncc-validation` (`POSTGRES_16`, `db-f1-micro`, cobrança por uso) acessada pelo Cloud SQL Auth Proxy. Ela não é ambiente de produção.
+Para desenvolvimento remoto, o projeto usa a instância Cloud SQL `educai-dev` (`POSTGRES_16`, `db-f1-micro`, zonal, cobrança por uso) acessada pelo Cloud SQL Auth Proxy na porta local `5433`. A instância `educai-bncc-validation` (`POSTGRES_16`, `db-f1-micro`) permanece separada e intacta para validação.
 
 Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alterar nome e preferência, mas nunca e-mail; consultas sem habilidade retornam fallback marcado para revisão.
 
