@@ -32,6 +32,16 @@ Implementado nesta etapa:
 - invalidação automática da revisão e aprovação após edição estrutural;
 - isolamento por professor e bloqueio para atividades publicadas ou arquivadas.
 
+## Dia 9 - Etapa 4: adaptadores Google
+
+Implementado nesta etapa:
+
+- escopos OAuth de escrita em Forms e Classroom, leitura de respostas e Drive;
+- criação, configuração como quiz e publicação explícita de Google Forms;
+- questões objetivas com gabarito e discursivas com campo de resposta longa;
+- criação de trabalho Classroom por turma com prazo, pontos e link do Form;
+- reconciliação por marcador determinístico e normalização de falhas Google.
+
 ## Entrega atual - Dia 8
 
 Implementado nesta etapa:

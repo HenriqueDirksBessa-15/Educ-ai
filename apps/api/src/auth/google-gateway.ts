@@ -12,8 +12,13 @@ const GOOGLE_SCOPES = [
   "email",
   "profile",
   "https://www.googleapis.com/auth/classroom.courses.readonly",
-  "https://www.googleapis.com/auth/forms.body.readonly",
+  "https://www.googleapis.com/auth/classroom.coursework.students",
+  "https://www.googleapis.com/auth/forms.body",
+  "https://www.googleapis.com/auth/forms.responses.readonly",
+  "https://www.googleapis.com/auth/drive.file",
 ];
+
+export const GOOGLE_PUBLISHING_SCOPES = GOOGLE_SCOPES.slice(3);
 
 export class GoogleGatewayError extends Error {
   constructor(
