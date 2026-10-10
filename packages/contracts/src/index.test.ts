@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   activityCollectionSummarySchema,
   feedbackCreateSchema,
+  bulletinCreateSchema,
   apiErrorSchema,
   activityInputSchema,
   authSessionSchema,
@@ -249,6 +250,28 @@ describe("shared contracts", () => {
         scope: "global",
         title: "Aviso",
         content: "Mensagem para a turma.",
+      }),
+    ).toThrow();
+  });
+
+  it("validates bulletin periods and requires an explicit average threshold", () => {
+    const base = {
+      classId: "11111111-1111-4111-8111-111111111111",
+      studentIds: ["21111111-1111-4111-8111-111111111111"],
+      periodType: "monthly" as const,
+      periodStart: "2026-10-01",
+      periodEnd: "2026-10-31",
+      title: "Boletim de outubro",
+    };
+    expect(bulletinCreateSchema.parse(base).periodType).toBe("monthly");
+    expect(() =>
+      bulletinCreateSchema.parse({ ...base, onlyBelowAverage: true }),
+    ).toThrow();
+    expect(() =>
+      bulletinCreateSchema.parse({
+        ...base,
+        periodStart: "2026-11-01",
+        periodEnd: "2026-10-31",
       }),
     ).toThrow();
   });

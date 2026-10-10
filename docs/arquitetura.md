@@ -106,7 +106,7 @@ Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alt
 
 ## Relações implementadas e próximas
 
-Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades vinculam plano, dificuldade, questões e prazo, preservam gerações/revisões e mantêm uma máquina de publicação por Form e por turma Classroom. A conclusão agenda a coleta no prazo; submissões reconciliam o aluno dentro das turmas distribuídas e preservam o detalhamento objetivo por questão. Correções discursivas, feedback e boletins preservarão histórico nas etapas seguintes.
+Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades vinculam plano, dificuldade, questões e prazo, preservam gerações/revisões e mantêm uma máquina de publicação por Form e por turma Classroom. A conclusão agenda a coleta no prazo; submissões reconciliam o aluno dentro das turmas distribuídas e preservam o detalhamento por questão. Correções, feedbacks, notificações e boletins mantêm históricos ou snapshots imutáveis próprios.
 
 ## Publicação externa de atividades
 
@@ -135,3 +135,11 @@ Na liberação, o adaptador procura a submissão do aluno pelo vínculo turma/tr
 A geração preserva contexto e sugestão versionados. Conteúdo assistido muda para revisado somente com ação docente, enquanto edições manuais e exclusões lógicas respeitam `FEEDBACK_EDIT_WINDOW_MINUTES`. O histórico é append-only e diferencia eventos da IA, do professor e do sistema.
 
 O envio cria uma única entrada em `notification_outbox`. O canal é Classroom quando há turma Google reconciliada e e-mail como fallback persistido; a entrega externa fica desacoplada do registro pedagógico e pode ser processada sem duplicar a comunicação.
+
+## Boletins, PDF e e-mail
+
+O boletim consulta apenas notas finais aprovadas ou liberadas da turma e do período. A média é aritmética simples das notas 0–10; presença, participação e responsável são omitidos porque não possuem fonte autorizada. O filtro abaixo da média recebe um limiar explícito do professor.
+
+Antes da persistência, a API monta um snapshot, gera o PDF e calcula SHA-256. Snapshot, bytes, período, média e destinatário ficam protegidos por trigger; o status de envio pode mudar sem reescrever a cópia emitida.
+
+Cada chamada de envio adquire o boletim, cria `bulletin_delivery` com número crescente e passa os mesmos bytes a `BulletinEmailSender`. Sucesso ou falha encerra apenas aquela tentativa. Desenvolvimento e teste usam fixture; produção usa um adaptador indisponível até a configuração deliberada de um provedor real.

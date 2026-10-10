@@ -105,6 +105,16 @@
 | DT-49 | 10/10/2026 | Persistir uma outbox idempotente por comunicação                    | Repetir envio não duplica notificação e permite integração operacional posterior |
 | DT-50 | 10/10/2026 | Manter sugestão de IA separada do texto revisado pelo professor     | Histórico distingue claramente autoria gerada e decisão docente                  |
 
+## Decisões técnicas do Dia 13
+
+| ID    | Data       | Decisão                                                              | Impacto                                                                    |
+| ----- | ---------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| DT-51 | 10/10/2026 | Calcular média aritmética simples das notas normalizadas             | Cada atividade tem o mesmo peso e o cálculo é explícito e reproduzível     |
+| DT-52 | 10/10/2026 | Armazenar snapshot e PDF com checksum como cópia histórica imutável  | Reenvios preservam exatamente o documento originalmente emitido            |
+| DT-53 | 10/10/2026 | Usar e-mail institucional do aluno e omitir responsável não modelado | Não inventa responsável nem outro dado pessoal ausente                     |
+| DT-54 | 10/10/2026 | Isolar envio em adaptador; produção falha sem provedor configurado   | Falha é recuperável e fixture nunca se apresenta como entrega externa real |
+| DT-55 | 10/10/2026 | Exigir limiar explícito no filtro de desempenho abaixo da média      | Nenhuma nota de corte institucional é inventada                            |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |
@@ -117,5 +127,5 @@
 | D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida por DT-28: formatos já aprovados; quota configurável sem limite fixo nesta etapa |
 | D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Implementação adotada em DT-29; pesos são a pontuação explícita de cada questão            |
 | D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Resolvida tecnicamente por DT-48: configurável, padrão provisório de 24 horas              |
-| D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Aberta                                                                                     |
-| D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Aberta                                                                                     |
+| D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Resolvida por DT-53: campos omitidos; envio usa e-mail institucional do aluno              |
+| D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Arquitetura resolvida por DT-54; provedor de produção permanece operacional                |

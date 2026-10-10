@@ -800,6 +800,107 @@ export const eligibleFeedbackSubmissionSchema = z.object({
   correctionStatus: z.enum(["approved", "released"]),
 });
 
+export const bulletinPeriodTypeSchema = z.enum([
+  "monthly",
+  "bimonthly",
+  "quarterly",
+  "annual",
+  "custom",
+]);
+
+export const bulletinStatusSchema = z.enum([
+  "generated",
+  "pending",
+  "sent",
+  "failed",
+]);
+
+export const bulletinCreateSchema = z
+  .object({
+    classId: z.uuid(),
+    studentIds: z.array(z.uuid()).min(1).max(200),
+    periodType: bulletinPeriodTypeSchema,
+    periodStart: z.iso.date(),
+    periodEnd: z.iso.date(),
+    title: z.string().trim().min(1).max(180),
+    teacherComment: z.string().trim().max(8_000).nullable().optional(),
+    onlyBelowAverage: z.boolean().default(false),
+    averageThreshold: z.number().min(0).max(10).optional(),
+  })
+  .refine((value) => new Date(value.periodStart) <= new Date(value.periodEnd), {
+    path: ["periodEnd"],
+    message: "O fim do período não pode anteceder o início.",
+  })
+  .refine(
+    (value) => !value.onlyBelowAverage || value.averageThreshold !== undefined,
+    {
+      path: ["averageThreshold"],
+      message: "Informe o limiar para filtrar médias abaixo dele.",
+    },
+  )
+  .refine(
+    (value) => new Set(value.studentIds).size === value.studentIds.length,
+    {
+      path: ["studentIds"],
+      message: "Cada aluno deve aparecer uma única vez.",
+    },
+  );
+
+export const bulletinActivitySnapshotSchema = z.object({
+  activityId: z.uuid(),
+  title: z.string().min(1),
+  dueAt: z.iso.datetime(),
+  grade: z.number().min(0).max(10),
+});
+
+export const bulletinFeedbackSnapshotSchema = z.object({
+  feedbackId: z.uuid(),
+  title: z.string().min(1),
+  content: z.string().min(1),
+  sentAt: z.iso.datetime(),
+});
+
+export const bulletinDeliverySchema = z.object({
+  id: z.uuid(),
+  attemptNumber: z.number().int().positive(),
+  recipientEmail: z.email(),
+  status: z.enum(["pending", "sent", "failed"]),
+  errorCode: z.string().nullable(),
+  attemptedAt: z.iso.datetime(),
+  completedAt: z.iso.datetime().nullable(),
+});
+
+export const bulletinSchema = z.object({
+  id: z.uuid(),
+  classId: z.uuid(),
+  className: z.string().min(1),
+  studentId: z.uuid(),
+  studentName: z.string().min(1),
+  studentEmail: z.email(),
+  periodType: bulletinPeriodTypeSchema,
+  periodStart: z.iso.date(),
+  periodEnd: z.iso.date(),
+  title: z.string().min(1),
+  teacherComment: z.string().nullable(),
+  average: z.number().min(0).max(10),
+  activities: z.array(bulletinActivitySnapshotSchema).min(1),
+  feedbacks: z.array(bulletinFeedbackSnapshotSchema),
+  status: bulletinStatusSchema,
+  lastErrorCode: z.string().nullable(),
+  generatedAt: z.iso.datetime(),
+  sentAt: z.iso.datetime().nullable(),
+  pdfSha256: z.string().length(64),
+  deliveries: z.array(bulletinDeliverySchema),
+});
+
+export const eligibleBulletinStudentSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(1),
+  email: z.email(),
+  classId: z.uuid(),
+  className: z.string().min(1),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -909,6 +1010,20 @@ export type FeedbackGeneration = z.infer<typeof feedbackGenerationSchema>;
 export type Feedback = z.infer<typeof feedbackSchema>;
 export type EligibleFeedbackSubmission = z.infer<
   typeof eligibleFeedbackSubmissionSchema
+>;
+export type BulletinPeriodType = z.infer<typeof bulletinPeriodTypeSchema>;
+export type BulletinStatus = z.infer<typeof bulletinStatusSchema>;
+export type BulletinCreate = z.infer<typeof bulletinCreateSchema>;
+export type BulletinActivitySnapshot = z.infer<
+  typeof bulletinActivitySnapshotSchema
+>;
+export type BulletinFeedbackSnapshot = z.infer<
+  typeof bulletinFeedbackSnapshotSchema
+>;
+export type BulletinDelivery = z.infer<typeof bulletinDeliverySchema>;
+export type Bulletin = z.infer<typeof bulletinSchema>;
+export type EligibleBulletinStudent = z.infer<
+  typeof eligibleBulletinStudentSchema
 >;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;

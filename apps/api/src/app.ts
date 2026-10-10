@@ -53,6 +53,14 @@ import { SubmissionReleaseService } from "./corrections/release.js";
 import { registerCorrectionRoutes } from "./corrections/routes.js";
 import { FeedbackRepository } from "./feedback/repository.js";
 import { registerFeedbackRoutes } from "./feedback/routes.js";
+import { BulletinsRepository } from "./bulletins/repository.js";
+import {
+  FixtureBulletinEmailSender,
+  UnavailableBulletinEmailSender,
+  type BulletinEmailSender,
+} from "./bulletins/email.js";
+import { BulletinService } from "./bulletins/service.js";
+import { registerBulletinRoutes } from "./bulletins/routes.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -62,6 +70,7 @@ type AppDependencies = {
   googleActivityPublisher?: GoogleActivityPublisher;
   googleResponseCollector?: GoogleResponseCollector;
   classroomGradeReturner?: ClassroomGradeReturner;
+  bulletinEmailSender?: BulletinEmailSender;
   startMonitor?: boolean;
 };
 
@@ -73,6 +82,7 @@ export async function createApp({
   googleActivityPublisher,
   googleResponseCollector,
   classroomGradeReturner,
+  bulletinEmailSender,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -102,6 +112,7 @@ export async function createApp({
     database,
   );
   const feedbackRepository = new FeedbackRepository(database);
+  const bulletinsRepository = new BulletinsRepository(database);
   const openAIAdapter =
     planGenerationAdapter ??
     (config.openai.apiKey
@@ -144,6 +155,12 @@ export async function createApp({
     repository,
     gradeReturner,
   );
+  const emailSender =
+    bulletinEmailSender ??
+    (config.nodeEnv === "production"
+      ? new UnavailableBulletinEmailSender()
+      : new FixtureBulletinEmailSender());
+  const bulletinService = new BulletinService(bulletinsRepository, emailSender);
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -203,6 +220,12 @@ export async function createApp({
     authRepository: repository,
     repository: feedbackRepository,
     adapter: openAIAdapter,
+  });
+  registerBulletinRoutes(app, {
+    config,
+    authRepository: repository,
+    repository: bulletinsRepository,
+    service: bulletinService,
   });
   if (startMonitor) {
     monitor.start();

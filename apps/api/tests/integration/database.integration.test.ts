@@ -18,6 +18,9 @@ import { CorrectionsRepository } from "../../src/corrections/repository.js";
 import { gradeObjectiveAnswers } from "../../src/corrections/objective-grader.js";
 import { DiscursiveCorrectionsRepository } from "../../src/corrections/discursive-repository.js";
 import { FeedbackRepository } from "../../src/feedback/repository.js";
+import { BulletinsRepository } from "../../src/bulletins/repository.js";
+import { BulletinService } from "../../src/bulletins/service.js";
+import { FixtureBulletinEmailSender } from "../../src/bulletins/email.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -76,6 +79,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "018_activity_submissions_objective_grading.sql",
       "019_discursive_corrections.sql",
       "020_feedback_notifications.sql",
+      "021_bulletins.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -111,6 +115,8 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "feedback_generation",
         "feedback_history",
         "notification_outbox",
+        "bulletin",
+        "bulletin_delivery",
       ]),
     );
   }, 60_000);
@@ -634,6 +640,82 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       [[feedbackId, globalFeedbackId]],
     );
     expect(Number(notifications.rows[0]!.count)).toBe(2);
+    const bulletins = new BulletinsRepository(testPool);
+    const bulletinService = new BulletinService(
+      bulletins,
+      new FixtureBulletinEmailSender(),
+    );
+    const bulletinInput = {
+      classId,
+      studentIds: [reconciliation.studentId!],
+      periodType: "monthly" as const,
+      periodStart: "2026-10-01",
+      periodEnd: "2026-10-31",
+      title: "Boletim de outubro",
+      teacherComment: "Bom progresso no período.",
+      onlyBelowAverage: false,
+    };
+    await expect(
+      bulletinService.generate(professorId, {
+        ...bulletinInput,
+        periodStart: "2025-01-01",
+        periodEnd: "2025-01-31",
+      }),
+    ).rejects.toThrow("BULLETIN_WITHOUT_GRADES");
+    await expect(
+      bulletinService.generate(professorId, {
+        ...bulletinInput,
+        onlyBelowAverage: true,
+        averageThreshold: 7,
+      }),
+    ).rejects.toThrow("BULLETIN_FILTER_EMPTY");
+    const bulletinIds = await bulletinService.generate(
+      professorId,
+      bulletinInput,
+    );
+    expect(bulletinIds).toHaveLength(1);
+    const bulletinId = bulletinIds[0]!;
+    const bulletinList = await bulletins.list(professorId);
+    expect(bulletinList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: bulletinId,
+          studentId: reconciliation.studentId,
+          average: 8,
+          status: "generated",
+          activities: [expect.objectContaining({ grade: 8 })],
+          feedbacks: [expect.objectContaining({ feedbackId })],
+        }),
+      ]),
+    );
+    expect(
+      await bulletins.getPdf(otherProfessor.rows[0]!.id, bulletinId),
+    ).toBeNull();
+    const pdf = await bulletins.getPdf(professorId, bulletinId);
+    expect(new TextDecoder().decode(pdf!.data.slice(0, 5))).toBe("%PDF-");
+    expect(await bulletinService.send(professorId, bulletinId)).toEqual({
+      status: "sent",
+    });
+    expect(await bulletinService.send(professorId, bulletinId)).toEqual({
+      status: "sent",
+    });
+    expect(await bulletins.list(professorId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: bulletinId,
+          status: "sent",
+          deliveries: [
+            expect.objectContaining({ attemptNumber: 1, status: "sent" }),
+            expect.objectContaining({ attemptNumber: 2, status: "sent" }),
+          ],
+        }),
+      ]),
+    );
+    await expect(
+      testPool.query("UPDATE bulletin SET average = 1 WHERE id = $1", [
+        bulletinId,
+      ]),
+    ).rejects.toThrow("bulletin historical copy is immutable");
     expect(await feedbacks.remove(professorId, feedbackId)).toBe("deleted");
     await expect(
       testPool.query(

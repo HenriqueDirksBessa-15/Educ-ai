@@ -203,6 +203,15 @@ Endpoints do Dia 12:
 
 `FEEDBACK_EDIT_WINDOW_MINUTES` configura a janela de edição/exclusão e usa 1.440 minutos por padrão. Notificações ficam na outbox persistida para entrega operacional por Classroom ou e-mail.
 
+Endpoints do Dia 13:
+
+- `GET/POST /api/bulletins` para listar e gerar boletins individuais ou em lote;
+- `GET /api/bulletins/eligible-students` para alunos ativos das turmas próprias;
+- `GET /api/bulletins/:bulletinId/pdf` para visualização autenticada;
+- `POST /api/bulletins/:bulletinId/send` para envio e reenvio auditáveis.
+
+A média é aritmética simples das atividades na escala 0–10. O PDF e seu snapshot ficam imutáveis; cada envio cria uma tentativa. Em produção, o adaptador retorna falha recuperável até a configuração de um provedor real de e-mail.
+
 Em produção, a publicação usa as APIs reais. Em desenvolvimento e teste, o adaptador Google é uma fixture identificada. A validação externa requer uma conta docente, uma turma Classroom vinculada e novo consentimento OAuth.
 
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

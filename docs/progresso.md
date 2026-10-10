@@ -2,7 +2,44 @@
 
 Atualizado em 10/10/2026.
 
-## Entrega atual - Dia 12
+## Entrega atual - Dia 13
+
+O fluxo de boletins agora consolida notas aprovadas por período, calcula média aritmética, inclui feedbacks enviados e comentário docente, gera PDF histórico imutável e permite envio ou reenvio com tentativas auditáveis. A geração funciona para um aluno ou lote e aceita filtro abaixo de um limiar informado, sem inventar presença, participação ou responsável.
+
+Verificações finais:
+
+- `npm run test:unit`: 74 testes aprovados (13 contratos, 57 API e 4 web);
+- `npm run test:integration`: 4 testes PostgreSQL aprovados e smoke OpenAI ignorado por ser opt-in;
+- migrações 001–021 aplicadas em banco vazio e repetição sem novas aplicações;
+- integração PostgreSQL comprovou bloqueio sem notas, filtro por média, PDF, isolamento, snapshot imutável e dois envios preservados;
+- `npm audit --omit=dev`: nenhuma vulnerabilidade de produção após atualização pontual do `ajv`;
+- lint, tipagem, formatação e build de produção aprovados.
+
+Validação externa pendente: aplicar as migrações 015–021 no Cloud SQL e configurar um provedor real de e-mail. Em produção, a ausência do provedor gera falha recuperável e preserva o PDF. Nenhuma chamada externa, deploy ou push foi executado automaticamente.
+
+## Dia 13 - Etapa 1: consolidação e média
+
+- boletim individual ou em lote para alunos ativos de turma própria;
+- períodos mensal, bimestral, trimestral, anual e personalizado;
+- somente notas aprovadas/liberadas com atividade dentro do período;
+- média aritmética simples entre atividades normalizadas em 0–10;
+- filtro opcional exige limiar explícito e boletim sem notas é bloqueado.
+
+## Dia 13 - Etapa 2: PDF e cópia histórica
+
+- snapshot com professor, turma, aluno, atividades, notas, feedbacks e comentário;
+- PDF multipágina gerado no servidor e armazenado com SHA-256;
+- visualização autenticada pelo professor proprietário;
+- período, média, snapshot e bytes protegidos contra alteração no banco.
+
+## Dia 13 - Etapa 3: envio e reenvio
+
+- envio ao e-mail institucional do aluno por adaptador;
+- fixture confirma envios em desenvolvimento/teste;
+- produção falha explicitamente enquanto o provedor não estiver configurado;
+- cada reenvio cria nova tentativa e falhas nunca apagam o PDF.
+
+## Entrega anterior - Dia 12
 
 O fluxo de comunicação pedagógica agora cobre feedback individual para submissões aprovadas e avisos globais para turmas, com texto manual, links, materiais autorizados, geração opcional por IA, revisão docente, histórico imutável e notificação idempotente. A janela de edição/exclusão é configurável por ambiente e usa 24 horas como padrão documentado.
 
@@ -338,4 +375,4 @@ Implementados:
 
 ## Próximo passo
 
-Aplicar as migrações 015–020 no Cloud SQL e executar o smoke externo dos Dias 9–12; em seguida iniciar boletins e envio do Dia 13.
+Aplicar as migrações 015–021 no Cloud SQL, configurar o provedor de e-mail e executar o smoke externo; em seguida iniciar regressão, segurança, LGPD e entrega do Dia 14.
