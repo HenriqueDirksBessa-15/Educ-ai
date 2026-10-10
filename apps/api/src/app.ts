@@ -43,6 +43,14 @@ import {
 import { CorrectionsRepository } from "./corrections/repository.js";
 import { ActivityCollectionService } from "./corrections/collection.js";
 import { ActivityCollectionWorker } from "./corrections/worker.js";
+import { DiscursiveCorrectionsRepository } from "./corrections/discursive-repository.js";
+import {
+  FixtureClassroomGradeReturner,
+  ProductionClassroomGradeReturner,
+  type ClassroomGradeReturner,
+} from "./corrections/classroom-return.js";
+import { SubmissionReleaseService } from "./corrections/release.js";
+import { registerCorrectionRoutes } from "./corrections/routes.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -51,6 +59,7 @@ type AppDependencies = {
   planGenerationAdapter?: OpenAIAdapter;
   googleActivityPublisher?: GoogleActivityPublisher;
   googleResponseCollector?: GoogleResponseCollector;
+  classroomGradeReturner?: ClassroomGradeReturner;
   startMonitor?: boolean;
 };
 
@@ -61,6 +70,7 @@ export async function createApp({
   planGenerationAdapter,
   googleActivityPublisher,
   googleResponseCollector,
+  classroomGradeReturner,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -86,6 +96,9 @@ export async function createApp({
   const plansRepository = new PlansRepository(database);
   const activitiesRepository = new ActivitiesRepository(database);
   const correctionsRepository = new CorrectionsRepository(database);
+  const discursiveCorrectionsRepository = new DiscursiveCorrectionsRepository(
+    database,
+  );
   const openAIAdapter =
     planGenerationAdapter ??
     (config.openai.apiKey
@@ -117,6 +130,16 @@ export async function createApp({
     collectionService,
     Math.min(config.integrationMonitorIntervalMs, 60_000),
     app.log,
+  );
+  const gradeReturner =
+    classroomGradeReturner ??
+    (config.nodeEnv === "production"
+      ? new ProductionClassroomGradeReturner(config.google)
+      : new FixtureClassroomGradeReturner());
+  const releaseService = new SubmissionReleaseService(
+    discursiveCorrectionsRepository,
+    repository,
+    gradeReturner,
   );
   const monitor = new IntegrationMonitor(
     repository,
@@ -164,6 +187,13 @@ export async function createApp({
     publicationService,
     collectionService,
     correctionsRepository,
+  });
+  registerCorrectionRoutes(app, {
+    config,
+    authRepository: repository,
+    repository: discursiveCorrectionsRepository,
+    adapter: openAIAdapter,
+    releaseService,
   });
   if (startMonitor) {
     monitor.start();

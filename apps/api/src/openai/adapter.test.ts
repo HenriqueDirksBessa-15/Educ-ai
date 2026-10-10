@@ -226,4 +226,99 @@ describe("OpenAI adapter boundary", () => {
       origin: "openai",
     });
   });
+
+  it("suggests discursive points without making the final decision", async () => {
+    const result =
+      await new FixtureOpenAIAdapter().generateDiscursiveCorrection({
+        question: "Explique frações equivalentes.",
+        answer: "São frações diferentes que representam o mesmo valor.",
+        targetAnswer: "Frações de mesmo valor.",
+        criteria: "Conceito e justificativa.",
+        maxPoints: 4,
+        rigour: "balanced",
+        schoolYear: "5º ano",
+        difficulty: "medium",
+        content: "Frações equivalentes.",
+      });
+
+    expect(result).toMatchObject({
+      origin: "fixture",
+      suggestion: { pointsAwarded: 3, requiresReview: true },
+    });
+  });
+
+  it("routes empty and ambiguous discursive answers to manual grading", async () => {
+    const adapter = new FixtureOpenAIAdapter();
+    const context = {
+      question: "Explique.",
+      targetAnswer: null,
+      criteria: "Clareza.",
+      maxPoints: 2,
+      rigour: "strict" as const,
+      schoolYear: "5º ano",
+      difficulty: "hard" as const,
+      content: "Frações.",
+    };
+    await expect(
+      adapter.generateDiscursiveCorrection({ ...context, answer: "" }),
+    ).rejects.toMatchObject({ code: "DISCURSIVE_ANSWER_EMPTY" });
+    await expect(
+      adapter.generateDiscursiveCorrection({ ...context, answer: "talvez" }),
+    ).rejects.toMatchObject({ code: "DISCURSIVE_ANSWER_AMBIGUOUS" });
+  });
+
+  it("validates a structured discursive correction response", async () => {
+    const suggestion = {
+      pointsAwarded: 1.5,
+      comment: "Conceito adequado; detalhe a justificativa.",
+      requiresReview: true,
+    };
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              content: [
+                { type: "output_text", text: JSON.stringify(suggestion) },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new ConfiguredOpenAIAdapter(
+      {
+        apiKey: "fixture-key",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-5-mini",
+      },
+      fetcher as typeof fetch,
+    );
+
+    await expect(
+      adapter.generateDiscursiveCorrection({
+        question: "Explique a equivalência.",
+        answer: "As duas frações representam a mesma quantidade.",
+        targetAnswer: "Mesmo valor com numerador e denominador proporcionais.",
+        criteria: "Conceito e justificativa.",
+        maxPoints: 2,
+        rigour: "balanced",
+        schoolYear: "5º ano",
+        difficulty: "medium",
+        content: "Frações equivalentes.",
+      }),
+    ).resolves.toEqual({
+      suggestion,
+      model: "gpt-5-mini",
+      origin: "openai",
+    });
+    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
+      input: Array<{ content: string }>;
+    };
+    expect(body.input[1]?.content).toContain("Rigor: balanced");
+    expect(body.input[1]?.content).toContain(
+      "Conteúdo-base: Frações equivalentes",
+    );
+  });
 });

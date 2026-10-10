@@ -1,10 +1,13 @@
 import type {
   ActivitySuggestion,
+  DiscursiveCorrectionSuggestion,
+  CorrectionRigour,
   LessonPlanSuggestion,
   OpenAiAvailability,
 } from "@educai/contracts";
 import {
   activitySuggestionSchema,
+  discursiveCorrectionSuggestionSchema,
   lessonPlanSuggestionSchema,
 } from "@educai/contracts";
 
@@ -19,6 +22,9 @@ export type OpenAIAdapter = {
   generateActivity(
     context: ActivityPromptContext,
   ): Promise<ActivityGenerationResult>;
+  generateDiscursiveCorrection(
+    context: DiscursiveCorrectionPromptContext,
+  ): Promise<DiscursiveCorrectionResult>;
 };
 
 export type LessonPlanPromptContext = {
@@ -59,6 +65,24 @@ export type ActivityPromptContext = {
 
 export type ActivityGenerationResult = {
   suggestion: ActivitySuggestion;
+  model: string;
+  origin: "fixture" | "openai";
+};
+
+export type DiscursiveCorrectionPromptContext = {
+  question: string;
+  answer: string;
+  targetAnswer: string | null;
+  criteria: string;
+  maxPoints: number;
+  rigour: CorrectionRigour;
+  schoolYear: string;
+  difficulty: "easy" | "medium" | "hard";
+  content: string;
+};
+
+export type DiscursiveCorrectionResult = {
+  suggestion: DiscursiveCorrectionSuggestion;
   model: string;
   origin: "fixture" | "openai";
 };
@@ -233,6 +257,70 @@ export class ConfiguredOpenAIAdapter implements OpenAIAdapter {
     };
   }
 
+  async generateDiscursiveCorrection(
+    context: DiscursiveCorrectionPromptContext,
+  ): Promise<DiscursiveCorrectionResult> {
+    assertDiscursiveAnswer(context.answer);
+    if (!this.config.apiKey)
+      throw new OpenAIPlanGenerationError("OPENAI_API_KEY_MISSING");
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.baseUrl()}/responses`, {
+        method: "POST",
+        headers: { ...this.headers(), "content-type": "application/json" },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({
+          model: this.config.model,
+          input: [
+            {
+              role: "developer",
+              content:
+                "Você sugere correções discursivas para professores brasileiros. Não tome a decisão final, use somente os critérios fornecidos e sinalize incerteza.",
+            },
+            { role: "user", content: buildDiscursiveCorrectionPrompt(context) },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name: "discursive_correction_suggestion",
+              strict: true,
+              schema: discursiveCorrectionJsonSchema,
+            },
+          },
+        }),
+      });
+    } catch (error) {
+      if (error instanceof OpenAIPlanGenerationError) throw error;
+      if (error instanceof Error && error.name === "TimeoutError")
+        throw new OpenAIPlanGenerationError("OPENAI_TIMEOUT");
+      throw new OpenAIPlanGenerationError("OPENAI_SERVICE_UNAVAILABLE");
+    }
+    if (!response.ok) {
+      if (response.status === 401)
+        throw new OpenAIPlanGenerationError("OPENAI_API_KEY_INVALID");
+      if (response.status === 429)
+        throw new OpenAIPlanGenerationError("OPENAI_RATE_LIMITED");
+      throw new OpenAIPlanGenerationError("OPENAI_SERVICE_UNAVAILABLE");
+    }
+    const outputText = extractOutputText((await response.json()) as unknown);
+    if (!outputText)
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(outputText);
+    } catch {
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    }
+    const parsed = discursiveCorrectionSuggestionSchema.safeParse(parsedJson);
+    if (!parsed.success || parsed.data.pointsAwarded > context.maxPoints)
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    return {
+      suggestion: parsed.data,
+      model: this.config.model,
+      origin: "openai",
+    };
+  }
+
   private baseUrl(): string {
     return this.config.baseUrl.replace(/\/$/, "");
   }
@@ -305,6 +393,27 @@ export class FixtureOpenAIAdapter implements OpenAIAdapter {
         type: context.activityType,
         difficulty: context.difficulty,
         questions,
+      },
+    };
+  }
+
+  async generateDiscursiveCorrection(
+    context: DiscursiveCorrectionPromptContext,
+  ): Promise<DiscursiveCorrectionResult> {
+    assertDiscursiveAnswer(context.answer);
+    const ratio =
+      context.rigour === "supportive"
+        ? 0.9
+        : context.rigour === "balanced"
+          ? 0.75
+          : 0.6;
+    return {
+      model: "fixture-discursive-correction-v1",
+      origin: "fixture",
+      suggestion: {
+        pointsAwarded: round2(context.maxPoints * ratio),
+        comment: `A resposta aborda o enunciado. Revise a aderência a: ${context.criteria}`,
+        requiresReview: true,
       },
     };
   }
@@ -393,6 +502,17 @@ const activityJsonSchema = {
   },
 } as const;
 
+const discursiveCorrectionJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["pointsAwarded", "comment", "requiresReview"],
+  properties: {
+    pointsAwarded: { type: "number", minimum: 0 },
+    comment: { type: "string" },
+    requiresReview: { type: "boolean" },
+  },
+} as const;
+
 function buildLessonPlanPrompt(context: LessonPlanPromptContext): string {
   return [
     `Título atual: ${context.title}`,
@@ -427,6 +547,35 @@ function buildActivityPrompt(context: ActivityPromptContext): string {
     `Estratégia de avaliação: ${context.evaluationStrategy}`,
     "Não invente habilidades BNCC nem materiais. Forneça gabarito e alternativas nas objetivas; resposta-alvo e critérios nas discursivas.",
   ].join("\n\n");
+}
+
+function buildDiscursiveCorrectionPrompt(
+  context: DiscursiveCorrectionPromptContext,
+): string {
+  return [
+    `Enunciado: ${context.question}`,
+    `Resposta do aluno: ${context.answer}`,
+    `Resposta-alvo: ${context.targetAnswer || "não informada"}`,
+    `Critérios: ${context.criteria}`,
+    `Pontuação máxima: ${context.maxPoints}`,
+    `Rigor: ${context.rigour}`,
+    `Ano/nível: ${context.schoolYear}`,
+    `Dificuldade: ${context.difficulty}`,
+    `Conteúdo-base: ${context.content}`,
+    "Sugira pontos e comentário. Marque requiresReview sempre que houver ambiguidade, informação insuficiente ou baixa confiança.",
+  ].join("\n\n");
+}
+
+function assertDiscursiveAnswer(answer: string): void {
+  const normalized = answer.trim();
+  if (!normalized)
+    throw new OpenAIPlanGenerationError("DISCURSIVE_ANSWER_EMPTY");
+  if (normalized.length < 8)
+    throw new OpenAIPlanGenerationError("DISCURSIVE_ANSWER_AMBIGUOUS");
+}
+
+function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function extractOutputText(payload: unknown): string | null {

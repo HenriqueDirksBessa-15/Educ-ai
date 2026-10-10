@@ -317,6 +317,8 @@ export const activityStatusSchema = z.enum(["draft", "published", "finished"]);
 
 export const activityTypeSchema = z.enum(["objective", "discursive", "mixed"]);
 
+export const activityQuestionKindSchema = z.enum(["objective", "discursive"]);
+
 export const activityDifficultySchema = z.enum(["easy", "medium", "hard"]);
 
 export const latePolicySchema = z.discriminatedUnion("mode", [
@@ -532,14 +534,92 @@ export const activitySubmissionStatusSchema = z.enum([
 export const activityAnswerStatusSchema = z.enum([
   "graded",
   "pending_discursive",
+  "teacher_reviewed",
   "manual_review_required",
 ]);
+
+export const submissionCorrectionStatusSchema = z.enum([
+  "pending",
+  "suggested",
+  "manual_required",
+  "reviewed",
+  "approved",
+  "released",
+]);
+
+export const classroomReturnStatusSchema = z.enum([
+  "pending",
+  "not_available",
+  "returned",
+  "failed",
+]);
+
+export const correctionRigourSchema = z.enum([
+  "supportive",
+  "balanced",
+  "strict",
+]);
+
+export const discursiveCorrectionSuggestionSchema = z.object({
+  pointsAwarded: z.number().nonnegative(),
+  comment: z.string().trim().min(1).max(4_000),
+  requiresReview: z.boolean(),
+});
+
+export const discursiveCorrectionGenerateSchema = z.object({
+  answerId: z.uuid(),
+  rigour: correctionRigourSchema,
+});
+
+export const discursiveAnswerReviewSchema = z.object({
+  answerId: z.uuid(),
+  pointsAwarded: z.number().nonnegative(),
+  comment: z.string().trim().min(1).max(4_000),
+});
+
+export const submissionCorrectionReviewSchema = z
+  .object({
+    answers: z.array(discursiveAnswerReviewSchema).min(1).max(100),
+    teacherComment: z.string().trim().min(1).max(8_000),
+  })
+  .refine(
+    (review) =>
+      new Set(review.answers.map((answer) => answer.answerId)).size ===
+      review.answers.length,
+    {
+      path: ["answers"],
+      message: "Cada resposta deve aparecer uma única vez.",
+    },
+  );
+
+export const correctionHistorySchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  answerId: z.uuid().nullable(),
+  action: z.enum([
+    "ai_suggestion",
+    "ai_failure",
+    "teacher_revision",
+    "approval",
+    "release",
+    "release_failure",
+  ]),
+  origin: z.enum(["fixture", "openai", "teacher", "system"]),
+  model: z.string().nullable(),
+  pointsAwarded: z.number().nonnegative().nullable(),
+  grade: z.number().min(0).max(10).nullable(),
+  comment: z.string().nullable(),
+  requiresReview: z.boolean().nullable(),
+  errorCode: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
 
 export const activitySubmissionAnswerSchema = z.object({
   id: z.uuid(),
   questionId: z.uuid().nullable(),
   externalQuestionId: z.string().min(1),
   questionPosition: z.number().int().nonnegative().nullable(),
+  kind: activityQuestionKindSchema.nullable(),
   prompt: z.string().nullable(),
   answerText: z.string().nullable(),
   status: activityAnswerStatusSchema,
@@ -547,6 +627,10 @@ export const activitySubmissionAnswerSchema = z.object({
   pointsAwarded: z.number().nonnegative().nullable(),
   pointsPossible: z.number().nonnegative().nullable(),
   reviewReason: z.string().nullable(),
+  suggestedPointsAwarded: z.number().nonnegative().nullable(),
+  suggestedComment: z.string().nullable(),
+  suggestionRequiresReview: z.boolean().nullable(),
+  teacherComment: z.string().nullable(),
 });
 
 export const activitySubmissionSchema = z.object({
@@ -562,6 +646,13 @@ export const activitySubmissionSchema = z.object({
   objectivePointsAwarded: z.number().nonnegative(),
   objectivePointsPossible: z.number().nonnegative(),
   grade: z.number().min(0).max(10).nullable(),
+  correctionStatus: submissionCorrectionStatusSchema,
+  teacherComment: z.string().nullable(),
+  approvedAt: z.iso.datetime().nullable(),
+  releasedAt: z.iso.datetime().nullable(),
+  classroomReturnStatus: classroomReturnStatusSchema,
+  classroomReturnErrorCode: z.string().nullable(),
+  correctionHistory: z.array(correctionHistorySchema),
   answers: z.array(activitySubmissionAnswerSchema),
 });
 
@@ -654,6 +745,21 @@ export type ActivitySubmissionStatus = z.infer<
   typeof activitySubmissionStatusSchema
 >;
 export type ActivityAnswerStatus = z.infer<typeof activityAnswerStatusSchema>;
+export type SubmissionCorrectionStatus = z.infer<
+  typeof submissionCorrectionStatusSchema
+>;
+export type ClassroomReturnStatus = z.infer<typeof classroomReturnStatusSchema>;
+export type CorrectionRigour = z.infer<typeof correctionRigourSchema>;
+export type DiscursiveCorrectionSuggestion = z.infer<
+  typeof discursiveCorrectionSuggestionSchema
+>;
+export type DiscursiveCorrectionGenerate = z.infer<
+  typeof discursiveCorrectionGenerateSchema
+>;
+export type SubmissionCorrectionReview = z.infer<
+  typeof submissionCorrectionReviewSchema
+>;
+export type CorrectionHistory = z.infer<typeof correctionHistorySchema>;
 export type ActivitySubmissionAnswer = z.infer<
   typeof activitySubmissionAnswerSchema
 >;

@@ -143,19 +143,33 @@ export class CorrectionsRepository {
            student_id = EXCLUDED.student_id,
            respondent_email = EXCLUDED.respondent_email,
            submitted_at = EXCLUDED.submitted_at,
-           status = EXCLUDED.status,
-           manual_review_reason = EXCLUDED.manual_review_reason,
-           objective_points_awarded = EXCLUDED.objective_points_awarded,
-           objective_points_possible = EXCLUDED.objective_points_possible,
-           grade = EXCLUDED.grade,
+           status = CASE
+             WHEN activity_submission.correction_status IN ('approved', 'released')
+               THEN activity_submission.status
+             ELSE EXCLUDED.status
+           END,
+           manual_review_reason = CASE
+             WHEN activity_submission.correction_status IN ('approved', 'released')
+               THEN activity_submission.manual_review_reason
+             ELSE EXCLUDED.manual_review_reason
+           END,
+           objective_points_awarded = CASE
+             WHEN activity_submission.correction_status IN ('approved', 'released')
+               THEN activity_submission.objective_points_awarded
+             ELSE EXCLUDED.objective_points_awarded
+           END,
+           objective_points_possible = CASE
+             WHEN activity_submission.correction_status IN ('approved', 'released')
+               THEN activity_submission.objective_points_possible
+             ELSE EXCLUDED.objective_points_possible
+           END,
+           grade = CASE
+             WHEN activity_submission.correction_status IN ('approved', 'released')
+               THEN activity_submission.grade
+             ELSE EXCLUDED.grade
+           END,
            raw_payload = EXCLUDED.raw_payload
          RETURNING id
-       ), cleared AS (
-         DELETE FROM activity_submission_answer
-         WHERE submission_id = (SELECT id FROM saved)
-         RETURNING submission_id
-       ), clear_done AS (
-         SELECT count(*) FROM cleared
        ), answers AS (
          INSERT INTO activity_submission_answer
            (submission_id, question_id, external_question_id, question_position,
@@ -165,12 +179,35 @@ export class CorrectionsRepository {
                 item.status::activity_answer_status, item.is_correct,
                 item.points_awarded, item.review_reason
          FROM saved
-         CROSS JOIN clear_done
          CROSS JOIN jsonb_to_recordset($13::jsonb) AS item(
            question_id uuid, external_question_id text, question_position smallint,
            answer_text text, status text, is_correct boolean,
            points_awarded numeric, review_reason text
          )
+         ON CONFLICT (submission_id, external_question_id) DO UPDATE SET
+           question_id = EXCLUDED.question_id,
+           question_position = EXCLUDED.question_position,
+           answer_text = EXCLUDED.answer_text,
+           status = CASE
+             WHEN activity_submission_answer.status = 'teacher_reviewed'
+               THEN activity_submission_answer.status
+             ELSE EXCLUDED.status
+           END,
+           is_correct = CASE
+             WHEN activity_submission_answer.status = 'teacher_reviewed'
+               THEN activity_submission_answer.is_correct
+             ELSE EXCLUDED.is_correct
+           END,
+           points_awarded = CASE
+             WHEN activity_submission_answer.status = 'teacher_reviewed'
+               THEN activity_submission_answer.points_awarded
+             ELSE EXCLUDED.points_awarded
+           END,
+           review_reason = CASE
+             WHEN activity_submission_answer.status = 'teacher_reviewed'
+               THEN activity_submission_answer.review_reason
+             ELSE EXCLUDED.review_reason
+           END
        ), compatibility AS (
          INSERT INTO activity_response
            (activity_id, external_student_id, submitted_at)
@@ -277,7 +314,7 @@ export class CorrectionsRepository {
               job.last_error_code, job.completed_at,
               count(submission.id)::int AS submission_count,
               count(submission.id) FILTER (
-                WHERE submission.status = 'objective_graded')::int AS graded_count,
+                WHERE submission.grade IS NOT NULL)::int AS graded_count,
               count(submission.id) FILTER (
                 WHERE submission.status = 'manual_review_required')::int
                 AS manual_review_count
@@ -308,20 +345,40 @@ export class CorrectionsRepository {
               submission.status, submission.manual_review_reason,
               submission.objective_points_awarded,
               submission.objective_points_possible, submission.grade,
+              submission.correction_status, submission.teacher_comment,
+              submission.approved_at, submission.released_at,
+              submission.classroom_return_status,
+              submission.classroom_return_error_code,
               coalesce(jsonb_agg(jsonb_build_object(
                 'id', answer.id,
                 'questionId', answer.question_id,
                 'externalQuestionId', answer.external_question_id,
                 'questionPosition', answer.question_position,
+                'kind', question.kind,
                 'prompt', question.prompt,
                 'answerText', answer.answer_text,
                 'status', answer.status,
                 'isCorrect', answer.is_correct,
                 'pointsAwarded', answer.points_awarded,
                 'pointsPossible', question.points,
-                'reviewReason', answer.review_reason
+                'reviewReason', answer.review_reason,
+                'suggestedPointsAwarded', answer.suggested_points_awarded,
+                'suggestedComment', answer.suggested_comment,
+                'suggestionRequiresReview', answer.suggestion_requires_review,
+                'teacherComment', answer.teacher_comment
               ) ORDER BY answer.question_position)
-                FILTER (WHERE answer.id IS NOT NULL), '[]'::jsonb) AS answers
+                FILTER (WHERE answer.id IS NOT NULL), '[]'::jsonb) AS answers,
+              (SELECT coalesce(jsonb_agg(jsonb_build_object(
+                'id', history.id, 'version', history.version,
+                'answerId', history.answer_id, 'action', history.action,
+                'origin', history.origin, 'model', history.model,
+                'pointsAwarded', history.points_awarded,
+                'grade', history.grade, 'comment', history.comment,
+                'requiresReview', history.requires_review,
+                'errorCode', history.error_code, 'createdAt', history.created_at
+              ) ORDER BY history.version), '[]'::jsonb)
+               FROM activity_correction_history history
+               WHERE history.submission_id = submission.id) AS correction_history
        FROM activity_submission submission
        LEFT JOIN student ON student.id = submission.student_id
        LEFT JOIN activity_submission_answer answer
@@ -366,12 +423,41 @@ function toSubmission(row: Record<string, unknown>): ActivitySubmission {
     objectivePointsAwarded: Number(row.objective_points_awarded),
     objectivePointsPossible: Number(row.objective_points_possible),
     grade: row.grade === null ? null : Number(row.grade),
+    correctionStatus: String(
+      row.correction_status,
+    ) as ActivitySubmission["correctionStatus"],
+    teacherComment: row.teacher_comment ? String(row.teacher_comment) : null,
+    approvedAt: row.approved_at
+      ? (row.approved_at as Date).toISOString()
+      : null,
+    releasedAt: row.released_at
+      ? (row.released_at as Date).toISOString()
+      : null,
+    classroomReturnStatus: String(
+      row.classroom_return_status,
+    ) as ActivitySubmission["classroomReturnStatus"],
+    classroomReturnErrorCode: row.classroom_return_error_code
+      ? String(row.classroom_return_error_code)
+      : null,
+    correctionHistory: (
+      row.correction_history as ActivitySubmission["correctionHistory"]
+    ).map((history) => ({
+      ...history,
+      pointsAwarded:
+        history.pointsAwarded === null ? null : Number(history.pointsAwarded),
+      grade: history.grade === null ? null : Number(history.grade),
+      createdAt: new Date(history.createdAt).toISOString(),
+    })),
     answers: (row.answers as ActivitySubmission["answers"]).map((answer) => ({
       ...answer,
       pointsAwarded:
         answer.pointsAwarded === null ? null : Number(answer.pointsAwarded),
       pointsPossible:
         answer.pointsPossible === null ? null : Number(answer.pointsPossible),
+      suggestedPointsAwarded:
+        answer.suggestedPointsAwarded === null
+          ? null
+          : Number(answer.suggestedPointsAwarded),
     })),
   };
 }

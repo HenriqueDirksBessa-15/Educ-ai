@@ -184,6 +184,15 @@ Endpoints do Dia 10:
 
 Em produção, um worker verifica trabalhos vencidos a cada minuto, pagina respostas do Forms e usa o ID externo como chave idempotente. Atividades mistas mantêm a nota final pendente até a revisão discursiva do Dia 11.
 
+Endpoints do Dia 11:
+
+- `POST /api/submissions/:submissionId/corrections/suggest` para sugestão estruturada de uma resposta discursiva;
+- `PATCH /api/submissions/:submissionId/correction` para pontos e comentários revisados pelo professor;
+- `POST /api/submissions/:submissionId/approve` para materializar a nota final;
+- `POST /api/submissions/:submissionId/release` para liberação local e devolução ao Classroom quando disponível.
+
+Sugestões de IA nunca alteram a nota. A aprovação exige revisão docente e todos os eventos de correção permanecem em histórico imutável.
+
 Em produção, a publicação usa as APIs reais. Em desenvolvimento e teste, o adaptador Google é uma fixture identificada. A validação externa requer uma conta docente, uma turma Classroom vinculada e novo consentimento OAuth.
 
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

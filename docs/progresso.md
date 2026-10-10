@@ -1,8 +1,44 @@
 # Progresso
 
-Atualizado em 09/10/2026.
+Atualizado em 10/10/2026.
 
-## Entrega atual - Dia 10
+## Entrega atual - Dia 11
+
+O fluxo de correção agora cobre sugestões discursivas estruturadas, correção manual, revisão docente obrigatória, aprovação explícita e liberação local ou via Google Classroom. Sugestões nunca alteram a nota final; cada tentativa, ajuste, aprovação e liberação gera histórico imutável. Atividades mistas combinam os pontos objetivos e discursivos somente após a decisão do professor.
+
+Verificações finais:
+
+- `npm run test:unit`: 63 testes aprovados (11 contratos, 48 API e 4 web);
+- `npm run test:integration`: 4 testes PostgreSQL aprovados e smoke OpenAI ignorado por ser opt-in;
+- migrações 001–019 aplicadas em banco vazio e repetição sem novas aplicações;
+- integração PostgreSQL comprovou sugestão, ajuste, nota mista, aprovação, liberação, isolamento por professor e bloqueio de alteração do histórico;
+- lint, tipagem, formatação e build de produção aprovados.
+
+Validação externa pendente: aplicar as migrações 015–019 no Cloud SQL e executar sugestões OpenAI e devolução Classroom reais com conta e turma de teste. Nenhuma chamada externa, deploy ou push foi executado automaticamente.
+
+## Dia 11 - Etapa 1: sugestão discursiva
+
+- prompt com enunciado, resposta, resposta-alvo, critérios, rigor, ano escolar, dificuldade e conteúdo-base;
+- Structured Outputs com pontos sugeridos, comentário e sinalização de revisão;
+- vazio, ambiguidade, timeout e indisponibilidade direcionam para correção manual;
+- sugestão persistida sem alterar pontos ou nota final.
+
+## Dia 11 - Etapa 2: revisão, aprovação e histórico
+
+- correção manual ou assistida de todas as respostas discursivas;
+- validação da pontuação máxima de cada questão;
+- cálculo da nota final 0–10 somente após aprovação explícita;
+- aprovação direta de correções totalmente objetivas;
+- histórico imutável de sugestão, falha, ajuste, aprovação e liberação.
+
+## Dia 11 - Etapa 3: liberação e interface
+
+- devolução de nota e retorno da submissão no Classroom quando os identificadores existem;
+- liberação local marcada como indisponível no Classroom quando o vínculo externo não existe;
+- falha externa preserva a aprovação e permite repetição idempotente;
+- painel com sugestão, edição de pontos/comentário, aprovação, liberação e estados externos.
+
+## Entrega anterior - Dia 10
 
 O fluxo de correção agora coleta respostas paginadas do Google Forms no prazo, reconcilia o aluno apenas dentro das turmas da atividade, persiste submissões idempotentes e corrige questões objetivas pelo gabarito. Atividades objetivas recebem nota normalizada de 0 a 10; atividades mistas preservam a parcela discursiva para o Dia 11; dados vazios ou inconsistentes seguem para revisão manual sem decisão automática.
 
@@ -265,4 +301,4 @@ Implementados:
 
 ## Próximo passo
 
-Aplicar as migrações 015–018 no Cloud SQL controlado e executar o smoke Google dos Dias 9–10; em seguida iniciar sugestão discursiva, revisão docente e liberação de notas do Dia 11.
+Aplicar as migrações 015–019 no Cloud SQL e executar o smoke externo dos Dias 9–11; em seguida iniciar feedback individual/global e avisos do Dia 12.

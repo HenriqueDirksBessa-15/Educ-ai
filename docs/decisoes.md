@@ -85,6 +85,16 @@
 | DT-39 | 09/10/2026 | Encaminhar vazio, questão desconhecida e aluno não reconciliado para revisão | Dados inconsistentes são preservados sem receber correção automática inventada      |
 | DT-40 | 09/10/2026 | Executar o worker periódico apenas com o coletor Google real                 | Fixtures não marcam trabalhos como concluídos sem respostas externas reais          |
 
+## Decisões técnicas do Dia 11
+
+| ID    | Data       | Decisão                                                                 | Impacto                                                                     |
+| ----- | ---------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| DT-41 | 10/10/2026 | Separar sugestão, revisão, aprovação e liberação em estados persistidos | Uma saída da IA nunca se torna nota final sem ações docentes explícitas     |
+| DT-42 | 10/10/2026 | Registrar cada transição como evento imutável com snapshot              | Sugestão original, ajuste e decisão final permanecem auditáveis             |
+| DT-43 | 10/10/2026 | Calcular nota mista somente após revisar todas as discursivas           | A parcela objetiva não antecipa nem mascara a decisão pedagógica            |
+| DT-44 | 10/10/2026 | Liberar localmente quando o Classroom não tiver vínculo suficiente      | O fluxo pedagógico não fica bloqueado por uma integração externa opcional   |
+| DT-45 | 10/10/2026 | Preservar aprovação quando a devolução externa falhar                   | A tentativa Classroom pode ser repetida sem apagar ou recalcular a correção |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |

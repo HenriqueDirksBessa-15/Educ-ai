@@ -119,3 +119,11 @@ Uma atividade só muda de `draft` para `published` depois de existir um Form pub
 O worker consulta somente trabalhos vencidos e usa uma aquisição persistida para impedir duas execuções simultâneas. A API do Forms é paginada e o `responseId` externo forma, com a atividade, a chave de idempotência. Cada nova coleta substitui atomicamente o detalhamento daquela submissão e registra uma execução com contagens e resultado.
 
 O aluno é reconciliado por e-mail apenas entre matrículas ativas das turmas presentes em `activity_classroom_distribution`. O corretor objetivo é uma função pura: compara o texto recebido com a alternativa do gabarito, soma pesos e normaliza atividades totalmente objetivas para 0–10. Questões discursivas permanecem pendentes; vazio, ausência, questão desconhecida e aluno não reconciliado exigem correção manual.
+
+## Correção discursiva e liberação
+
+Cada resposta discursiva pode receber uma projeção de sugestão da OpenAI, mas pontos finais e comentário só são gravados pela revisão autenticada do professor. A aprovação exige todas as discursivas revisadas, combina os pontos com as objetivas e normaliza a nota entre 0 e 10. Atividades totalmente objetivas também exigem aprovação antes da liberação.
+
+`activity_correction_history` é append-only e preserva snapshots de sugestão, falha, ajuste, aprovação e liberação. O estado corrente na submissão é apenas uma projeção para consulta; o banco rejeita atualização ou exclusão do histórico.
+
+Na liberação, o adaptador procura a submissão do aluno pelo vínculo turma/trabalho/identidade Google, atribui a nota na escala de pontos da atividade e chama o retorno do Classroom. Ausência de vínculo produz liberação local; falha externa mantém a aprovação e permite nova tentativa.

@@ -478,6 +478,18 @@ h1 {
   background: var(--surface, #fff);
 }
 
+.discursive-correction {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #d7e7e2;
+}
+
+.discursive-correction p {
+  margin: 0;
+}
+
 .status-error {
   color: #a12b2b;
 }

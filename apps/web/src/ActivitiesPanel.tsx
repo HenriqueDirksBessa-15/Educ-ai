@@ -58,7 +58,31 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
   );
   const [collection, setCollection] =
     useState<ActivityCollectionSummary | null>(null);
+  const [correctionDrafts, setCorrectionDrafts] = useState<
+    Record<string, { pointsAwarded: number; comment: string }>
+  >({});
   const [questionCount, setQuestionCount] = useState(4);
+
+  useEffect(() => {
+    if (!collection) return;
+    setCorrectionDrafts((current) => {
+      const next = { ...current };
+      for (const submission of collection.submissions) {
+        for (const answer of submission.answers) {
+          if (answer.kind !== "discursive") continue;
+          next[answer.id] = next[answer.id] ?? {
+            pointsAwarded:
+              answer.pointsAwarded ?? answer.suggestedPointsAwarded ?? 0,
+            comment:
+              answer.teacherComment ??
+              answer.suggestedComment ??
+              "Revisão docente.",
+          };
+        }
+      }
+      return next;
+    });
+  }, [collection]);
 
   const loadActivities = useCallback(async () => {
     const query = filter === "all" ? "" : `?status=${filter}`;
@@ -95,6 +119,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setGeneration(null);
     setPublication(null);
     setCollection(null);
+    setCorrectionDrafts({});
     setMessage(null);
   };
 
@@ -378,6 +403,101 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     }
   };
 
+  const suggestDiscursiveCorrection = async (
+    submissionId: string,
+    answerId: string,
+  ) => {
+    if (!selected) return;
+    setSaving(true);
+    setMessage("Gerando sugestão discursiva para revisão…");
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/submissions/${submissionId}/corrections/suggest`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ answerId, rigour: "balanced" }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setMessage(
+        "Sugestão registrada. Revise pontos e comentário antes de salvar.",
+      );
+      await loadAssistState(selected.id);
+    } catch {
+      setMessage("A IA não sugeriu uma correção; faça a revisão manual.");
+      await loadAssistState(selected.id);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reviewSubmission = async (
+    submission: ActivityCollectionSummary["submissions"][number],
+  ) => {
+    if (!selected) return;
+    const discursive = submission.answers.filter(
+      (answer) => answer.kind === "discursive",
+    );
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/submissions/${submission.id}/correction`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            answers: discursive.map((answer) => ({
+              answerId: answer.id,
+              pointsAwarded: correctionDrafts[answer.id]?.pointsAwarded ?? 0,
+              comment:
+                correctionDrafts[answer.id]?.comment || "Revisão docente.",
+            })),
+            teacherComment: "Correção discursiva revisada pelo professor.",
+          }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setMessage("Correção docente salva. A submissão já pode ser aprovada.");
+      await loadAssistState(selected.id);
+    } catch {
+      setMessage("Revise todas as discursivas e respeite a pontuação máxima.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changeCorrectionState = async (
+    submissionId: string,
+    action: "approve" | "release",
+  ) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/submissions/${submissionId}/${action}`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!response.ok) throw new Error();
+      setMessage(
+        action === "approve"
+          ? "Nota aprovada pelo professor."
+          : "Nota liberada; o estado do Classroom foi registrado.",
+      );
+      await loadAssistState(selected.id);
+    } catch {
+      setMessage(
+        action === "approve"
+          ? "Revise todas as discursivas antes de aprovar."
+          : "A nota segue aprovada; tente novamente a devolução ao Classroom.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const updateQuestion = (index: number, question: ActivityQuestionInput) =>
     setQuestions((current) =>
       current.map((item, position) => (position === index ? question : item)),
@@ -391,7 +511,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     <section className="timeline-panel" aria-labelledby="activities-title">
       <div className="status-heading">
         <div>
-          <span className="section-label">Dia 10 · RF012</span>
+          <span className="section-label">Dia 11 · RF012</span>
           <h2 id="activities-title">
             Atividades assistidas e publicação Google
           </h2>
@@ -912,6 +1032,162 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                     {submission.manualReviewReason && (
                       <small>{submission.manualReviewReason}</small>
                     )}
+                    <small>
+                      Correção:{" "}
+                      {correctionStatusLabel(submission.correctionStatus)}
+                      {" · "}Classroom:{" "}
+                      {classroomStatusLabel(submission.classroomReturnStatus)}
+                    </small>
+                    {submission.answers
+                      .filter((answer) => answer.kind === "discursive")
+                      .map((answer) => (
+                        <div className="discursive-correction" key={answer.id}>
+                          <strong>{answer.prompt}</strong>
+                          <p>{answer.answerText || "Resposta vazia"}</p>
+                          {answer.suggestedComment && (
+                            <small>
+                              Sugestão: {answer.suggestedPointsAwarded}/
+                              {answer.pointsPossible} ·{" "}
+                              {answer.suggestedComment}
+                            </small>
+                          )}
+                          <div className="form-row">
+                            <label>
+                              Pontos
+                              <input
+                                type="number"
+                                min="0"
+                                max={answer.pointsPossible ?? undefined}
+                                step="0.01"
+                                value={
+                                  correctionDrafts[answer.id]?.pointsAwarded ??
+                                  0
+                                }
+                                onChange={(event) =>
+                                  setCorrectionDrafts((current) => ({
+                                    ...current,
+                                    [answer.id]: {
+                                      pointsAwarded: Number(event.target.value),
+                                      comment:
+                                        current[answer.id]?.comment ??
+                                        "Revisão docente.",
+                                    },
+                                  }))
+                                }
+                              />
+                            </label>
+                            <label>
+                              Comentário docente
+                              <input
+                                value={
+                                  correctionDrafts[answer.id]?.comment ?? ""
+                                }
+                                onChange={(event) =>
+                                  setCorrectionDrafts((current) => ({
+                                    ...current,
+                                    [answer.id]: {
+                                      pointsAwarded:
+                                        current[answer.id]?.pointsAwarded ?? 0,
+                                      comment: event.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </label>
+                          </div>
+                          <button
+                            type="button"
+                            className="secondary-action compact-action"
+                            disabled={
+                              saving ||
+                              ["approved", "released"].includes(
+                                submission.correctionStatus,
+                              )
+                            }
+                            onClick={() =>
+                              void suggestDiscursiveCorrection(
+                                submission.id,
+                                answer.id,
+                              )
+                            }
+                          >
+                            Sugerir com IA
+                          </button>
+                        </div>
+                      ))}
+                    {submission.answers.some(
+                      (answer) => answer.kind === "discursive",
+                    ) && (
+                      <div className="inline-actions">
+                        <button
+                          type="button"
+                          className="secondary-action compact-action"
+                          disabled={
+                            saving ||
+                            ["approved", "released"].includes(
+                              submission.correctionStatus,
+                            )
+                          }
+                          onClick={() => void reviewSubmission(submission)}
+                        >
+                          Salvar revisão
+                        </button>
+                        <button
+                          type="button"
+                          className="compact-action"
+                          disabled={
+                            saving || submission.correctionStatus !== "reviewed"
+                          }
+                          onClick={() =>
+                            void changeCorrectionState(submission.id, "approve")
+                          }
+                        >
+                          Aprovar nota
+                        </button>
+                        <button
+                          type="button"
+                          className="compact-action"
+                          disabled={
+                            saving || submission.correctionStatus !== "approved"
+                          }
+                          onClick={() =>
+                            void changeCorrectionState(submission.id, "release")
+                          }
+                        >
+                          Liberar
+                        </button>
+                      </div>
+                    )}
+                    {!submission.answers.some(
+                      (answer) => answer.kind === "discursive",
+                    ) && (
+                      <div className="inline-actions">
+                        <button
+                          type="button"
+                          className="compact-action"
+                          disabled={
+                            saving || submission.correctionStatus !== "pending"
+                          }
+                          onClick={() =>
+                            void changeCorrectionState(submission.id, "approve")
+                          }
+                        >
+                          Aprovar nota objetiva
+                        </button>
+                        <button
+                          type="button"
+                          className="compact-action"
+                          disabled={
+                            saving || submission.correctionStatus !== "approved"
+                          }
+                          onClick={() =>
+                            void changeCorrectionState(submission.id, "release")
+                          }
+                        >
+                          Liberar
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1074,6 +1350,30 @@ function submissionStatusLabel(
     collected: "Objetivas corrigidas; discursivas pendentes",
     objective_graded: "Correção objetiva concluída",
     manual_review_required: "Correção manual necessária",
+  }[status];
+}
+
+function correctionStatusLabel(
+  status: ActivityCollectionSummary["submissions"][number]["correctionStatus"],
+): string {
+  return {
+    pending: "Pendente",
+    suggested: "Sugestão disponível",
+    manual_required: "Correção manual necessária",
+    reviewed: "Revisada pelo professor",
+    approved: "Aprovada",
+    released: "Liberada",
+  }[status];
+}
+
+function classroomStatusLabel(
+  status: ActivityCollectionSummary["submissions"][number]["classroomReturnStatus"],
+): string {
+  return {
+    pending: "Pendente",
+    not_available: "Não disponível",
+    returned: "Devolvida",
+    failed: "Falha recuperável",
   }[status];
 }
 

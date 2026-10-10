@@ -16,6 +16,7 @@ import { findRepositoryRoot } from "../../src/db/paths.js";
 import { runSeeds } from "../../src/db/seeds.js";
 import { CorrectionsRepository } from "../../src/corrections/repository.js";
 import { gradeObjectiveAnswers } from "../../src/corrections/objective-grader.js";
+import { DiscursiveCorrectionsRepository } from "../../src/corrections/discursive-repository.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -72,6 +73,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "016_activity_ai_publication.sql",
       "017_defer_activity_question_keys.sql",
       "018_activity_submissions_objective_grading.sql",
+      "019_discursive_corrections.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -102,6 +104,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "activity_submission",
         "activity_submission_answer",
         "activity_collection_run",
+        "activity_correction_history",
       ]),
     );
   }, 60_000);
@@ -400,19 +403,105 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       (lease as { runId: string }).runId,
       { received: 1, created: 1, updated: 0, manualReview: 0 },
     );
-    expect(await corrections.getSummary(professorId, activityId)).toMatchObject(
-      {
-        status: "completed",
-        submissionCount: 1,
-        submissions: [
+    const collectedSummary = await corrections.getSummary(
+      professorId,
+      activityId,
+    );
+    expect(collectedSummary).toMatchObject({
+      status: "completed",
+      submissionCount: 1,
+      submissions: [
+        {
+          status: "collected",
+          grade: null,
+          objectivePointsAwarded: 2,
+        },
+      ],
+    });
+    const submission = collectedSummary!.submissions[0]!;
+    const discursiveAnswer = submission.answers.find(
+      (answer) => answer.kind === "discursive",
+    )!;
+    const discursiveRepository = new DiscursiveCorrectionsRepository(testPool);
+    expect(
+      await discursiveRepository.getContext(
+        otherProfessor.rows[0]!.id,
+        submission.id,
+        discursiveAnswer.id,
+        "balanced",
+      ),
+    ).toBeNull();
+    const context = await discursiveRepository.getContext(
+      professorId,
+      submission.id,
+      discursiveAnswer.id,
+      "balanced",
+    );
+    expect(context).toMatchObject({
+      answer: "Metade do inteiro.",
+      criteria: "Justificativa coerente.",
+      maxPoints: 3,
+    });
+    expect(
+      await discursiveRepository.recordSuggestion(professorId, context!, {
+        model: "fixture-discursive-correction-v1",
+        origin: "fixture",
+        suggestion: {
+          pointsAwarded: 2,
+          comment: "Conceito correto; ampliar justificativa.",
+          requiresReview: true,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      await discursiveRepository.review(professorId, submission.id, {
+        answers: [
           {
-            status: "collected",
-            grade: null,
-            objectivePointsAwarded: 2,
+            answerId: discursiveAnswer.id,
+            pointsAwarded: 2,
+            comment: "Resposta adequada, com justificativa breve.",
           },
         ],
-      },
+        teacherComment: "Correção revisada pelo professor.",
+      }),
+    ).toBe("reviewed");
+    expect(await discursiveRepository.approve(professorId, submission.id)).toBe(
+      "approved",
     );
+    expect(
+      await discursiveRepository.markReleased(
+        professorId,
+        submission.id,
+        "not_available",
+      ),
+    ).toBe(true);
+    const correctedSummary = await corrections.getSummary(
+      professorId,
+      activityId,
+    );
+    expect(correctedSummary).toMatchObject({
+      gradedCount: 1,
+      submissions: [
+        {
+          correctionStatus: "released",
+          grade: 8,
+          classroomReturnStatus: "not_available",
+          correctionHistory: [
+            { version: 1, action: "ai_suggestion" },
+            { version: 2, action: "teacher_revision" },
+            { version: 3, action: "approval" },
+            { version: 4, action: "release" },
+          ],
+        },
+      ],
+    });
+    await expect(
+      testPool.query(
+        `UPDATE activity_correction_history SET comment = 'alterado'
+         WHERE submission_id = $1`,
+        [submission.id],
+      ),
+    ).rejects.toThrow("activity correction history is immutable");
     expect(await repository.archive(professorId, activityId)).toBe(true);
     const archived = await repository.get(professorId, activityId);
     expect(archived?.responseCount).toBe(1);
