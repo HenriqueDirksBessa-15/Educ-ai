@@ -7,18 +7,26 @@ import {
 import type { AppConfig } from "../config.js";
 import type { GoogleCredential, GoogleGateway } from "./types.js";
 
-const GOOGLE_SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  "https://www.googleapis.com/auth/classroom.courses.readonly",
+const GOOGLE_IDENTITY_SCOPES = ["openid", "email", "profile"];
+
+export const GOOGLE_CLASSROOM_SYNC_SCOPES = [
+  "https://www.googleapis.com/auth/classroom.courses",
+  "https://www.googleapis.com/auth/classroom.rosters.readonly",
+  "https://www.googleapis.com/auth/classroom.profile.emails",
+];
+
+export const GOOGLE_PUBLISHING_SCOPES = [
   "https://www.googleapis.com/auth/classroom.coursework.students",
   "https://www.googleapis.com/auth/forms.body",
   "https://www.googleapis.com/auth/forms.responses.readonly",
   "https://www.googleapis.com/auth/drive.file",
 ];
 
-export const GOOGLE_PUBLISHING_SCOPES = GOOGLE_SCOPES.slice(3);
+const GOOGLE_SCOPES = [
+  ...GOOGLE_IDENTITY_SCOPES,
+  ...GOOGLE_CLASSROOM_SYNC_SCOPES,
+  ...GOOGLE_PUBLISHING_SCOPES,
+];
 
 export class GoogleGatewayError extends Error {
   constructor(

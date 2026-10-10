@@ -16,7 +16,11 @@ import { registerCurriculumRoutes } from "./curriculum/routes.js";
 import { CurriculumRepository } from "./curriculum/repository.js";
 import { registerClassesRoutes } from "./classes/routes.js";
 import { ClassesRepository } from "./classes/repository.js";
-import { FixtureClassroomAdapter } from "./classroom/adapter.js";
+import {
+  FixtureClassroomAdapter,
+  ProductionClassroomAdapter,
+  type ClassroomAdapter,
+} from "./classroom/adapter.js";
 import { isDatabaseAvailable, type DatabaseClient } from "./database.js";
 import {
   ConfiguredOpenAIAdapter,
@@ -71,6 +75,7 @@ type AppDependencies = {
   config: AppConfig;
   database: DatabaseClient;
   googleGateway?: GoogleGateway;
+  classroomAdapter?: ClassroomAdapter;
   planGenerationAdapter?: OpenAIAdapter;
   googleActivityPublisher?: GoogleActivityPublisher;
   googleResponseCollector?: GoogleResponseCollector;
@@ -83,6 +88,7 @@ export async function createApp({
   config,
   database,
   googleGateway,
+  classroomAdapter,
   planGenerationAdapter,
   googleActivityPublisher,
   googleResponseCollector,
@@ -252,7 +258,10 @@ export async function createApp({
     authRepository: repository,
     classesRepository,
     classroomAdapter:
-      config.nodeEnv === "test" ? undefined : new FixtureClassroomAdapter(),
+      classroomAdapter ??
+      (config.nodeEnv === "production"
+        ? new ProductionClassroomAdapter(config.google)
+        : new FixtureClassroomAdapter()),
   });
   registerTimelineRoutes(app, {
     config,

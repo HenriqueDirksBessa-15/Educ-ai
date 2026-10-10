@@ -2,6 +2,25 @@
 
 Atualizado em 10/10/2026.
 
+## Ciclo vertical — CV-A1: Classroom real e isolamento de status
+
+A fronteira de produção do Classroom agora lista cursos docentes com paginação,
+refresh de token e erros normalizados. Em produção, `app.ts` usa o adapter real;
+desenvolvimento e teste continuam com fixture explicitamente identificada. A
+sincronização obtém a credencial da sessão, exige os escopos mínimos aprovados e
+persiste eventual renovação antes do upsert idempotente.
+
+O monitor deixou de verificar apenas a credencial mais recente: percorre todas
+as credenciais ativas. A consulta pública combina somente os estados Google do
+professor autenticado com o estado global da OpenAI, eliminando contaminação
+entre professores.
+
+Verificações: 66 testes de API, typecheck e lint aprovados. Paginação, falha de
+permissão, escopos, múltiplos professores, ausência de credencial e
+reconsentimento foram cobertos com dublês. Nenhuma chamada Google/OpenAI ou
+escrita em banco externo foi executada. Criação de curso e roster pertencem a
+CV-A2.
+
 ## Ciclo vertical — CV-0: gate TDD determinístico
 
 O primeiro patch de saneamento foi concluído antes das mudanças funcionais:

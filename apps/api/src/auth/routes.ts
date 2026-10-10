@@ -172,7 +172,9 @@ export function registerAuthRoutes(
         cookieName,
       );
       if (!identity) return;
-      const statuses = await repository.latestIntegrationStatuses();
+      const statuses = await repository.latestIntegrationStatuses(
+        identity.professorId,
+      );
       return {
         data: statuses.map(
           ({ professorId: _professorId, attemptNumber: _attempt, ...status }) =>

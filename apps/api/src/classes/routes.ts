@@ -8,8 +8,12 @@ import type { FastifyInstance } from "fastify";
 import type { AppConfig } from "../config.js";
 import { requireIdentity, sessionCookieName } from "../auth/routes.js";
 import type { AuthRepository } from "../auth/repository.js";
+import { GOOGLE_CLASSROOM_SYNC_SCOPES } from "../auth/google-gateway.js";
 import type { ClassesRepository } from "./repository.js";
-import type { ClassroomAdapter } from "../classroom/adapter.js";
+import {
+  ClassroomAdapterError,
+  type ClassroomAdapter,
+} from "../classroom/adapter.js";
 
 export function registerClassesRoutes(
   app: FastifyInstance,
@@ -37,17 +41,48 @@ export function registerClassesRoutes(
         },
       });
     }
-    const courses = await dependencies.classroomAdapter.listCourses();
-    const count = await dependencies.classesRepository.syncGoogleCourses(
+    const credential = await dependencies.authRepository.getCredential(
       identity.professorId,
-      courses,
     );
-    return {
-      data: {
-        imported: count,
-        isFixture: dependencies.classroomAdapter.isFixture,
-      },
-    };
+    if (!credential && !dependencies.classroomAdapter.isFixture)
+      return integrationUnavailable(reply, "Credencial Google ausente.");
+    if (
+      !dependencies.classroomAdapter.isFixture &&
+      !GOOGLE_CLASSROOM_SYNC_SCOPES.every((scope) =>
+        credential!.scopes.includes(scope),
+      )
+    )
+      return integrationUnavailable(
+        reply,
+        "Autorize novamente o acesso ao Google Classroom.",
+      );
+    try {
+      const result = await dependencies.classroomAdapter.listCourses(
+        credential ?? { scopes: [] },
+      );
+      if (!dependencies.classroomAdapter.isFixture)
+        await dependencies.authRepository.saveCredential(
+          identity.professorId,
+          result.credential,
+        );
+      const count = await dependencies.classesRepository.syncGoogleCourses(
+        identity.professorId,
+        result.courses,
+      );
+      return {
+        data: {
+          imported: count,
+          isFixture: dependencies.classroomAdapter.isFixture,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ClassroomAdapterError)
+        return integrationUnavailable(
+          reply,
+          "Não foi possível sincronizar o Google Classroom.",
+        );
+      throw error;
+    }
   });
   app.get("/api/classes", async (request, reply) => {
     const identity = await requireIdentity(
@@ -189,6 +224,15 @@ function conflict(
   message: string,
 ) {
   return reply.code(409).send({ error: { code: "VALIDATION_ERROR", message } });
+}
+
+function integrationUnavailable(
+  reply: { code: (status: number) => { send: (value: unknown) => unknown } },
+  message: string,
+) {
+  return reply
+    .code(503)
+    .send({ error: { code: "INTEGRATION_UNAVAILABLE", message } });
 }
 
 function isUniqueViolation(error: unknown): boolean {

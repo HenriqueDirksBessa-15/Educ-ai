@@ -44,9 +44,15 @@ export class IntegrationMonitor {
     if (this.running) return;
     this.running = true;
     try {
-      const stored = await this.repository.getLatestCredential();
-      for (const service of SERVICES) {
-        await this.checkService(service, stored);
+      const storedCredentials = await this.repository.getActiveCredentials();
+      if (storedCredentials.length === 0) {
+        for (const service of SERVICES) await this.checkService(service, null);
+      } else {
+        for (const stored of storedCredentials) {
+          for (const service of SERVICES) {
+            await this.checkService(service, stored);
+          }
+        }
       }
       if (this.openAIAdapter) await this.checkOpenAI();
     } catch (error) {
@@ -94,7 +100,9 @@ export class IntegrationMonitor {
 
   private async checkService(
     service: IntegrationService,
-    stored: Awaited<ReturnType<AuthRepository["getLatestCredential"]>>,
+    stored:
+      | Awaited<ReturnType<AuthRepository["getActiveCredentials"]>>[number]
+      | null,
   ): Promise<void> {
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       try {

@@ -165,21 +165,23 @@ export class AuthRepository {
     return result.rows[0] ? this.mapCredential(result.rows[0]) : null;
   }
 
-  async getLatestCredential(): Promise<{
-    professorId: string;
-    credential: GoogleCredential;
-  } | null> {
+  async getActiveCredentials(): Promise<
+    Array<{
+      professorId: string;
+      credential: GoogleCredential;
+    }>
+  > {
     const result = (await this.database.query(
       `SELECT professor_id, access_token_ciphertext, refresh_token_ciphertext,
               expiry_date, scopes, token_type
        FROM google_oauth_credential
        WHERE revoked_at IS NULL
-       ORDER BY updated_at DESC LIMIT 1`,
+        ORDER BY updated_at DESC, professor_id`,
     )) as QueryResult<CredentialRow>;
-    const row = result.rows[0];
-    return row
-      ? { professorId: row.professor_id, credential: this.mapCredential(row) }
-      : null;
+    return result.rows.map((row) => ({
+      professorId: row.professor_id,
+      credential: this.mapCredential(row),
+    }));
   }
 
   async createSession(identity: Identity): Promise<{
@@ -263,13 +265,19 @@ export class AuthRepository {
     );
   }
 
-  async latestIntegrationStatuses(): Promise<IntegrationStatusRecord[]> {
+  async latestIntegrationStatuses(
+    professorId: string,
+  ): Promise<IntegrationStatusRecord[]> {
     const result = (await this.database.query(
       `SELECT DISTINCT ON (service)
          service, status, checked_at, error_code, professor_id, attempt_number
        FROM integration_status
-       WHERE service IN ('google_oauth', 'google_classroom', 'google_forms', 'openai')
-       ORDER BY service, checked_at DESC, id DESC`,
+        WHERE (
+          service IN ('google_oauth', 'google_classroom', 'google_forms')
+          AND professor_id = $1
+        ) OR (service = 'openai' AND professor_id IS NULL)
+        ORDER BY service, checked_at DESC, id DESC`,
+      [professorId],
     )) as QueryResult<{
       service: IntegrationStatusRecord["service"];
       status: IntegrationStatusRecord["status"];

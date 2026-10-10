@@ -55,7 +55,9 @@ O mesmo limite de runtime afeta o ESLint: a série 10 requer Node 20.19 ou super
 
 O callback verifica o ID token, exige e-mail confirmado e usa o `sub` Google como vínculo externo. O professor é criado ou atualizado no servidor. A sessão guarda apenas um token aleatório no navegador; seu hash e validade ficam no PostgreSQL.
 
-O monitor consulta OAuth, Classroom e Forms em ciclos de cinco minutos. Cada falha recebe uma tentativa inicial e até três tentativas adicionais. Somente código normalizado chega ao contrato público; resposta bruta e tokens permanecem internos. Forms exige um formulário de teste configurado para não apresentar conectividade simulada como integração validada.
+O monitor consulta OAuth, Classroom e Forms em ciclos de cinco minutos para todas as credenciais docentes ativas. Cada falha recebe uma tentativa inicial e até três tentativas adicionais. Estados Google são consultados no escopo do professor autenticado; apenas o estado OpenAI é global. Somente código normalizado chega ao contrato público; resposta bruta e tokens permanecem internos. Forms exige um formulário de teste configurado para não apresentar conectividade simulada como integração validada.
+
+O adapter Classroom de produção renova a credencial e lista, com paginação, cursos em que `me` é docente. A importação continua idempotente por professor e ID remoto. Como a API Classroom não fornece ano letivo curricular estruturado, cursos novos entram com “A definir” até o professor configurar o perfil curricular explícito na etapa seguinte; nenhum ano ou vínculo BNCC é inferido do nome do curso.
 
 O adaptador OpenAI distingue chave ausente, disponibilidade e falhas normalizadas. Com chave configurada, o monitor valida a conexão e a geração usa a Responses API com JSON Schema estrito; sem chave, planos continuam usando fixture local. Chaves, cabeçalhos e respostas brutas não são persistidos.
 
