@@ -95,6 +95,16 @@
 | DT-44 | 10/10/2026 | Liberar localmente quando o Classroom não tiver vínculo suficiente      | O fluxo pedagógico não fica bloqueado por uma integração externa opcional   |
 | DT-45 | 10/10/2026 | Preservar aprovação quando a devolução externa falhar                   | A tentativa Classroom pode ser repetida sem apagar ou recalcular a correção |
 
+## Decisões técnicas do Dia 12
+
+| ID    | Data       | Decisão                                                             | Impacto                                                                          |
+| ----- | ---------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| DT-46 | 10/10/2026 | Unificar feedback individual e aviso global por escopo              | Histórico, anexos, geração e envio compartilham as mesmas garantias              |
+| DT-47 | 10/10/2026 | Usar materiais autorizados como anexos, sem duplicar arquivos       | Autorização e armazenamento continuam centralizados no módulo de materiais       |
+| DT-48 | 10/10/2026 | Configurar a janela por ambiente, com padrão provisório de 24 horas | O valor pode mudar sem migração enquanto o DERS não define um limite normativo   |
+| DT-49 | 10/10/2026 | Persistir uma outbox idempotente por comunicação                    | Repetir envio não duplica notificação e permite integração operacional posterior |
+| DT-50 | 10/10/2026 | Manter sugestão de IA separada do texto revisado pelo professor     | Histórico distingue claramente autoria gerada e decisão docente                  |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |
@@ -106,6 +116,6 @@
 | D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Resolvida por DT-26: confirmação arquiva o marco e preserva o histórico publicado          |
 | D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida por DT-28: formatos já aprovados; quota configurável sem limite fixo nesta etapa |
 | D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Implementação adotada em DT-29; pesos são a pontuação explícita de cada questão            |
-| D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Aberta                                                                                     |
+| D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Resolvida tecnicamente por DT-48: configurável, padrão provisório de 24 horas              |
 | D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Aberta                                                                                     |
 | D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Aberta                                                                                     |

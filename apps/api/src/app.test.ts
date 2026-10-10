@@ -22,6 +22,7 @@ const config: AppConfig = {
     "9f238e1d4c7a6b05d9e31074a2c8f61b3d0e7a95c4b1286f50d2a9e37c6148fb",
   sessionTtlSeconds: 28_800,
   integrationMonitorIntervalMs: 300_000,
+  feedbackEditWindowMinutes: 1_440,
 };
 
 const apps: Awaited<ReturnType<typeof createApp>>[] = [];
@@ -125,6 +126,21 @@ describe("authentication boundary", () => {
       method: "GET",
       url: "/api/activities?status=draft",
     });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: { code: "UNAUTHENTICATED" },
+    });
+  });
+
+  it("protects feedbacks with the Google session", async () => {
+    const app = await createApp({
+      config,
+      database: { query: vi.fn() },
+    });
+    apps.push(app);
+
+    const response = await app.inject({ method: "GET", url: "/api/feedbacks" });
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({

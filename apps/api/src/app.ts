@@ -51,6 +51,8 @@ import {
 } from "./corrections/classroom-return.js";
 import { SubmissionReleaseService } from "./corrections/release.js";
 import { registerCorrectionRoutes } from "./corrections/routes.js";
+import { FeedbackRepository } from "./feedback/repository.js";
+import { registerFeedbackRoutes } from "./feedback/routes.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -99,6 +101,7 @@ export async function createApp({
   const discursiveCorrectionsRepository = new DiscursiveCorrectionsRepository(
     database,
   );
+  const feedbackRepository = new FeedbackRepository(database);
   const openAIAdapter =
     planGenerationAdapter ??
     (config.openai.apiKey
@@ -194,6 +197,12 @@ export async function createApp({
     repository: discursiveCorrectionsRepository,
     adapter: openAIAdapter,
     releaseService,
+  });
+  registerFeedbackRoutes(app, {
+    config,
+    authRepository: repository,
+    repository: feedbackRepository,
+    adapter: openAIAdapter,
   });
   if (startMonitor) {
     monitor.start();

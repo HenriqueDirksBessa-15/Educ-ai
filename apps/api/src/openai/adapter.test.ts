@@ -321,4 +321,72 @@ describe("OpenAI adapter boundary", () => {
       "Conteúdo-base: Frações equivalentes",
     );
   });
+
+  it("generates a feedback fixture with strengths and improvements", async () => {
+    const result = await new FixtureOpenAIAdapter().generateFeedback({
+      scope: "individual",
+      audience: "Aluno Teste",
+      title: "Retorno da atividade",
+      currentContent: "Revise seu resultado.",
+      activityTitle: "Frações",
+      grade: 8,
+      teacherComment: "Detalhar a justificativa.",
+      answerSummaries: ["Questão 1: correta"],
+    });
+
+    expect(result).toMatchObject({
+      origin: "fixture",
+      suggestion: {
+        strengths: [expect.stringContaining("8.0/10")],
+        improvements: ["Detalhar a justificativa."],
+      },
+    });
+  });
+
+  it("uses structured output for feedback generation", async () => {
+    const suggestion = {
+      strengths: ["Boa compreensão conceitual."],
+      improvements: ["Explicitar o raciocínio."],
+      message: "Continue praticando.",
+    };
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              content: [
+                { type: "output_text", text: JSON.stringify(suggestion) },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new ConfiguredOpenAIAdapter(
+      {
+        apiKey: "fixture-key",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-5-mini",
+      },
+      fetcher as typeof fetch,
+    );
+
+    await expect(
+      adapter.generateFeedback({
+        scope: "global",
+        audience: "5º ano",
+        title: "Aviso",
+        currentContent: "Revisem o conteúdo.",
+        activityTitle: null,
+        grade: null,
+        teacherComment: null,
+        answerSummaries: [],
+      }),
+    ).resolves.toEqual({
+      suggestion,
+      model: "gpt-5-mini",
+      origin: "openai",
+    });
+  });
 });

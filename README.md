@@ -193,6 +193,16 @@ Endpoints do Dia 11:
 
 Sugestões de IA nunca alteram a nota. A aprovação exige revisão docente e todos os eventos de correção permanecem em histórico imutável.
 
+Endpoints do Dia 12:
+
+- `GET/POST /api/feedbacks` para listar e criar feedbacks ou avisos;
+- `GET /api/feedbacks/eligible-submissions` para destinatários individuais corrigidos;
+- `PATCH/DELETE /api/feedbacks/:feedbackId` para edição e exclusão lógica dentro da janela;
+- `POST /api/feedbacks/:feedbackId/generate` e `review` para assistência com revisão docente;
+- `POST /api/feedbacks/:feedbackId/send` para envio idempotente e criação da notificação.
+
+`FEEDBACK_EDIT_WINDOW_MINUTES` configura a janela de edição/exclusão e usa 1.440 minutos por padrão. Notificações ficam na outbox persistida para entrega operacional por Classroom ou e-mail.
+
 Em produção, a publicação usa as APIs reais. Em desenvolvimento e teste, o adaptador Google é uma fixture identificada. A validação externa requer uma conta docente, uma turma Classroom vinculada e novo consentimento OAuth.
 
 O plano completo está em [PLANO_IMPLEMENTACAO_14_DIAS.md](./PLANO_IMPLEMENTACAO_14_DIAS.md). A matriz registra separadamente implementação e validação real de cada RF.

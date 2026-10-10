@@ -2,12 +2,14 @@ import type {
   ActivitySuggestion,
   DiscursiveCorrectionSuggestion,
   CorrectionRigour,
+  FeedbackSuggestion,
   LessonPlanSuggestion,
   OpenAiAvailability,
 } from "@educai/contracts";
 import {
   activitySuggestionSchema,
   discursiveCorrectionSuggestionSchema,
+  feedbackSuggestionSchema,
   lessonPlanSuggestionSchema,
 } from "@educai/contracts";
 
@@ -25,6 +27,9 @@ export type OpenAIAdapter = {
   generateDiscursiveCorrection(
     context: DiscursiveCorrectionPromptContext,
   ): Promise<DiscursiveCorrectionResult>;
+  generateFeedback(
+    context: FeedbackPromptContext,
+  ): Promise<FeedbackGenerationResult>;
 };
 
 export type LessonPlanPromptContext = {
@@ -83,6 +88,23 @@ export type DiscursiveCorrectionPromptContext = {
 
 export type DiscursiveCorrectionResult = {
   suggestion: DiscursiveCorrectionSuggestion;
+  model: string;
+  origin: "fixture" | "openai";
+};
+
+export type FeedbackPromptContext = {
+  scope: "individual" | "global";
+  audience: string;
+  title: string;
+  currentContent: string;
+  activityTitle: string | null;
+  grade: number | null;
+  teacherComment: string | null;
+  answerSummaries: string[];
+};
+
+export type FeedbackGenerationResult = {
+  suggestion: FeedbackSuggestion;
   model: string;
   origin: "fixture" | "openai";
 };
@@ -321,6 +343,68 @@ export class ConfiguredOpenAIAdapter implements OpenAIAdapter {
     };
   }
 
+  async generateFeedback(
+    context: FeedbackPromptContext,
+  ): Promise<FeedbackGenerationResult> {
+    if (!this.config.apiKey)
+      throw new OpenAIPlanGenerationError("OPENAI_API_KEY_MISSING");
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.baseUrl()}/responses`, {
+        method: "POST",
+        headers: { ...this.headers(), "content-type": "application/json" },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({
+          model: this.config.model,
+          input: [
+            {
+              role: "developer",
+              content:
+                "Você auxilia professores brasileiros a redigir feedback pedagógico. Use somente as evidências fornecidas, mantenha tom respeitoso e não invente desempenho, habilidades ou fatos.",
+            },
+            { role: "user", content: buildFeedbackPrompt(context) },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name: "feedback_suggestion",
+              strict: true,
+              schema: feedbackJsonSchema,
+            },
+          },
+        }),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError")
+        throw new OpenAIPlanGenerationError("OPENAI_TIMEOUT");
+      throw new OpenAIPlanGenerationError("OPENAI_SERVICE_UNAVAILABLE");
+    }
+    if (!response.ok) {
+      if (response.status === 401)
+        throw new OpenAIPlanGenerationError("OPENAI_API_KEY_INVALID");
+      if (response.status === 429)
+        throw new OpenAIPlanGenerationError("OPENAI_RATE_LIMITED");
+      throw new OpenAIPlanGenerationError("OPENAI_SERVICE_UNAVAILABLE");
+    }
+    const outputText = extractOutputText((await response.json()) as unknown);
+    if (!outputText)
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(outputText);
+    } catch {
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    }
+    const parsed = feedbackSuggestionSchema.safeParse(parsedJson);
+    if (!parsed.success)
+      throw new OpenAIPlanGenerationError("OPENAI_INVALID_RESPONSE");
+    return {
+      suggestion: parsed.data,
+      model: this.config.model,
+      origin: "openai",
+    };
+  }
+
   private baseUrl(): string {
     return this.config.baseUrl.replace(/\/$/, "");
   }
@@ -414,6 +498,26 @@ export class FixtureOpenAIAdapter implements OpenAIAdapter {
         pointsAwarded: round2(context.maxPoints * ratio),
         comment: `A resposta aborda o enunciado. Revise a aderência a: ${context.criteria}`,
         requiresReview: true,
+      },
+    };
+  }
+
+  async generateFeedback(
+    context: FeedbackPromptContext,
+  ): Promise<FeedbackGenerationResult> {
+    return {
+      model: "fixture-feedback-v1",
+      origin: "fixture",
+      suggestion: {
+        strengths:
+          context.grade === null
+            ? ["Participação no percurso coletivo proposto."]
+            : [`Desempenho registrado em ${context.grade.toFixed(1)}/10.`],
+        improvements: [
+          context.teacherComment ||
+            "Retomar os critérios indicados pelo professor e registrar dúvidas.",
+        ],
+        message: `${context.currentContent}\n\nContinue desenvolvendo as estratégias discutidas e revise os pontos indicados.`,
       },
     };
   }
@@ -513,6 +617,27 @@ const discursiveCorrectionJsonSchema = {
   },
 } as const;
 
+const feedbackJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["strengths", "improvements", "message"],
+  properties: {
+    strengths: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      items: { type: "string" },
+    },
+    improvements: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      items: { type: "string" },
+    },
+    message: { type: "string" },
+  },
+} as const;
+
 function buildLessonPlanPrompt(context: LessonPlanPromptContext): string {
   return [
     `Título atual: ${context.title}`,
@@ -563,6 +688,20 @@ function buildDiscursiveCorrectionPrompt(
     `Dificuldade: ${context.difficulty}`,
     `Conteúdo-base: ${context.content}`,
     "Sugira pontos e comentário. Marque requiresReview sempre que houver ambiguidade, informação insuficiente ou baixa confiança.",
+  ].join("\n\n");
+}
+
+function buildFeedbackPrompt(context: FeedbackPromptContext): string {
+  return [
+    `Escopo: ${context.scope}`,
+    `Destinatário: ${context.audience}`,
+    `Título: ${context.title}`,
+    `Rascunho atual: ${context.currentContent}`,
+    `Atividade: ${context.activityTitle || "não aplicável"}`,
+    `Nota: ${context.grade === null ? "não aplicável" : `${context.grade}/10`}`,
+    `Comentário docente: ${context.teacherComment || "não informado"}`,
+    `Evidências por questão: ${context.answerSummaries.join(" | ") || "não informadas"}`,
+    "Produza pontos fortes, oportunidades de melhoria e uma mensagem sugerida. O professor revisará o texto antes do envio.",
   ].join("\n\n");
 }
 

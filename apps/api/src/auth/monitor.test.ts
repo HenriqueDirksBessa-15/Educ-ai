@@ -46,6 +46,7 @@ describe("integration monitor", () => {
         generateLessonPlan: vi.fn(),
         generateActivity: vi.fn(),
         generateDiscursiveCorrection: vi.fn(),
+        generateFeedback: vi.fn(),
       } satisfies OpenAIAdapter,
     );
 

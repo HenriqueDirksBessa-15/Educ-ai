@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   activityCollectionSummarySchema,
+  feedbackCreateSchema,
   apiErrorSchema,
   activityInputSchema,
   authSessionSchema,
@@ -228,6 +229,26 @@ describe("shared contracts", () => {
       activityCollectionSummarySchema.parse({
         ...summary,
         submissions: [{ ...summary.submissions[0], grade: 11 }],
+      }),
+    ).toThrow();
+  });
+
+  it("distinguishes individual feedback from a global class notice", () => {
+    expect(
+      feedbackCreateSchema.parse({
+        scope: "individual",
+        submissionId: "11111111-1111-4111-8111-111111111111",
+        title: "Retorno",
+        content: "Continue praticando.",
+        links: [],
+        materialIds: [],
+      }).scope,
+    ).toBe("individual");
+    expect(() =>
+      feedbackCreateSchema.parse({
+        scope: "global",
+        title: "Aviso",
+        content: "Mensagem para a turma.",
       }),
     ).toThrow();
   });

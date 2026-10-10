@@ -669,6 +669,137 @@ export const activityCollectionSummarySchema = z.object({
   submissions: z.array(activitySubmissionSchema),
 });
 
+export const feedbackScopeSchema = z.enum(["individual", "global"]);
+export const feedbackStatusSchema = z.enum([
+  "draft",
+  "generated",
+  "reviewed",
+  "sent",
+  "deleted",
+]);
+
+export const feedbackLinkInputSchema = z.object({
+  label: z.string().trim().min(1).max(160),
+  url: z.url(),
+});
+
+const feedbackInputBaseSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  content: z.string().trim().min(1).max(8_000),
+  teacherObservation: z.string().trim().max(8_000).nullable().optional(),
+  links: z.array(feedbackLinkInputSchema).max(20).default([]),
+  materialIds: z
+    .array(z.uuid())
+    .max(20)
+    .default([])
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: "Cada material deve aparecer uma única vez.",
+    }),
+});
+
+export const feedbackCreateSchema = z.discriminatedUnion("scope", [
+  feedbackInputBaseSchema.extend({
+    scope: z.literal("individual"),
+    submissionId: z.uuid(),
+  }),
+  feedbackInputBaseSchema.extend({
+    scope: z.literal("global"),
+    classId: z.uuid(),
+  }),
+]);
+
+export const feedbackUpdateSchema = feedbackInputBaseSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo editável.",
+  });
+
+export const feedbackSuggestionSchema = z.object({
+  strengths: z.array(z.string().trim().min(1).max(1_000)).min(1).max(10),
+  improvements: z.array(z.string().trim().min(1).max(1_000)).min(1).max(10),
+  message: z.string().trim().min(1).max(8_000),
+});
+
+export const feedbackReviewSchema = z.object({
+  generationId: z.uuid(),
+  content: z.string().trim().min(1).max(8_000),
+  teacherObservation: z.string().trim().min(1).max(8_000),
+});
+
+export const feedbackGenerationSchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  model: z.string().min(1),
+  origin: z.enum(["fixture", "openai"]),
+  status: z.enum(["succeeded", "failed"]),
+  suggestion: feedbackSuggestionSchema.nullable(),
+  errorCode: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const feedbackHistorySchema = z.object({
+  id: z.uuid(),
+  version: z.number().int().positive(),
+  action: z.enum([
+    "created",
+    "ai_suggestion",
+    "ai_failure",
+    "teacher_revision",
+    "teacher_edit",
+    "sent",
+    "deleted",
+  ]),
+  origin: z.enum(["teacher", "fixture", "openai", "system"]),
+  createdAt: z.iso.datetime(),
+});
+
+export const feedbackSchema = z.object({
+  id: z.uuid(),
+  scope: feedbackScopeSchema,
+  submissionId: z.uuid().nullable(),
+  studentId: z.uuid().nullable(),
+  studentName: z.string().nullable(),
+  activityId: z.uuid().nullable(),
+  activityTitle: z.string().nullable(),
+  classId: z.uuid().nullable(),
+  className: z.string().nullable(),
+  title: z.string().min(1),
+  content: z.string().min(1),
+  teacherObservation: z.string().nullable(),
+  origin: z.enum(["manual", "fixture", "openai"]),
+  status: feedbackStatusSchema,
+  editableUntil: z.iso.datetime(),
+  canEdit: z.boolean(),
+  sentAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  links: z.array(feedbackLinkInputSchema.extend({ id: z.uuid() })),
+  attachments: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string().min(1),
+      category: materialCategorySchema,
+    }),
+  ),
+  latestGeneration: feedbackGenerationSchema.nullable(),
+  history: z.array(feedbackHistorySchema),
+  notification: z
+    .object({
+      channel: z.enum(["google_classroom", "email"]),
+      status: z.enum(["pending", "sent", "failed"]),
+      errorCode: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+export const eligibleFeedbackSubmissionSchema = z.object({
+  id: z.uuid(),
+  studentName: z.string().min(1),
+  activityTitle: z.string().min(1),
+  grade: z.number().min(0).max(10),
+  correctionStatus: z.enum(["approved", "released"]),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -766,6 +897,18 @@ export type ActivitySubmissionAnswer = z.infer<
 export type ActivitySubmission = z.infer<typeof activitySubmissionSchema>;
 export type ActivityCollectionSummary = z.infer<
   typeof activityCollectionSummarySchema
+>;
+export type FeedbackScope = z.infer<typeof feedbackScopeSchema>;
+export type FeedbackStatus = z.infer<typeof feedbackStatusSchema>;
+export type FeedbackLinkInput = z.infer<typeof feedbackLinkInputSchema>;
+export type FeedbackCreate = z.infer<typeof feedbackCreateSchema>;
+export type FeedbackUpdate = z.infer<typeof feedbackUpdateSchema>;
+export type FeedbackSuggestion = z.infer<typeof feedbackSuggestionSchema>;
+export type FeedbackReview = z.infer<typeof feedbackReviewSchema>;
+export type FeedbackGeneration = z.infer<typeof feedbackGenerationSchema>;
+export type Feedback = z.infer<typeof feedbackSchema>;
+export type EligibleFeedbackSubmission = z.infer<
+  typeof eligibleFeedbackSubmissionSchema
 >;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;

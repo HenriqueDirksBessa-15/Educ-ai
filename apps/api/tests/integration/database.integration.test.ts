@@ -17,6 +17,7 @@ import { runSeeds } from "../../src/db/seeds.js";
 import { CorrectionsRepository } from "../../src/corrections/repository.js";
 import { gradeObjectiveAnswers } from "../../src/corrections/objective-grader.js";
 import { DiscursiveCorrectionsRepository } from "../../src/corrections/discursive-repository.js";
+import { FeedbackRepository } from "../../src/feedback/repository.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -74,6 +75,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "017_defer_activity_question_keys.sql",
       "018_activity_submissions_objective_grading.sql",
       "019_discursive_corrections.sql",
+      "020_feedback_notifications.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -105,6 +107,10 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "activity_submission_answer",
         "activity_collection_run",
         "activity_correction_history",
+        "feedback",
+        "feedback_generation",
+        "feedback_history",
+        "notification_outbox",
       ]),
     );
   }, 60_000);
@@ -502,6 +508,139 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         [submission.id],
       ),
     ).rejects.toThrow("activity correction history is immutable");
+    const feedbacks = new FeedbackRepository(testPool);
+    await expect(
+      feedbacks.create(
+        otherProfessor.rows[0]!.id,
+        {
+          scope: "individual",
+          submissionId: submission.id,
+          title: "Retorno",
+          content: "Revise o resultado.",
+          links: [],
+          materialIds: [],
+        },
+        1_440,
+      ),
+    ).rejects.toThrow("FEEDBACK_TARGET_NOT_FOUND");
+    const feedbackId = await feedbacks.create(
+      professorId,
+      {
+        scope: "individual",
+        submissionId: submission.id,
+        title: "Retorno da atividade",
+        content: "Revise o resultado e a justificativa.",
+        teacherObservation: "Mensagem inicial.",
+        links: [{ label: "Apoio", url: "https://example.test/apoio" }],
+        materialIds: [],
+      },
+      1_440,
+    );
+    const feedbackContext = await feedbacks.getPromptContext(
+      professorId,
+      feedbackId,
+    );
+    expect(feedbackContext).toMatchObject({
+      scope: "individual",
+      audience: expect.any(String),
+      activityTitle: "Atividade mista de frações",
+      grade: 8,
+    });
+    const feedbackGeneration = await feedbacks.recordGenerationSuccess(
+      professorId,
+      feedbackId,
+      feedbackContext!,
+      {
+        model: "fixture-feedback-v1",
+        origin: "fixture",
+        suggestion: {
+          strengths: ["Acerto na questão objetiva."],
+          improvements: ["Detalhar a justificativa."],
+          message: "Continue praticando frações equivalentes.",
+        },
+      },
+    );
+    expect(feedbackGeneration).toMatchObject({
+      version: 1,
+      status: "succeeded",
+    });
+    expect(
+      await feedbacks.review(professorId, feedbackId, {
+        generationId: feedbackGeneration!.id,
+        content: "Você acertou a objetiva; detalhe melhor a justificativa.",
+        teacherObservation: "Texto revisado pelo professor.",
+      }),
+    ).toBe("reviewed");
+    expect(await feedbacks.send(professorId, feedbackId)).toBe("sent");
+    expect(await feedbacks.send(professorId, feedbackId)).toBe("sent");
+    const globalFeedbackId = await feedbacks.create(
+      professorId,
+      {
+        scope: "global",
+        classId,
+        title: "Aviso para a turma",
+        content: "Revisem o conteúdo antes da próxima aula.",
+        links: [],
+        materialIds: [],
+      },
+      1_440,
+    );
+    expect(await feedbacks.send(professorId, globalFeedbackId)).toBe("sent");
+    await testPool.query(
+      "UPDATE feedback SET editable_until = now() - interval '1 minute' WHERE id = $1",
+      [globalFeedbackId],
+    );
+    expect(
+      await feedbacks.update(professorId, globalFeedbackId, {
+        content: "Tentativa fora da janela.",
+      }),
+    ).toBe("window_expired");
+    expect(await feedbacks.remove(professorId, globalFeedbackId)).toBe(
+      "window_expired",
+    );
+    const feedbackList = await feedbacks.list(professorId);
+    expect(feedbackList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: feedbackId,
+          scope: "individual",
+          status: "sent",
+          origin: "fixture",
+          latestGeneration: expect.objectContaining({ version: 1 }),
+          notification: expect.objectContaining({ status: "pending" }),
+          history: [
+            expect.objectContaining({ action: "created", origin: "teacher" }),
+            expect.objectContaining({
+              action: "ai_suggestion",
+              origin: "fixture",
+            }),
+            expect.objectContaining({
+              action: "teacher_revision",
+              origin: "teacher",
+            }),
+            expect.objectContaining({ action: "sent", origin: "system" }),
+          ],
+        }),
+        expect.objectContaining({
+          id: globalFeedbackId,
+          scope: "global",
+          status: "sent",
+          canEdit: false,
+        }),
+      ]),
+    );
+    const notifications = await testPool.query<{ count: string }>(
+      "SELECT count(*) FROM notification_outbox WHERE feedback_id = ANY($1::uuid[])",
+      [[feedbackId, globalFeedbackId]],
+    );
+    expect(Number(notifications.rows[0]!.count)).toBe(2);
+    expect(await feedbacks.remove(professorId, feedbackId)).toBe("deleted");
+    await expect(
+      testPool.query(
+        "UPDATE feedback_history SET origin = 'system' WHERE feedback_id = $1",
+        [feedbackId],
+      ),
+    ).rejects.toThrow("feedback history is immutable");
     expect(await repository.archive(professorId, activityId)).toBe(true);
     const archived = await repository.get(professorId, activityId);
     expect(archived?.responseCount).toBe(1);
@@ -531,6 +670,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       tokenEncryptionKey: encryptionKey,
       sessionTtlSeconds: 28_800,
       integrationMonitorIntervalMs: 300_000,
+      feedbackEditWindowMinutes: 1_440,
     };
     let issuedState = "";
     const gateway: GoogleGateway = {

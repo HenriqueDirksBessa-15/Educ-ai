@@ -127,3 +127,11 @@ Cada resposta discursiva pode receber uma projeção de sugestão da OpenAI, mas
 `activity_correction_history` é append-only e preserva snapshots de sugestão, falha, ajuste, aprovação e liberação. O estado corrente na submissão é apenas uma projeção para consulta; o banco rejeita atualização ou exclusão do histórico.
 
 Na liberação, o adaptador procura a submissão do aluno pelo vínculo turma/trabalho/identidade Google, atribui a nota na escala de pontos da atividade e chama o retorno do Classroom. Ausência de vínculo produz liberação local; falha externa mantém a aprovação e permite nova tentativa.
+
+## Feedbacks, avisos e notificações
+
+`feedback` usa um escopo discriminado: o individual exige submissão aprovada, aluno e atividade; o global exige turma própria. Links pertencem à comunicação e anexos referenciam materiais já autorizados, evitando outra camada de armazenamento.
+
+A geração preserva contexto e sugestão versionados. Conteúdo assistido muda para revisado somente com ação docente, enquanto edições manuais e exclusões lógicas respeitam `FEEDBACK_EDIT_WINDOW_MINUTES`. O histórico é append-only e diferencia eventos da IA, do professor e do sistema.
+
+O envio cria uma única entrada em `notification_outbox`. O canal é Classroom quando há turma Google reconciliada e e-mail como fallback persistido; a entrega externa fica desacoplada do registro pedagógico e pode ser processada sem duplicar a comunicação.

@@ -2,7 +2,44 @@
 
 Atualizado em 10/10/2026.
 
-## Entrega atual - Dia 11
+## Entrega atual - Dia 12
+
+O fluxo de comunicação pedagógica agora cobre feedback individual para submissões aprovadas e avisos globais para turmas, com texto manual, links, materiais autorizados, geração opcional por IA, revisão docente, histórico imutável e notificação idempotente. A janela de edição/exclusão é configurável por ambiente e usa 24 horas como padrão documentado.
+
+Verificações finais:
+
+- `npm run test:unit`: 67 testes aprovados (12 contratos, 51 API e 4 web);
+- `npm run test:integration`: 4 testes PostgreSQL aprovados e smoke OpenAI ignorado por ser opt-in;
+- migrações 001–020 aplicadas em banco vazio e repetição sem novas aplicações;
+- integração PostgreSQL comprovou isolamento de destinatário, geração/revisão, feedback individual, aviso global, envio idempotente, duas notificações e histórico protegido;
+- lint, tipagem, formatação e build de produção aprovados.
+
+Validação externa pendente: aplicar as migrações 015–020 no Cloud SQL e executar geração OpenAI real. A outbox de notificações está persistida; a entrega externa efetiva por Classroom/e-mail permanece para integração operacional. Nenhuma chamada externa, deploy ou push foi executado automaticamente.
+
+## Dia 12 - Etapa 1: contratos e persistência
+
+- cenários de autorização, geração, revisão, janela, envio e histórico;
+- feedback individual vinculado à submissão, aluno e atividade corrigida;
+- aviso global vinculado à turma;
+- links, materiais anexados, gerações versionadas, histórico append-only e outbox;
+- janela `FEEDBACK_EDIT_WINDOW_MINUTES`, com padrão de 1.440 minutos.
+
+## Dia 12 - Etapa 2: IA e autoridade docente
+
+- prompt restrito a destinatário, atividade, nota, comentário e evidências por questão;
+- Structured Outputs com pontos fortes, melhorias e mensagem sugerida;
+- falha da IA preserva o rascunho manual;
+- conteúdo gerado exige revisão explícita antes do envio;
+- histórico diferencia origem `fixture`/`openai`, revisão e edição docente.
+
+## Dia 12 - Etapa 3: interface e notificações
+
+- painel para criar feedback ou aviso, escolher destinatário, link e material;
+- edição, exclusão lógica e bloqueio após a janela configurada;
+- geração, revisão e envio com estados visíveis;
+- uma notificação por comunicação, direcionada a aluno ou turma e canal calculado.
+
+## Entrega anterior - Dia 11
 
 O fluxo de correção agora cobre sugestões discursivas estruturadas, correção manual, revisão docente obrigatória, aprovação explícita e liberação local ou via Google Classroom. Sugestões nunca alteram a nota final; cada tentativa, ajuste, aprovação e liberação gera histórico imutável. Atividades mistas combinam os pontos objetivos e discursivos somente após a decisão do professor.
 
@@ -301,4 +338,4 @@ Implementados:
 
 ## Próximo passo
 
-Aplicar as migrações 015–019 no Cloud SQL e executar o smoke externo dos Dias 9–11; em seguida iniciar feedback individual/global e avisos do Dia 12.
+Aplicar as migrações 015–020 no Cloud SQL e executar o smoke externo dos Dias 9–12; em seguida iniciar boletins e envio do Dia 13.

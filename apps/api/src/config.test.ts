@@ -16,6 +16,7 @@ const validEnvironment = {
 describe("loadConfig", () => {
   it("loads a valid environment", () => {
     expect(loadConfig(validEnvironment).apiPort).toBe(3000);
+    expect(loadConfig(validEnvironment).feedbackEditWindowMinutes).toBe(1_440);
   });
 
   it("reports missing variables without exposing secret values", () => {

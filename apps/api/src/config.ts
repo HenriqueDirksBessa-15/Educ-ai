@@ -51,6 +51,12 @@ const configSchema = z
       .int()
       .min(60_000)
       .default(300_000),
+    FEEDBACK_EDIT_WINDOW_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(43_200)
+      .default(1_440),
   })
   .superRefine((data, context) => {
     if (Boolean(data.GOOGLE_CLIENT_ID) !== Boolean(data.GOOGLE_CLIENT_SECRET)) {
@@ -89,6 +95,7 @@ export type AppConfig = {
   tokenEncryptionKey: string;
   sessionTtlSeconds: number;
   integrationMonitorIntervalMs: number;
+  feedbackEditWindowMinutes: number;
 };
 
 export class ConfigurationError extends Error {
@@ -138,5 +145,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     tokenEncryptionKey: result.data.TOKEN_ENCRYPTION_KEY,
     sessionTtlSeconds: result.data.SESSION_TTL_SECONDS,
     integrationMonitorIntervalMs: result.data.INTEGRATION_MONITOR_INTERVAL_MS,
+    feedbackEditWindowMinutes: result.data.FEEDBACK_EDIT_WINDOW_MINUTES,
   };
 }

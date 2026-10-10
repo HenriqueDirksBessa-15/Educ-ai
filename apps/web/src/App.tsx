@@ -12,6 +12,7 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { ActivitiesPanel } from "./ActivitiesPanel";
+import { FeedbackPanel } from "./FeedbackPanel";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -168,8 +169,8 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 11 de 14</span>
-        <span>Correção discursiva · revisão · liberação</span>
+        <span>Dia 12 de 14</span>
+        <span>Feedback individual · avisos · notificações</span>
       </footer>
     </main>
   );
@@ -258,6 +259,7 @@ function ProfessorShell({
       />
       <LessonPlansPanel plans={plans} classes={classes} />
       <ActivitiesPanel plans={plans} />
+      <FeedbackPanel classes={classes} materials={materials} />
     </>
   );
 }
