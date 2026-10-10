@@ -2,6 +2,26 @@
 
 Atualizado em 10/10/2026.
 
+## Ciclo vertical — diagnóstico inicial
+
+O ciclo vertical A → E foi auditado contra o DERS completo, migrações 001–022,
+implementação e testes. O parecer e o menor conjunto de patches estão em
+[`ciclo-vertical/00-diagnostico.md`](./ciclo-vertical/00-diagnostico.md).
+
+Resultado: a base local de planos, atividades, correção e boletim é relevante,
+mas o ciclo real está bloqueado antes da turma Google. A aplicação injeta um
+adapter Classroom fixture em execução normal, não lista/cria turmas nem importa
+roster real, e a interface não permite compor turma → currículo/BNCC → material
+→ plano aprovado. Nenhum deploy, recurso cloud, chamada Google/OpenAI ou escrita
+em banco compartilhado foi executado.
+
+Gate reproduzido após instalação pelo lockfile: contratos 13/13 e API 59/59;
+web 3/4 na execução agregada e 4/4 isolada (flakiness); lint, tipagem e build
+aprovados; integração indisponível e com falha de skip sem `DATABASE_URL`;
+formatação falhou por LF/CRLF; audit de produção sem vulnerabilidades. A próxima
+etapa proposta é CV-0, para tornar o gate determinístico antes dos patches
+funcionais.
+
 ## Entrega atual - Dia 14
 
 O produto recebeu endurecimento HTTP, rate limit, logs redigidos, auditoria geral, exportação/anonimização LGPD, retenção técnica, scripts de backup/restauração, acessibilidade responsiva, E2E e uma entrada de demonstração estritamente local. A instância foi iniciada com o banco configurado, migrações e seeds atuais.
