@@ -1,6 +1,6 @@
 # EDUC.AI
 
-Sistema executável de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual inclui os Dias 1 a 9 do plano: identidade Google, currículo, turmas, materiais, planos, atividades, geração assistida e publicação no Google Forms/Classroom.
+Sistema executável de apoio ao planejamento pedagógico e à correção de atividades escolares. A entrega atual cobre os Dias 1 a 14: identidade Google, currículo, turmas, materiais, planos, atividades, correção, feedbacks, boletins, segurança, privacidade e operação.
 
 A autenticação é exclusivamente Google. O adaptador OpenAI usa fixture sem chave e ativa a Responses API somente quando `OPENAI_API_KEY` está configurada no servidor.
 
@@ -74,6 +74,8 @@ npm run dev
 - API viva: <http://localhost:3000/api/health/live>
 - API pronta: <http://localhost:3000/api/health/ready>
 
+Para uma demonstração estritamente local, defina `ENABLE_DEV_AUTH=true` e `VITE_ENABLE_DEV_AUTH=true`, execute a seed e use **Entrar na demonstração local**. O endpoint retorna 404 fora de `development` ou sem a flag do servidor.
+
 `/api/health/live` confirma que o processo da API responde. `/api/health/ready` também consulta o PostgreSQL e retorna HTTP 503 quando o banco estiver indisponível.
 
 Para iniciar os processos separadamente:
@@ -97,6 +99,7 @@ O teste de integração cria um banco temporário no mesmo servidor PostgreSQL, 
 
 ```powershell
 npm run test:integration
+npm run test:e2e
 ```
 
 O smoke test real da OpenAI é opt-in porque faz uma chamada faturável. Após preencher `OPENAI_API_KEY` no `.env`, execute:
@@ -135,6 +138,11 @@ npm run check
 | `OPENAI_BASE_URL`                 | Base URL da Responses API                 |
 | `OPENAI_MODEL`                    | Modelo usado para sugestões estruturadas  |
 | `RUN_OPENAI_INTEGRATION`          | Habilita o smoke test real, com custo     |
+| `ENABLE_DEV_AUTH`                 | Habilita sessão fixture só em development |
+| `VITE_ENABLE_DEV_AUTH`            | Exibe o botão local em desenvolvimento    |
+| `RATE_LIMIT_MAX`                  | Requisições máximas por minuto/IP         |
+| `DATA_RETENTION_DAYS`             | Retenção de dados técnicos revogados      |
+| `FEEDBACK_EDIT_WINDOW_MINUTES`    | Janela de edição/exclusão de feedback     |
 
 Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
 
@@ -211,6 +219,15 @@ Endpoints do Dia 13:
 - `POST /api/bulletins/:bulletinId/send` para envio e reenvio auditáveis.
 
 A média é aritmética simples das atividades na escala 0–10. O PDF e seu snapshot ficam imutáveis; cada envio cria uma tentativa. Em produção, o adaptador retorna falha recuperável até a configuração de um provedor real de e-mail.
+
+Endpoints e operação do Dia 14:
+
+- `GET /api/privacy/export` exporta dados próprios sem tokens;
+- `DELETE /api/privacy/account` revoga acesso e anonimiza a identidade após confirmação;
+- `npm run db:retention` remove sessões, estados OAuth e credenciais técnicas expiradas;
+- `npm run test:e2e` executa smoke responsivo em Chrome e Edge instalados.
+
+Cabeçalhos de segurança, CSP, CORS restrito, validação de origem, rate limit, corpo máximo de 1 MiB, logs redigidos e auditoria de mutações são aplicados na API. Consulte [operação](./docs/operacao.md), [segurança/LGPD](./docs/seguranca-lgpd.md) e o [relatório final](./docs/relatorio-final.md).
 
 Em produção, a publicação usa as APIs reais. Em desenvolvimento e teste, o adaptador Google é uma fixture identificada. A validação externa requer uma conta docente, uma turma Classroom vinculada e novo consentimento OAuth.
 

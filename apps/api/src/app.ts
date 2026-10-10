@@ -1,5 +1,7 @@
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import type { ApiError, LiveResponse, ReadyResponse } from "@educai/contracts";
 import Fastify, { type FastifyInstance } from "fastify";
 
@@ -61,6 +63,9 @@ import {
 } from "./bulletins/email.js";
 import { BulletinService } from "./bulletins/service.js";
 import { registerBulletinRoutes } from "./bulletins/routes.js";
+import { AuditRepository } from "./audit/repository.js";
+import { PrivacyRepository } from "./privacy/repository.js";
+import { registerPrivacyRoutes } from "./privacy/routes.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -86,9 +91,35 @@ export async function createApp({
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: config.nodeEnv === "test" ? false : { level: config.logLevel },
+    bodyLimit: 1_048_576,
+    logger:
+      config.nodeEnv === "test"
+        ? false
+        : {
+            level: config.logLevel,
+            redact: {
+              paths: [
+                "req.headers.authorization",
+                "req.headers.cookie",
+                "res.headers.set-cookie",
+              ],
+              censor: "[REDACTED]",
+            },
+          },
   });
 
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  });
+  await app.register(rateLimit, {
+    max: config.rateLimitMax,
+    timeWindow: "1 minute",
+  });
   await app.register(cors, {
     origin: config.webOrigin,
     credentials: true,
@@ -113,6 +144,8 @@ export async function createApp({
   );
   const feedbackRepository = new FeedbackRepository(database);
   const bulletinsRepository = new BulletinsRepository(database);
+  const auditRepository = new AuditRepository(database);
+  const privacyRepository = new PrivacyRepository(database);
   const openAIAdapter =
     planGenerationAdapter ??
     (config.openai.apiKey
@@ -169,6 +202,40 @@ export async function createApp({
     undefined,
     new ConfiguredOpenAIAdapter(config.openai),
   );
+  app.addHook("onRequest", async (request, reply) => {
+    if (
+      ["POST", "PUT", "PATCH", "DELETE"].includes(request.method) &&
+      request.headers.origin &&
+      request.headers.origin !== config.webOrigin
+    )
+      return reply.code(403).send({
+        error: {
+          code: "FORBIDDEN",
+          message: "Origem não autorizada.",
+          requestId: request.id,
+        },
+      });
+  });
+
+  app.addHook("onResponse", async (request, reply) => {
+    if (
+      !["POST", "PUT", "PATCH", "DELETE"].includes(request.method) ||
+      !request.url.startsWith("/api/")
+    )
+      return;
+    try {
+      await auditRepository.record({
+        professorId: request.authenticatedIdentity?.professorId ?? null,
+        requestId: request.id,
+        method: request.method,
+        route: request.url,
+        statusCode: reply.statusCode,
+      });
+    } catch (error) {
+      request.log.error({ err: error }, "audit event persistence failed");
+    }
+  });
+
   registerAuthRoutes(app, { config, repository, gateway });
   registerProfileRoutes(app, {
     config,
@@ -227,6 +294,12 @@ export async function createApp({
     repository: bulletinsRepository,
     service: bulletinService,
   });
+  registerPrivacyRoutes(app, {
+    config,
+    authRepository: repository,
+    privacyRepository,
+  });
+
   if (startMonitor) {
     monitor.start();
     if (!responseCollector.isFixture) collectionWorker.start();
@@ -270,14 +343,32 @@ export async function createApp({
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ err: error }, "request failed");
+    const errorStatus =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number"
+        ? error.statusCode
+        : null;
+    const clientStatus =
+      errorStatus !== null && errorStatus >= 400 && errorStatus < 500
+        ? errorStatus
+        : null;
     const response: ApiError = {
       error: {
-        code: "INTERNAL_ERROR",
-        message: "Ocorreu um erro interno.",
+        code:
+          clientStatus === 403
+            ? "FORBIDDEN"
+            : clientStatus
+              ? "VALIDATION_ERROR"
+              : "INTERNAL_ERROR",
+        message: clientStatus
+          ? "A requisição foi rejeitada. Revise os dados e cabeçalhos."
+          : "Ocorreu um erro interno.",
         requestId: request.id,
       },
     };
-    return reply.code(500).send(response);
+    return reply.code(clientStatus ?? 500).send(response);
   });
 
   return app;

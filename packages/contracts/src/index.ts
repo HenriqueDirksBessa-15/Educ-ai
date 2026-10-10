@@ -901,6 +901,10 @@ export const eligibleBulletinStudentSchema = z.object({
   className: z.string().min(1),
 });
 
+export const privacyDeletionSchema = z.object({
+  confirmation: z.literal("EXCLUIR"),
+});
+
 export const dependencyStatusSchema = z.enum(["available", "unavailable"]);
 
 export const liveResponseSchema = z.object({
@@ -1025,6 +1029,7 @@ export type Bulletin = z.infer<typeof bulletinSchema>;
 export type EligibleBulletinStudent = z.infer<
   typeof eligibleBulletinStudentSchema
 >;
+export type PrivacyDeletion = z.infer<typeof privacyDeletionSchema>;
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 

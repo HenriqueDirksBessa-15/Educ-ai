@@ -143,3 +143,11 @@ O boletim consulta apenas notas finais aprovadas ou liberadas da turma e do per�
 Antes da persistência, a API monta um snapshot, gera o PDF e calcula SHA-256. Snapshot, bytes, período, média e destinatário ficam protegidos por trigger; o status de envio pode mudar sem reescrever a cópia emitida.
 
 Cada chamada de envio adquire o boletim, cria `bulletin_delivery` com número crescente e passa os mesmos bytes a `BulletinEmailSender`. Sucesso ou falha encerra apenas aquela tentativa. Desenvolvimento e teste usam fixture; produção usa um adaptador indisponível até a configuração deliberada de um provedor real.
+
+## Segurança, privacidade e operação
+
+A API limita corpo e frequência, aplica Helmet/CSP, CORS por origem e rejeita mutações com `Origin` divergente. Logs redigem autorização e cookies. `audit_event` registra método, rota, recurso, status, professor e request ID, sem corpo ou conteúdo pedagógico.
+
+Exportação LGPD agrega somente dados próprios e nunca credenciais. Exclusão remove sessões/credenciais e anonimiza a linha do professor, mantendo FKs históricas. `DATA_RETENTION_DAYS` governa dados técnicos expirados; registros pedagógicos, auditoria, solicitações e PDFs permanecem até política institucional adicional.
+
+Backup e restauração são scripts externos a partir de `pg_dump`/`pg_restore`, com arquivo custom, manifesto SHA-256, alvo explícito e confirmação de restauração. A demonstração local usa fixture somente quando ambiente e flag permitem.

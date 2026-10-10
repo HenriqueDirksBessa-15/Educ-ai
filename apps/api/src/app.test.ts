@@ -23,6 +23,9 @@ const config: AppConfig = {
   sessionTtlSeconds: 28_800,
   integrationMonitorIntervalMs: 300_000,
   feedbackEditWindowMinutes: 1_440,
+  enableDevAuth: false,
+  rateLimitMax: 300,
+  dataRetentionDays: 365,
 };
 
 const apps: Awaited<ReturnType<typeof createApp>>[] = [];
@@ -51,6 +54,10 @@ describe("technical health endpoints", () => {
       status: "alive",
       service: "educai-api",
     });
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["content-security-policy"]).toContain(
+      "default-src 'none'",
+    );
   }, 15_000);
 
   it("reports readiness when PostgreSQL responds", async () => {
@@ -97,6 +104,38 @@ describe("technical health endpoints", () => {
 });
 
 describe("authentication boundary", () => {
+  it("rejects state-changing requests from another origin", async () => {
+    const app = await createApp({
+      config,
+      database: { query: vi.fn() },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/logout",
+      headers: { origin: "https://attacker.example" },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: "FORBIDDEN" } });
+  });
+
+  it("keeps local demonstration login disabled by default", async () => {
+    const app = await createApp({
+      config,
+      database: { query: vi.fn() },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/dev-login",
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
   it("protects lesson plans with the Google session", async () => {
     const app = await createApp({
       config,

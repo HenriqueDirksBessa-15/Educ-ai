@@ -10,6 +10,11 @@ const optionalString = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const booleanString = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((value) => value === "true");
+
 const configSchema = z
   .object({
     NODE_ENV: z
@@ -57,6 +62,14 @@ const configSchema = z
       .min(1)
       .max(43_200)
       .default(1_440),
+    ENABLE_DEV_AUTH: booleanString,
+    RATE_LIMIT_MAX: z.coerce.number().int().min(10).max(10_000).default(300),
+    DATA_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .min(30)
+      .max(3_650)
+      .default(365),
   })
   .superRefine((data, context) => {
     if (Boolean(data.GOOGLE_CLIENT_ID) !== Boolean(data.GOOGLE_CLIENT_SECRET)) {
@@ -96,6 +109,9 @@ export type AppConfig = {
   sessionTtlSeconds: number;
   integrationMonitorIntervalMs: number;
   feedbackEditWindowMinutes: number;
+  enableDevAuth: boolean;
+  rateLimitMax: number;
+  dataRetentionDays: number;
 };
 
 export class ConfigurationError extends Error {
@@ -146,5 +162,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     sessionTtlSeconds: result.data.SESSION_TTL_SECONDS,
     integrationMonitorIntervalMs: result.data.INTEGRATION_MONITOR_INTERVAL_MS,
     feedbackEditWindowMinutes: result.data.FEEDBACK_EDIT_WINDOW_MINUTES,
+    enableDevAuth: result.data.ENABLE_DEV_AUTH,
+    rateLimitMax: result.data.RATE_LIMIT_MAX,
+    dataRetentionDays: result.data.DATA_RETENTION_DAYS,
   };
 }

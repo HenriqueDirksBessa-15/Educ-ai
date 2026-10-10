@@ -2,7 +2,43 @@
 
 Atualizado em 10/10/2026.
 
-## Entrega atual - Dia 13
+## Entrega atual - Dia 14
+
+O produto recebeu endurecimento HTTP, rate limit, logs redigidos, auditoria geral, exportação/anonimização LGPD, retenção técnica, scripts de backup/restauração, acessibilidade responsiva, E2E e uma entrada de demonstração estritamente local. A instância foi iniciada com o banco configurado, migrações e seeds atuais.
+
+Verificações finais:
+
+- `npm run test:unit`: 76 testes aprovados (13 contratos, 59 API e 4 web);
+- `npm run test:integration`: 5 testes PostgreSQL aprovados e smoke OpenAI ignorado por ser opt-in;
+- `npm run test:e2e`: 6 testes aprovados em Chrome e Edge;
+- migrações 001–022 aprovadas em banco vazio; 014–022 aplicadas ao banco de desenvolvimento configurado;
+- health live/ready, sessão de demonstração e isolamento de turma confirmados;
+- `npm audit --omit=dev`, lint, tipagem, formatação e build aprovados.
+
+Limitações registradas: Firefox e segundas versões dos navegadores não estavam disponíveis; `pg_dump`/`pg_restore` não estão instalados; provedor de e-mail e smokes Google/OpenAI reais continuam externos; não houve deploy público nem teste de penetração.
+
+## Dia 14 - Etapa 1: segurança e auditoria
+
+- Helmet/CSP, CORS exato, rejeição de origem divergente, rate limit e corpo de 1 MiB;
+- cookie seguro em produção, tokens cifrados e logs com cabeçalhos sensíveis redigidos;
+- auditoria imutável de mutações sem corpo ou conteúdo pedagógico;
+- atualização de segurança do `ajv` e audit de produção zerado.
+
+## Dia 14 - Etapa 2: LGPD, retenção e operação
+
+- exportação própria sem tokens e exclusão com revogação/anonimização;
+- retenção configurável de sessões, estados OAuth, credenciais revogadas e status técnicos;
+- scripts de backup custom + SHA-256 e restauração com confirmação explícita;
+- runbook operacional, política de segurança/LGPD e limitações documentadas.
+
+## Dia 14 - Etapa 3: regressão e instância
+
+- foco visível, skip link e breakpoints de telefone/tablet;
+- Playwright sequencial em Chrome e Edge para evitar pressão de memória;
+- entrada fixture protegida por `NODE_ENV=development` e flag local;
+- instância web/API ativa em localhost, com banco pronto e seed idempotente.
+
+## Entrega anterior - Dia 13
 
 O fluxo de boletins agora consolida notas aprovadas por período, calcula média aritmética, inclui feedbacks enviados e comentário docente, gera PDF histórico imutável e permite envio ou reenvio com tentativas auditáveis. A geração funciona para um aluno ou lote e aceita filtro abaixo de um limiar informado, sem inventar presença, participação ou responsável.
 
@@ -375,4 +411,4 @@ Implementados:
 
 ## Próximo passo
 
-Aplicar as migrações 015–021 no Cloud SQL, configurar o provedor de e-mail e executar o smoke externo; em seguida iniciar regressão, segurança, LGPD e entrega do Dia 14.
+Configurar credenciais externas e provedor de e-mail, executar smoke real Google/OpenAI, instalar ferramentas PostgreSQL para o ensaio de restauração e decidir o deploy público quando autorizado.

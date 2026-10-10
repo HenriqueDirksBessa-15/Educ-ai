@@ -21,6 +21,7 @@ import { FeedbackRepository } from "../../src/feedback/repository.js";
 import { BulletinsRepository } from "../../src/bulletins/repository.js";
 import { BulletinService } from "../../src/bulletins/service.js";
 import { FixtureBulletinEmailSender } from "../../src/bulletins/email.js";
+import { RetentionService } from "../../src/privacy/retention.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -80,6 +81,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "019_discursive_corrections.sql",
       "020_feedback_notifications.sql",
       "021_bulletins.sql",
+      "022_security_privacy_audit.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -117,6 +119,8 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "notification_outbox",
         "bulletin",
         "bulletin_delivery",
+        "privacy_request",
+        "audit_event",
       ]),
     );
   }, 60_000);
@@ -151,6 +155,30 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(Number(expectedOwnership.rows[0]?.count)).toBe(2);
     expect(Number(curriculumLoads.rows[0]?.count)).toBe(1);
   }, 60_000);
+
+  it("removes expired technical data according to retention policy", async () => {
+    const professor = await testPool.query<{ id: string }>(
+      "SELECT id FROM professor ORDER BY id LIMIT 1",
+    );
+    await testPool.query(
+      `INSERT INTO auth_session
+        (professor_id, token_hash, created_at, expires_at, last_seen_at)
+       VALUES ($1, gen_random_bytes(32), now() - interval '3 days',
+               now() - interval '2 days', now() - interval '3 days')`,
+      [professor.rows[0]!.id],
+    );
+    await testPool.query(
+      `INSERT INTO oauth_authorization_state
+        (state_hash, code_verifier, created_at, expires_at)
+       VALUES (gen_random_bytes(32), 'expired-verifier',
+               now() - interval '3 days', now() - interval '2 days')`,
+    );
+
+    const result = await new RetentionService(testPool, 365).run();
+
+    expect(result.sessions).toBeGreaterThanOrEqual(1);
+    expect(result.oauthStates).toBeGreaterThanOrEqual(1);
+  });
 
   it("persists a mixed activity and locks its structure after publication", async () => {
     const owner = await testPool.query<{
@@ -753,6 +781,9 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       sessionTtlSeconds: 28_800,
       integrationMonitorIntervalMs: 300_000,
       feedbackEditWindowMinutes: 1_440,
+      enableDevAuth: false,
+      rateLimitMax: 300,
+      dataRetentionDays: 365,
     };
     let issuedState = "";
     const gateway: GoogleGateway = {
@@ -839,6 +870,62 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       expect(
         await repository.consumeAuthorizationState(issuedState),
       ).toBeNull();
+
+      const exported = await app.inject({
+        method: "GET",
+        url: "/api/privacy/export",
+        headers: { cookie: cookie! },
+      });
+      expect(exported.statusCode).toBe(200);
+      expect(exported.json()).toMatchObject({
+        profile: { email: "oauth.professor@example.invalid" },
+      });
+
+      const deletion = await app.inject({
+        method: "DELETE",
+        url: "/api/privacy/account",
+        headers: {
+          cookie: cookie!,
+          "content-type": "application/json",
+        },
+        payload: { confirmation: "EXCLUIR" },
+      });
+      expect(deletion.statusCode).toBe(204);
+      const afterDeletion = await app.inject({
+        method: "GET",
+        url: "/api/professor/shell",
+        headers: { cookie: cookie! },
+      });
+      expect(afterDeletion.statusCode).toBe(401);
+      const anonymized = await testPool.query<{
+        email: string;
+        display_name: string;
+        google_subject: string | null;
+      }>(
+        `SELECT email::text, display_name, google_subject FROM professor
+         WHERE email::text LIKE 'deleted+%@example.invalid'`,
+      );
+      expect(anonymized.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            display_name: "Conta excluída",
+            google_subject: null,
+          }),
+        ]),
+      );
+      const privacyRequests = await testPool.query<{ count: string }>(
+        "SELECT count(*) FROM privacy_request WHERE status = 'completed'",
+      );
+      expect(Number(privacyRequests.rows[0]!.count)).toBeGreaterThanOrEqual(2);
+      const auditEvents = await testPool.query<{ count: string }>(
+        "SELECT count(*) FROM audit_event WHERE route = '/api/privacy/account'",
+      );
+      expect(Number(auditEvents.rows[0]!.count)).toBe(1);
+      await expect(
+        testPool.query(
+          "UPDATE audit_event SET action = 'changed' WHERE route = '/api/privacy/account'",
+        ),
+      ).rejects.toThrow("audit event is immutable");
     } finally {
       await app.close();
     }

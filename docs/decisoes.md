@@ -115,6 +115,16 @@
 | DT-54 | 10/10/2026 | Isolar envio em adaptador; produção falha sem provedor configurado   | Falha é recuperável e fixture nunca se apresenta como entrega externa real |
 | DT-55 | 10/10/2026 | Exigir limiar explícito no filtro de desempenho abaixo da média      | Nenhuma nota de corte institucional é inventada                            |
 
+## Decisões técnicas do Dia 14
+
+| ID    | Data       | Decisão                                                                  | Impacto                                                                        |
+| ----- | ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| DT-56 | 10/10/2026 | Habilitar login fixture somente em development e com flag explícita      | Permite homologação local sem criar atalho de autenticação em produção         |
+| DT-57 | 10/10/2026 | Auditar metadados de mutação, nunca corpo, cookie ou autorização         | Rastreabilidade sem replicar conteúdo pedagógico ou segredos                   |
+| DT-58 | 10/10/2026 | Anonimizar professor e preservar referências históricas na exclusão LGPD | Revoga acesso sem quebrar integridade pedagógica                               |
+| DT-59 | 10/10/2026 | Reter automaticamente apenas dados técnicos com prazo configurável       | Históricos pedagógicos/auditoria aguardam política institucional               |
+| DT-60 | 10/10/2026 | Executar E2E sequencial nos navegadores instalados                       | Chrome/Edge ficam comprovados; Firefox e versões ausentes são lacuna explícita |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |

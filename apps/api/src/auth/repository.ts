@@ -33,6 +33,22 @@ export class AuthRepository {
     private readonly sessionTtlSeconds: number,
   ) {}
 
+  async getFixtureIdentity(): Promise<Identity | null> {
+    const result = (await this.database.query(
+      `SELECT id, email::text, display_name FROM professor
+       WHERE is_fixture = true ORDER BY created_at, id LIMIT 1`,
+    )) as QueryResult<ProfessorRow>;
+    const professor = result.rows[0];
+    return professor
+      ? {
+          professorId: professor.id,
+          email: professor.email,
+          displayName: professor.display_name,
+          provider: "google",
+        }
+      : null;
+  }
+
   async createAuthorizationState(): Promise<{
     state: string;
     codeVerifier: string;

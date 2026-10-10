@@ -9,13 +9,28 @@ import type {
   Material,
   Milestone,
 } from "@educai/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { ActivitiesPanel } from "./ActivitiesPanel";
-import { FeedbackPanel } from "./FeedbackPanel";
-import { BulletinsPanel } from "./BulletinsPanel";
+
+const ActivitiesPanel = lazy(() =>
+  import("./ActivitiesPanel").then((module) => ({
+    default: module.ActivitiesPanel,
+  })),
+);
+const FeedbackPanel = lazy(() =>
+  import("./FeedbackPanel").then((module) => ({
+    default: module.FeedbackPanel,
+  })),
+);
+const BulletinsPanel = lazy(() =>
+  import("./BulletinsPanel").then((module) => ({
+    default: module.BulletinsPanel,
+  })),
+);
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+const devAuthEnabled =
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_AUTH === "true";
 
 type AppState =
   | { kind: "loading" }
@@ -89,10 +104,30 @@ export function App() {
     }
   };
 
+  const devLogin = async () => {
+    const response = await fetch(`${apiBaseUrl}/auth/dev-login`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    if (!response.ok) {
+      setState({
+        kind: "error",
+        message: "A sessão de demonstração não está disponível.",
+      });
+      return;
+    }
+    await loadSession();
+  };
+
   const authError = readAuthError();
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" id="main-content">
+      <a className="skip-link" href="#main-content">
+        Ir para o conteúdo principal
+      </a>
       <header className="app-header">
         <span className="brand">EDUC.AI</span>
         {state.kind === "authenticated" && (
@@ -146,6 +181,15 @@ export function App() {
             >
               Entrar com Google
             </a>
+            {devAuthEnabled && (
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => void devLogin()}
+              >
+                Entrar na demonstração local
+              </button>
+            )}
             <small>
               Nenhuma senha Google é recebida ou armazenada pelo EDUC.AI.
             </small>
@@ -170,8 +214,8 @@ export function App() {
       )}
 
       <footer>
-        <span>Dia 13 de 14</span>
-        <span>Boletins · PDF · envio e reenvio</span>
+        <span>Dia 14 de 14</span>
+        <span>Segurança · privacidade · operação</span>
       </footer>
     </main>
   );
@@ -259,9 +303,12 @@ function ProfessorShell({
         classes={classes}
       />
       <LessonPlansPanel plans={plans} classes={classes} />
-      <ActivitiesPanel plans={plans} />
-      <FeedbackPanel classes={classes} materials={materials} />
-      <BulletinsPanel />
+      <Suspense fallback={<p className="empty-state">Carregando módulos…</p>}>
+        <ActivitiesPanel plans={plans} />
+        <FeedbackPanel classes={classes} materials={materials} />
+        <BulletinsPanel />
+      </Suspense>
+      <PrivacyPanel />
     </>
   );
 }
@@ -616,6 +663,63 @@ function IntegrationCard({
           : "O monitor ainda não registrou um ciclo para este serviço."}
       </p>
     </article>
+  );
+}
+
+function PrivacyPanel() {
+  const [deleting, setDeleting] = useState(false);
+  const deleteAccount = async () => {
+    if (
+      !window.confirm(
+        "Excluir a conta remove sessões e credenciais e anonimiza sua identidade. O histórico pedagógico obrigatório será preservado. Continuar?",
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/privacy/account`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirmation: "EXCLUIR" }),
+      });
+      if (!response.ok) throw new Error();
+      window.location.reload();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <section className="timeline-panel" aria-labelledby="privacy-title">
+      <div className="status-heading">
+        <div>
+          <span className="section-label">Privacidade e LGPD</span>
+          <h2 id="privacy-title">Seus dados</h2>
+        </div>
+      </div>
+      <p>
+        Tokens nunca aparecem na exportação. A exclusão revoga o acesso e
+        anonimiza a identidade, preservando somente históricos pedagógicos e de
+        auditoria exigidos pela integridade do sistema.
+      </p>
+      <div className="inline-actions">
+        <a
+          className="secondary-action compact-action"
+          href={`${apiBaseUrl}/privacy/export`}
+        >
+          Exportar meus dados
+        </a>
+        <button
+          type="button"
+          className="secondary-action compact-action"
+          disabled={deleting}
+          onClick={() => void deleteAccount()}
+        >
+          {deleting ? "Excluindo…" : "Excluir minha conta"}
+        </button>
+      </div>
+    </section>
   );
 }
 

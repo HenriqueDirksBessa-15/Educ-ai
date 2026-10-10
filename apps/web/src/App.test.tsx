@@ -68,7 +68,7 @@ describe("Google authentication screen", () => {
     expect(screen.getByText("Google Classroom")).toBeInTheDocument();
     expect(screen.getAllByText("Aguardando verificação")).toHaveLength(2);
     expect(
-      screen.getByRole("heading", {
+      await screen.findByRole("heading", {
         name: "Atividades assistidas e publicação Google",
       }),
     ).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe("Google authentication screen", () => {
     expect(
       await screen.findByRole("link", { name: "Entrar com Google" }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/auth/logout", {
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });

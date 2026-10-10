@@ -52,6 +52,30 @@ export function registerAuthRoutes(
       .send();
   });
 
+  app.post("/api/auth/dev-login", async (_request, reply) => {
+    if (config.nodeEnv !== "development" || !config.enableDevAuth) {
+      return sendError(reply, 404, "NOT_FOUND", "Recurso não encontrado.");
+    }
+    const identity = await repository.getFixtureIdentity();
+    if (!identity) {
+      return sendError(
+        reply,
+        503,
+        "INTEGRATION_UNAVAILABLE",
+        "Execute a seed local antes de usar a demonstração.",
+      );
+    }
+    const session = await repository.createSession(identity);
+    reply.setCookie(cookieName, session.token, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      expires: session.expiresAt,
+    });
+    return { data: { authenticated: true } };
+  });
+
   app.get<{ Querystring: CallbackQuery }>(
     "/api/auth/google/callback",
     async (request, reply) => {
@@ -177,7 +201,7 @@ export async function requireIdentity(
   const identity = await resolveIdentity(request, repository, cookieName);
   if (!identity) {
     sendError(reply, 401, "UNAUTHENTICATED", "Autenticação necessária.");
-  }
+  } else request.authenticatedIdentity = identity;
   return identity;
 }
 
