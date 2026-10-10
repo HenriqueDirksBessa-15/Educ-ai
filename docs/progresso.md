@@ -2,6 +2,24 @@
 
 Atualizado em 10/10/2026.
 
+## Ciclo vertical — CV-0: gate TDD determinístico
+
+O primeiro patch de saneamento foi concluído antes das mudanças funcionais:
+
+- Prettier passou a respeitar o fim de linha do checkout, mantendo o gate
+  reproduzível em Windows sem reformatar 152 arquivos;
+- a suíte PostgreSQL sem `DATABASE_URL` agora é coletada e ignorada sem tentar
+  construir uma URL inválida ou abrir conexão;
+- o teste web do shell lazy recebeu espera local e passou dentro da suíte
+  agregada;
+- os 76 casos locais foram inventariados em 61 unidades/contratos, 11
+  componentes HTTP/API e 4 componentes web em
+  [`ciclo-vertical/01-cv0-gate.md`](./ciclo-vertical/01-cv0-gate.md).
+
+Verificações: `npm run check` aprovado; 5 integrações PostgreSQL e 1 smoke
+OpenAI corretamente ignorados com variáveis deliberadamente vazias. Nenhuma
+credencial externa foi usada e nenhuma escrita em banco foi realizada.
+
 ## Ciclo vertical — diagnóstico inicial
 
 O ciclo vertical A → E foi auditado contra o DERS completo, migrações 001–022,

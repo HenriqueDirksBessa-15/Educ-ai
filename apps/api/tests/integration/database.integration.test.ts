@@ -29,7 +29,9 @@ const describeWithDatabase = baseUrl ? describe : describe.skip;
 
 describeWithDatabase("PostgreSQL migrations and seeds", () => {
   const databaseName = `educai_test_${randomUUID().replaceAll("-", "")}`;
-  const parsedUrl = new URL(baseUrl!);
+  const parsedUrl = new URL(
+    baseUrl || "postgresql://skipped:skipped@localhost/educai_skipped",
+  );
   const adminUrl = new URL(parsedUrl);
   adminUrl.pathname = "/postgres";
   const testUrl = new URL(parsedUrl);

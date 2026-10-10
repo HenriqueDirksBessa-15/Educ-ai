@@ -68,9 +68,13 @@ describe("Google authentication screen", () => {
     expect(screen.getByText("Google Classroom")).toBeInTheDocument();
     expect(screen.getAllByText("Aguardando verificação")).toHaveLength(2);
     expect(
-      await screen.findByRole("heading", {
-        name: "Atividades assistidas e publicação Google",
-      }),
+      await screen.findByRole(
+        "heading",
+        {
+          name: "Atividades assistidas e publicação Google",
+        },
+        { timeout: 5_000 },
+      ),
     ).toBeInTheDocument();
   });
 

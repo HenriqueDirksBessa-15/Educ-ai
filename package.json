@@ -21,7 +21,7 @@
     "typecheck": "npm run typecheck -w @educai/contracts && npm run typecheck -w @educai/api && npm run typecheck -w @educai/web",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check . --end-of-line auto",
     "test": "npm run test:unit",
     "test:unit": "npm run test -w @educai/contracts && npm run test -w @educai/api && npm run test -w @educai/web",
     "test:integration": "npm run test:integration -w @educai/api",
