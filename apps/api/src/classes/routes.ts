@@ -1,4 +1,5 @@
 import {
+  classCurriculumInputSchema,
   classCreateSchema,
   classUpdateSchema,
   studentEnrollmentInputSchema,
@@ -96,6 +97,169 @@ export function registerClassesRoutes(
       data: await dependencies.classesRepository.list(identity.professorId),
     };
   });
+
+  app.post<{ Params: { classId: string } }>(
+    "/api/classes/:classId/google",
+    async (request, reply) => {
+      const identity = await requireIdentity(
+        request,
+        reply,
+        dependencies.authRepository,
+        cookieName,
+      );
+      if (!identity) return;
+      if (!dependencies.classroomAdapter)
+        return integrationUnavailable(
+          reply,
+          "Integração Classroom não configurada.",
+        );
+      const context =
+        await dependencies.classesRepository.getGoogleCourseContext(
+          identity.professorId,
+          request.params.classId,
+        );
+      if (!context) return notFound(reply, "Turma não encontrada.");
+      if (context.googleClassroomId)
+        return { data: { googleClassroomId: context.googleClassroomId } };
+      const credential = await dependencies.authRepository.getCredential(
+        identity.professorId,
+      );
+      if (!credential && !dependencies.classroomAdapter.isFixture)
+        return integrationUnavailable(reply, "Credencial Google ausente.");
+      if (
+        !dependencies.classroomAdapter.isFixture &&
+        !GOOGLE_CLASSROOM_SYNC_SCOPES.every((scope) =>
+          credential!.scopes.includes(scope),
+        )
+      )
+        return integrationUnavailable(
+          reply,
+          "Autorize novamente o acesso ao Google Classroom.",
+        );
+      try {
+        const created = await dependencies.classroomAdapter.ensureCourse(
+          credential ?? { scopes: [] },
+          {
+            localClassId: context.id,
+            name: context.name,
+            description: context.description,
+          },
+        );
+        if (!dependencies.classroomAdapter.isFixture)
+          await dependencies.authRepository.saveCredential(
+            identity.professorId,
+            created.credential,
+          );
+        const linked = await dependencies.classesRepository.linkGoogleCourse(
+          identity.professorId,
+          context.id,
+          created.googleClassroomId,
+        );
+        if (!linked)
+          return conflict(reply, "A turma não pode mais ser publicada.");
+        return { data: { googleClassroomId: created.googleClassroomId } };
+      } catch (error) {
+        if (error instanceof ClassroomAdapterError)
+          return integrationUnavailable(
+            reply,
+            "Não foi possível criar a turma no Google Classroom.",
+          );
+        throw error;
+      }
+    },
+  );
+
+  app.post<{ Params: { classId: string } }>(
+    "/api/classes/:classId/students/sync",
+    async (request, reply) => {
+      const identity = await requireIdentity(
+        request,
+        reply,
+        dependencies.authRepository,
+        cookieName,
+      );
+      if (!identity) return;
+      if (!dependencies.classroomAdapter)
+        return integrationUnavailable(
+          reply,
+          "Integração Classroom não configurada.",
+        );
+      const googleClassroomId =
+        await dependencies.classesRepository.getGoogleClassroomId(
+          identity.professorId,
+          request.params.classId,
+        );
+      if (googleClassroomId === undefined)
+        return notFound(reply, "Turma não encontrada.");
+      if (googleClassroomId === null)
+        return conflict(
+          reply,
+          "A turma ainda não está vinculada ao Classroom.",
+        );
+      const credential = await dependencies.authRepository.getCredential(
+        identity.professorId,
+      );
+      if (!credential && !dependencies.classroomAdapter.isFixture)
+        return integrationUnavailable(reply, "Credencial Google ausente.");
+      if (
+        !dependencies.classroomAdapter.isFixture &&
+        !GOOGLE_CLASSROOM_SYNC_SCOPES.every((scope) =>
+          credential!.scopes.includes(scope),
+        )
+      )
+        return integrationUnavailable(
+          reply,
+          "Autorize novamente o acesso ao Google Classroom.",
+        );
+      try {
+        const roster = await dependencies.classroomAdapter.listStudents(
+          credential ?? { scopes: [] },
+          googleClassroomId,
+        );
+        if (!dependencies.classroomAdapter.isFixture)
+          await dependencies.authRepository.saveCredential(
+            identity.professorId,
+            roster.credential,
+          );
+        const synchronized =
+          await dependencies.classesRepository.syncGoogleStudents(
+            identity.professorId,
+            request.params.classId,
+            roster.students,
+          );
+        return { data: { synchronized } };
+      } catch (error) {
+        if (error instanceof ClassroomAdapterError)
+          return integrationUnavailable(
+            reply,
+            "Não foi possível sincronizar os alunos do Classroom.",
+          );
+        throw error;
+      }
+    },
+  );
+
+  app.put<{ Params: { classId: string }; Body: unknown }>(
+    "/api/classes/:classId/curriculum",
+    async (request, reply) => {
+      const identity = await requireIdentity(
+        request,
+        reply,
+        dependencies.authRepository,
+        cookieName,
+      );
+      if (!identity) return;
+      const parsed = classCurriculumInputSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const updated = await dependencies.classesRepository.setCurriculumProfile(
+        identity.professorId,
+        request.params.classId,
+        parsed.data,
+      );
+      if (!updated) return notFound(reply, "Turma não encontrada.");
+      return { data: { updated: true } };
+    },
+  );
 
   app.post<{ Body: unknown }>("/api/classes", async (request, reply) => {
     const identity = await requireIdentity(
@@ -217,6 +381,13 @@ function validationError(reply: {
   return reply
     .code(400)
     .send({ error: { code: "VALIDATION_ERROR", message: "Dados inválidos." } });
+}
+
+function notFound(
+  reply: { code: (status: number) => { send: (value: unknown) => unknown } },
+  message: string,
+) {
+  return reply.code(404).send({ error: { code: "NOT_FOUND", message } });
 }
 
 function conflict(

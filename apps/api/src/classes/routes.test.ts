@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthRepository } from "../auth/repository.js";
+import { GOOGLE_CLASSROOM_SYNC_SCOPES } from "../auth/google-gateway.js";
 import type { ClassroomAdapter } from "../classroom/adapter.js";
 import type { AppConfig } from "../config.js";
 import { registerClassesRoutes } from "./routes.js";
@@ -29,10 +30,19 @@ function dependencies(credential: unknown) {
     getCredential: vi.fn().mockResolvedValue(credential),
     saveCredential: vi.fn(),
   };
-  const classesRepository = { syncGoogleCourses: vi.fn() };
+  const classesRepository = {
+    syncGoogleCourses: vi.fn(),
+    getGoogleCourseContext: vi.fn(),
+    linkGoogleCourse: vi.fn(),
+    getGoogleClassroomId: vi.fn(),
+    syncGoogleStudents: vi.fn(),
+    setCurriculumProfile: vi.fn(),
+  };
   const classroomAdapter = {
     isFixture: false,
     listCourses: vi.fn(),
+    ensureCourse: vi.fn(),
+    listStudents: vi.fn(),
   };
   return { authRepository, classesRepository, classroomAdapter };
 }
@@ -78,5 +88,115 @@ describe("Classroom synchronization route", () => {
     expect(response.statusCode).toBe(503);
     expect(response.body).toContain("Autorize novamente");
     expect(input.classroomAdapter.listCourses).not.toHaveBeenCalled();
+  });
+
+  it("publishes an owned local class and persists the remote id", async () => {
+    const input = dependencies({
+      refreshToken: "refresh",
+      scopes: GOOGLE_CLASSROOM_SYNC_SCOPES,
+    });
+    input.classesRepository.getGoogleCourseContext.mockResolvedValue({
+      id: "class-id",
+      name: "Matemática",
+      description: null,
+      source: "local",
+      googleClassroomId: null,
+    });
+    input.classroomAdapter.ensureCourse.mockResolvedValue({
+      googleClassroomId: "course-id",
+      credential: { accessToken: "renewed" },
+    });
+    input.classesRepository.linkGoogleCourse.mockResolvedValue(true);
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/classes/class-id/google",
+      headers: { cookie: "educai_session=session-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(input.classesRepository.linkGoogleCourse).toHaveBeenCalledWith(
+      professorId,
+      "class-id",
+      "course-id",
+    );
+    expect(input.authRepository.saveCredential).toHaveBeenCalled();
+  });
+
+  it("does not request a roster for a local-only class", async () => {
+    const input = dependencies({
+      refreshToken: "refresh",
+      scopes: GOOGLE_CLASSROOM_SYNC_SCOPES,
+    });
+    input.classesRepository.getGoogleClassroomId.mockResolvedValue(null);
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/classes/class-id/students/sync",
+      headers: { cookie: "educai_session=session-token" },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(input.classroomAdapter.listStudents).not.toHaveBeenCalled();
+  });
+
+  it("persists a roster returned for an owned Google class", async () => {
+    const input = dependencies({
+      refreshToken: "refresh",
+      scopes: GOOGLE_CLASSROOM_SYNC_SCOPES,
+    });
+    input.classesRepository.getGoogleClassroomId.mockResolvedValue("course-id");
+    input.classroomAdapter.listStudents.mockResolvedValue({
+      students: [
+        {
+          googleSubject: "student-id",
+          name: "Aluno Teste",
+          email: "aluno@example.invalid",
+        },
+      ],
+      credential: { accessToken: "renewed" },
+    });
+    input.classesRepository.syncGoogleStudents.mockResolvedValue(1);
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/classes/class-id/students/sync",
+      headers: { cookie: "educai_session=session-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ data: { synchronized: 1 } });
+    expect(input.classesRepository.syncGoogleStudents).toHaveBeenCalledWith(
+      professorId,
+      "class-id",
+      expect.arrayContaining([
+        expect.objectContaining({ googleSubject: "student-id" }),
+      ]),
+    );
+  });
+
+  it("rejects duplicated curricular components before persistence", async () => {
+    const input = dependencies(null);
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/classes/class-id/curriculum",
+      headers: {
+        cookie: "educai_session=session-token",
+        "content-type": "application/json",
+      },
+      payload: {
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática", "Matemática"],
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(input.classesRepository.setCurriculumProfile).not.toHaveBeenCalled();
   });
 });

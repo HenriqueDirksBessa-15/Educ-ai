@@ -1,6 +1,26 @@
 # Progresso
 
-Atualizado em 10/10/2026.
+Atualizado em 14/10/2026.
+
+## Ciclo vertical — CV-A2: turmas, roster e currículo
+
+Concluída em 14/10/2026 a fatia local de turmas e alunos:
+
+- publicação idempotente de turma local no Classroom por marcador determinístico;
+- promoção do curso remoto de `PROVISIONED` para `ACTIVE`;
+- roster paginado, reconciliado por ID Google/e-mail, sem apagar histórico nem
+  remover restrição docente em sincronização repetida;
+- perfil curricular explícito por turma, com etapa, ano/série e múltiplos
+  componentes, inclusive para turmas Google;
+- interface para criar/importar/abrir/publicar turma, sincronizar alunos e salvar
+  currículo;
+- migração `023_class_curriculum_profile.sql`.
+
+Verificações: `npm run check` aprovado (14 contratos, 76 API e 5 web); 6 testes
+PostgreSQL aprovados em banco temporário com migrações 001–023 e remoção ao
+final. O proxy foi encerrado. A migração 023 não foi aplicada ao banco `educai`
+e nenhuma API Google/OpenAI foi chamada. O roteiro de teste está em
+[`ciclo-vertical/03-cv-a2-turmas-roster-curriculo.md`](./ciclo-vertical/03-cv-a2-turmas-roster-curriculo.md).
 
 ## Ciclo vertical — CV-A1: Classroom real e isolamento de status
 

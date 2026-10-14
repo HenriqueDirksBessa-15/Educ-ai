@@ -141,6 +141,31 @@ export const classUpdateSchema = classCreateSchema
     message: "Informe ao menos um campo editável.",
   });
 
+export const educationStageSchema = z.enum([
+  "early_childhood",
+  "elementary_1",
+  "elementary_2",
+  "high_school",
+]);
+
+export const classCurriculumInputSchema = z
+  .object({
+    educationStage: educationStageSchema,
+    schoolYear: z.string().trim().min(1).max(20),
+    curricularComponents: z
+      .array(z.string().trim().min(1).max(100))
+      .min(1)
+      .max(20),
+  })
+  .refine(
+    (value) =>
+      new Set(value.curricularComponents).size ===
+      value.curricularComponents.length,
+    { message: "Cada componente curricular deve aparecer uma única vez." },
+  );
+
+export const classCurriculumSchema = classCurriculumInputSchema;
+
 export const enrollmentStatusSchema = z.enum([
   "active",
   "restricted",
@@ -173,6 +198,7 @@ export const classDetailSchema = classSummarySchema.extend({
   syncStatus: z.enum(["never", "active", "failed"]),
   lastSyncedAt: z.iso.datetime().nullable(),
   students: z.array(enrolledStudentSchema),
+  curriculum: classCurriculumSchema.nullable(),
 });
 
 export const milestoneTypeSchema = z.enum([
@@ -940,6 +966,9 @@ export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 export type ClassCreate = z.infer<typeof classCreateSchema>;
 export type ClassUpdate = z.infer<typeof classUpdateSchema>;
+export type EducationStage = z.infer<typeof educationStageSchema>;
+export type ClassCurriculumInput = z.infer<typeof classCurriculumInputSchema>;
+export type ClassCurriculum = z.infer<typeof classCurriculumSchema>;
 export type StudentEnrollmentInput = z.infer<
   typeof studentEnrollmentInputSchema
 >;

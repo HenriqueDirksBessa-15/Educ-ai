@@ -22,6 +22,7 @@ import { BulletinsRepository } from "../../src/bulletins/repository.js";
 import { BulletinService } from "../../src/bulletins/service.js";
 import { FixtureBulletinEmailSender } from "../../src/bulletins/email.js";
 import { RetentionService } from "../../src/privacy/retention.js";
+import { ClassesRepository } from "../../src/classes/repository.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -84,6 +85,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "020_feedback_notifications.sql",
       "021_bulletins.sql",
       "022_security_privacy_audit.sql",
+      "023_class_curriculum_profile.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -123,8 +125,75 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         "bulletin_delivery",
         "privacy_request",
         "audit_event",
+        "class_curriculum_profile",
+        "class_curriculum_component",
       ]),
     );
+  }, 60_000);
+
+  it("persists an isolated curriculum profile and idempotent Google roster", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES
+         ($1, $2, 'Professor Vertical A'),
+         ($3, $4, 'Professor Vertical B')
+       RETURNING id`,
+      [
+        `vertical-a-${randomUUID()}`,
+        `vertical-a-${randomUUID()}@example.invalid`,
+        `vertical-b-${randomUUID()}`,
+        `vertical-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const professorA = professors.rows[0]!.id;
+    const professorB = professors.rows[1]!.id;
+    const repository = new ClassesRepository(testPool);
+    const classId = await repository.create(professorA, {
+      name: "Turma vertical",
+      schoolYear: "8º ano EF",
+      localAccessCode: `vertical-${randomUUID().slice(0, 8)}`,
+    });
+
+    expect(
+      await repository.setCurriculumProfile(professorB, classId, {
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática"],
+      }),
+    ).toBe(false);
+    expect(
+      await repository.setCurriculumProfile(professorA, classId, {
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática", "Ciências"],
+      }),
+    ).toBe(true);
+    expect(
+      await repository.linkGoogleCourse(professorA, classId, "course-vertical"),
+    ).toBe(true);
+
+    const roster = [
+      {
+        googleSubject: "student-vertical",
+        name: "Aluno Vertical",
+        email: `student-${randomUUID()}@example.invalid`,
+      },
+    ];
+    expect(
+      await repository.syncGoogleStudents(professorA, classId, roster),
+    ).toBe(1);
+    expect(
+      await repository.syncGoogleStudents(professorA, classId, roster),
+    ).toBe(1);
+
+    const detail = await repository.getDetail(professorA, classId);
+    expect(detail?.curriculum).toEqual({
+      educationStage: "elementary_2",
+      schoolYear: "8º ano EF",
+      curricularComponents: ["Ciências", "Matemática"],
+    });
+    expect(detail?.students).toHaveLength(1);
+    expect(await repository.getDetail(professorB, classId)).toBeNull();
   }, 60_000);
 
   it("seeds fictitious isolated data repeatedly without duplication", async () => {

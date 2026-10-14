@@ -1,4 +1,6 @@
 import type {
+  ClassCurriculum,
+  ClassCurriculumInput,
   ClassCreate,
   ClassDetail,
   ClassSummary,
@@ -7,7 +9,10 @@ import type {
 } from "@educai/contracts";
 
 import type { DatabaseClient } from "../database.js";
-import type { ClassroomCourse } from "../classroom/adapter.js";
+import type {
+  ClassroomCourse,
+  ClassroomStudent,
+} from "../classroom/adapter.js";
 import { createHash } from "node:crypto";
 
 type QueryResult<Row> = { rows: Row[]; rowCount?: number | null };
@@ -30,6 +35,19 @@ type StudentRow = {
   status: "active" | "restricted" | "pending";
   is_inconsistent: boolean;
   inconsistency_reason: string | null;
+};
+type CurriculumRow = {
+  education_stage: ClassCurriculum["educationStage"];
+  school_year: string;
+  curricular_components: string[];
+};
+
+export type GoogleCourseContext = {
+  id: string;
+  name: string;
+  description: string | null;
+  source: ClassSummary["source"];
+  googleClassroomId: string | null;
 };
 
 export class ClassesRepository {
@@ -67,6 +85,17 @@ export class ClassesRepository {
        ORDER BY student.name, student.id`,
       [classId, status ?? null],
     )) as QueryResult<StudentRow>;
+    const curriculum = (await this.database.query(
+      `SELECT profile.education_stage, profile.school_year,
+              array_agg(component.curricular_component ORDER BY component.curricular_component)
+                AS curricular_components
+       FROM class_curriculum_profile profile
+       JOIN class_curriculum_component component
+         ON component.class_group_id = profile.class_group_id
+       WHERE profile.class_group_id = $1
+       GROUP BY profile.class_group_id, profile.education_stage, profile.school_year`,
+      [classId],
+    )) as QueryResult<CurriculumRow>;
     return {
       ...this.toSummary(group),
       generalNotice: group.general_notice,
@@ -81,6 +110,13 @@ export class ClassesRepository {
         isInconsistent: row.is_inconsistent,
         inconsistencyReason: row.inconsistency_reason,
       })),
+      curriculum: curriculum.rows[0]
+        ? {
+            educationStage: curriculum.rows[0].education_stage,
+            schoolYear: curriculum.rows[0].school_year,
+            curricularComponents: curriculum.rows[0].curricular_components,
+          }
+        : null,
     };
   }
 
@@ -193,7 +229,10 @@ export class ClassesRepository {
          ON CONFLICT (professor_id, google_classroom_id) DO UPDATE SET
            name = EXCLUDED.name,
            description = EXCLUDED.description,
-           school_year = EXCLUDED.school_year,
+           school_year = CASE WHEN EXISTS (
+             SELECT 1 FROM class_curriculum_profile profile
+             WHERE profile.class_group_id = class_group.id
+           ) THEN class_group.school_year ELSE EXCLUDED.school_year END,
            sync_status = 'active',
            last_synced_at = now(),
            sync_error = NULL`,
@@ -208,6 +247,165 @@ export class ClassesRepository {
       );
     }
     return courses.length;
+  }
+
+  async getGoogleCourseContext(
+    professorId: string,
+    classId: string,
+  ): Promise<GoogleCourseContext | null> {
+    const result = (await this.database.query(
+      `SELECT id, name, description, origin, google_classroom_id
+       FROM class_group WHERE id = $1 AND professor_id = $2`,
+      [classId, professorId],
+    )) as QueryResult<{
+      id: string;
+      name: string;
+      description: string | null;
+      origin: ClassSummary["source"];
+      google_classroom_id: string | null;
+    }>;
+    const row = result.rows[0];
+    return row
+      ? {
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          source: row.origin,
+          googleClassroomId: row.google_classroom_id,
+        }
+      : null;
+  }
+
+  async linkGoogleCourse(
+    professorId: string,
+    classId: string,
+    googleClassroomId: string,
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `UPDATE class_group SET google_classroom_id = $3, origin = 'google',
+         sync_status = 'active', last_synced_at = now(), sync_error = NULL
+       WHERE id = $1 AND professor_id = $2 AND origin = 'local'
+       RETURNING id`,
+      [classId, professorId, googleClassroomId],
+    )) as QueryResult<{ id: string }>;
+    return Boolean(result.rows[0]);
+  }
+
+  async getGoogleClassroomId(
+    professorId: string,
+    classId: string,
+  ): Promise<string | null | undefined> {
+    const result = (await this.database.query(
+      `SELECT google_classroom_id FROM class_group
+       WHERE id = $1 AND professor_id = $2`,
+      [classId, professorId],
+    )) as QueryResult<{ google_classroom_id: string | null }>;
+    return result.rows[0]?.google_classroom_id;
+  }
+
+  async syncGoogleStudents(
+    professorId: string,
+    classId: string,
+    students: ClassroomStudent[],
+  ): Promise<number> {
+    const result = (await this.database.query(
+      `WITH owned AS (
+         SELECT id FROM class_group
+         WHERE id = $2 AND professor_id = $1 AND google_classroom_id IS NOT NULL
+       ), roster AS (
+         SELECT DISTINCT ON (value->>'googleSubject')
+           value->>'googleSubject' AS google_subject,
+           value->>'name' AS name,
+           lower(value->>'email') AS email
+         FROM jsonb_array_elements($3::jsonb)
+         ORDER BY value->>'googleSubject'
+       ), updated AS (
+         UPDATE student SET name = roster.name, email = roster.email,
+           origin = 'google', google_subject = roster.google_subject,
+           is_inconsistent = false, inconsistency_reason = NULL
+         FROM roster, owned
+         WHERE student.google_subject = roster.google_subject
+         RETURNING student.id, student.google_subject
+       ), remaining AS (
+         SELECT roster.* FROM roster
+         WHERE NOT EXISTS (
+           SELECT 1 FROM updated WHERE updated.google_subject = roster.google_subject
+         )
+       ), inserted AS (
+         INSERT INTO student (google_subject, name, email, origin)
+         SELECT remaining.google_subject, remaining.name, remaining.email, 'google'
+         FROM remaining, owned
+         ON CONFLICT (email) DO UPDATE SET
+           google_subject = EXCLUDED.google_subject,
+           name = EXCLUDED.name,
+           origin = 'google',
+           is_inconsistent = false,
+           inconsistency_reason = NULL
+         RETURNING student.id, student.google_subject
+       ), resolved AS (
+         SELECT * FROM updated UNION ALL SELECT * FROM inserted
+       ), enrolled AS (
+         INSERT INTO enrollment (
+           class_group_id, student_id, status, origin,
+           external_enrollment_id, last_synced_at
+         )
+         SELECT owned.id, resolved.id, 'active', 'google',
+           resolved.google_subject, now()
+         FROM owned CROSS JOIN resolved
+         ON CONFLICT (class_group_id, student_id) DO UPDATE SET
+           status = CASE WHEN enrollment.status = 'restricted'
+             THEN enrollment.status ELSE 'active' END,
+           origin = 'google',
+           external_enrollment_id = EXCLUDED.external_enrollment_id,
+           last_synced_at = now(), updated_at = now()
+         RETURNING student_id
+       ), synced AS (
+         UPDATE class_group SET sync_status = 'active', last_synced_at = now(),
+           sync_error = NULL WHERE id IN (SELECT id FROM owned)
+       )
+       SELECT count(*)::int AS count FROM enrolled`,
+      [professorId, classId, JSON.stringify(students)],
+    )) as QueryResult<{ count: number }>;
+    return result.rows[0]?.count ?? 0;
+  }
+
+  async setCurriculumProfile(
+    professorId: string,
+    classId: string,
+    input: ClassCurriculumInput,
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `WITH owned AS (
+         UPDATE class_group SET school_year = $4
+         WHERE id = $2 AND professor_id = $1 RETURNING id
+       ), profile AS (
+         INSERT INTO class_curriculum_profile (
+           class_group_id, education_stage, school_year
+         ) SELECT id, $3::education_stage, $4 FROM owned
+         ON CONFLICT (class_group_id) DO UPDATE SET
+           education_stage = EXCLUDED.education_stage,
+           school_year = EXCLUDED.school_year
+         RETURNING class_group_id
+       ), removed AS (
+         DELETE FROM class_curriculum_component
+         WHERE class_group_id IN (SELECT class_group_id FROM profile)
+       ), components AS (
+         INSERT INTO class_curriculum_component (
+           class_group_id, curricular_component
+         ) SELECT profile.class_group_id, component
+           FROM profile CROSS JOIN unnest($5::text[]) AS component
+         RETURNING class_group_id
+       )
+       SELECT class_group_id FROM profile`,
+      [
+        professorId,
+        classId,
+        input.educationStage,
+        input.schoolYear,
+        input.curricularComponents,
+      ],
+    )) as QueryResult<{ class_group_id: string }>;
+    return Boolean(result.rows[0]);
   }
 
   private toSummary(row: ClassRow): ClassSummary {

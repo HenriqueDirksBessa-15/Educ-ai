@@ -8,6 +8,7 @@ import {
   activityInputSchema,
   authSessionSchema,
   curriculumSearchResponseSchema,
+  classCurriculumInputSchema,
   classCreateSchema,
   identitySchema,
   integrationStatusSchema,
@@ -110,6 +111,27 @@ describe("shared contracts", () => {
       googleClassroomId: "google-controlled",
     });
     expect(parsed).not.toHaveProperty("googleClassroomId");
+  });
+
+  it("validates an explicit multi-component class curriculum profile", () => {
+    expect(
+      classCurriculumInputSchema.parse({
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática", "Ciências"],
+      }),
+    ).toEqual({
+      educationStage: "elementary_2",
+      schoolYear: "8º ano EF",
+      curricularComponents: ["Matemática", "Ciências"],
+    });
+    expect(() =>
+      classCurriculumInputSchema.parse({
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática", "Matemática"],
+      }),
+    ).toThrow();
   });
 
   it("validates objective, discursive and mixed activities without AI", () => {

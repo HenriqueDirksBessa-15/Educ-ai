@@ -81,6 +81,66 @@ describe("classes repository boundaries", () => {
       "ON CONFLICT (professor_id, google_classroom_id)",
     );
     expect(firstSql).not.toContain("professor_id = EXCLUDED.professor_id");
+    expect(firstSql).toContain("class_curriculum_profile");
     expect(firstValues[5]).not.toEqual(secondValues[5]);
+  });
+
+  it("links only an owned local class to the created Google course", async () => {
+    const database = {
+      query: vi.fn().mockResolvedValue({ rows: [{ id: "class-id" }] }),
+    };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(
+      repository.linkGoogleCourse(professorA, "class-id", "course-id"),
+    ).resolves.toBe(true);
+    expect(database.query).toHaveBeenCalledWith(
+      expect.stringContaining("origin = 'local'"),
+      ["class-id", professorA, "course-id"],
+    );
+  });
+
+  it("upserts Google students without clearing a local restriction", async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await repository.syncGoogleStudents(professorA, "class-id", [
+      {
+        googleSubject: "google-student-1",
+        name: "Aluno Teste",
+        email: "aluno@example.invalid",
+      },
+    ]);
+
+    const [sql, values] = database.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("enrollment.status = 'restricted'");
+    expect(String(values[2])).toContain("google-student-1");
+  });
+
+  it("replaces the curriculum profile only for an owned class", async () => {
+    const database = {
+      query: vi
+        .fn()
+        .mockResolvedValue({ rows: [{ class_group_id: "class-id" }] }),
+    };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(
+      repository.setCurriculumProfile(professorA, "class-id", {
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática", "Ciências"],
+      }),
+    ).resolves.toBe(true);
+    expect(database.query).toHaveBeenCalledWith(
+      expect.stringContaining("class_curriculum_component"),
+      expect.arrayContaining([professorA, "class-id"]),
+    );
   });
 });

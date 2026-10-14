@@ -89,4 +89,109 @@ describe("Google Classroom adapter", () => {
       code: "GOOGLE_PERMISSION_DENIED",
     } satisfies Partial<ClassroomAdapterError>);
   });
+
+  it("reuses a marked course before attempting creation", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        courses: [
+          {
+            id: "course-existing",
+            name: "Matemática",
+            description: "Turma\n\n[EDUCAI-CLASS:class-local]",
+          },
+        ],
+      }),
+    );
+    const adapter = new ProductionClassroomAdapter(
+      config,
+      fetcher,
+      vi.fn().mockResolvedValue({ token: "access-token", credential: {} }),
+    );
+
+    await expect(
+      adapter.ensureCourse(credential, {
+        localClassId: "class-local",
+        name: "Matemática",
+        description: "Turma",
+      }),
+    ).resolves.toMatchObject({ googleClassroomId: "course-existing" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates and activates a course when no marker is found", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ courses: [] }))
+      .mockResolvedValueOnce(Response.json({ id: "course-new" }))
+      .mockResolvedValueOnce(Response.json({ id: "course-new" }));
+    const adapter = new ProductionClassroomAdapter(
+      config,
+      fetcher,
+      vi.fn().mockResolvedValue({ token: "access-token", credential: {} }),
+    );
+
+    await expect(
+      adapter.ensureCourse(credential, {
+        localClassId: "class-local",
+        name: "Matemática",
+        description: null,
+      }),
+    ).resolves.toMatchObject({ googleClassroomId: "course-new" });
+    expect(fetcher.mock.calls[1]![1]).toMatchObject({ method: "POST" });
+    expect(fetcher.mock.calls[2]![1]).toMatchObject({ method: "PATCH" });
+  });
+
+  it("paginates and normalizes the student roster", async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("pageToken=next"))
+        return Response.json({
+          students: [
+            {
+              userId: "student-2",
+              profile: {
+                name: { fullName: "Aluno Dois" },
+                emailAddress: "dois@example.invalid",
+              },
+            },
+          ],
+        });
+      return Response.json({
+        students: [
+          {
+            userId: "student-1",
+            profile: {
+              name: { fullName: "Aluno Um" },
+              emailAddress: "um@example.invalid",
+            },
+          },
+          { userId: "invalid", profile: { name: {} } },
+        ],
+        nextPageToken: "next",
+      });
+    });
+    const adapter = new ProductionClassroomAdapter(
+      config,
+      fetcher as typeof fetch,
+      vi.fn().mockResolvedValue({ token: "access-token", credential: {} }),
+    );
+
+    await expect(adapter.listStudents(credential, "course-1")).resolves.toEqual(
+      {
+        students: [
+          {
+            googleSubject: "student-1",
+            name: "Aluno Um",
+            email: "um@example.invalid",
+          },
+          {
+            googleSubject: "student-2",
+            name: "Aluno Dois",
+            email: "dois@example.invalid",
+          },
+        ],
+        credential: {},
+      },
+    );
+  });
 });

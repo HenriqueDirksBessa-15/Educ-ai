@@ -11,6 +11,7 @@ import type {
 } from "@educai/contracts";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { ClassesPanel } from "./ClassesPanel";
 
 const ActivitiesPanel = lazy(() =>
   import("./ActivitiesPanel").then((module) => ({
@@ -233,19 +234,28 @@ function ProfessorShell({
   const [classes, setClasses] = useState<ClassSummary[]>([]);
   const [plans, setPlans] = useState<LessonPlan[]>([]);
 
+  const loadClasses = useCallback(async () => {
+    const response = await fetch(`${apiBaseUrl}/classes`, {
+      credentials: "include",
+    });
+    if (!response.ok) return;
+    const body = (await response.json()) as DataEnvelope<ClassSummary[]>;
+    setClasses(Array.isArray(body.data) ? body.data : []);
+  }, []);
+
   useEffect(() => {
     void Promise.all([
       fetch(`${apiBaseUrl}/timeline/milestones`, { credentials: "include" }),
       fetch(`${apiBaseUrl}/materials`, { credentials: "include" }),
-      fetch(`${apiBaseUrl}/classes`, { credentials: "include" }),
       fetch(`${apiBaseUrl}/lesson-plans`, { credentials: "include" }),
+      loadClasses(),
     ])
       .then(
         async ([
           milestoneResponse,
           materialResponse,
-          classesResponse,
           plansResponse,
+          _classesLoaded,
         ]) => {
           const read = async <T,>(response: Response): Promise<T[]> => {
             if (!response.ok) return [];
@@ -254,12 +264,11 @@ function ProfessorShell({
           };
           setMilestones(await read<Milestone>(milestoneResponse));
           setMaterials(await read<Material>(materialResponse));
-          setClasses(await read<ClassSummary>(classesResponse));
           setPlans(await read<LessonPlan>(plansResponse));
         },
       )
       .catch(() => undefined);
-  }, []);
+  }, [loadClasses]);
 
   return (
     <>
@@ -297,6 +306,7 @@ function ProfessorShell({
           )}
         </div>
       </section>
+      <ClassesPanel classes={classes} reload={loadClasses} />
       <TimelinePanel
         milestones={milestones}
         materials={materials}

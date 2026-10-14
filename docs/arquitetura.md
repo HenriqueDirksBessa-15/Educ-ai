@@ -59,6 +59,10 @@ O monitor consulta OAuth, Classroom e Forms em ciclos de cinco minutos para toda
 
 O adapter Classroom de produção renova a credencial e lista, com paginação, cursos em que `me` é docente. A importação continua idempotente por professor e ID remoto. Como a API Classroom não fornece ano letivo curricular estruturado, cursos novos entram com “A definir” até o professor configurar o perfil curricular explícito na etapa seguinte; nenhum ano ou vínculo BNCC é inferido do nome do curso.
 
+Turmas criadas no EDUC.AI permanecem locais até uma publicação explícita. A criação Classroom inclui um marcador derivado do UUID local; uma repetição pesquisa esse marcador antes de criar e, portanto, recupera falhas ambíguas sem duplicar curso. O roster é paginado e reconciliado por `google_subject` e e-mail. Sincronizações preservam restrições docentes e nunca removem alunos ausentes automaticamente.
+
+`class_curriculum_profile` e `class_curriculum_component` separam do Google a etapa, o ano/série e um ou mais componentes curriculares. O perfil sempre é escrito com escopo do professor e alimentará os filtros BNCC da próxima etapa.
+
 O adaptador OpenAI distingue chave ausente, disponibilidade e falhas normalizadas. Com chave configurada, o monitor valida a conexão e a geração usa a Responses API com JSON Schema estrito; sem chave, planos continuam usando fixture local. Chaves, cabeçalhos e respostas brutas não são persistidos.
 
 Logout revoga a sessão atual. A rota de desconexão revoga o token Google e todas as sessões locais do professor.
