@@ -118,7 +118,11 @@ Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, geraçõe
 
 A publicação não mantém transação aberta durante chamadas Google. A preparação adquire lock da atividade, fixa a geração aprovada quando aplicável e bloqueia edições estruturais a partir desse ponto. Cada passo é persistido antes e depois da operação externa. Um marcador derivado do UUID local permite reconciliar Forms pelo Drive e trabalhos pela descrição do Classroom. Repetições ignoram IDs já confirmados; respostas ambíguas entram em `reconciliation_required` e nunca disparam recriação cega.
 
-Cada pergunta criada no Forms recebe um `itemId` determinístico derivado da questão local. A confirmação do Form grava atomicamente questão local, `itemId`, `questionId` externo e posição original; conjuntos incompletos não são confirmados. A coleta usa esse vínculo persistido, portanto uma reordenação externa do Form não troca as respostas entre questões.
+Após criar as perguntas, o publicador lê os `itemId` e `questionId` opacos atribuídos pelo Forms na ordem confirmada. A confirmação grava atomicamente questão local, IDs externos e posição original, recusando conjuntos incompletos ou IDs repetidos. A coleta usa esse vínculo persistido, portanto uma reordenação posterior do Form não troca as respostas entre questões.
+
+O Form é configurado como quiz com coleta de e-mail `VERIFIED`. Questões objetivas recebem gabarito e pontuação automática; questões discursivas de parágrafo recebem somente pontuação máxima, pois o Forms rejeita `correctAnswers` nesse tipo. Resposta-alvo e critérios permanecem no banco para revisão docente.
+
+A Classroom API aceita o Form criado pelo EDUC.AI apenas como material de link; o material `form` é somente leitura. Assim, o autoencerramento disponível em “Atividade com teste” criada pela interface não está disponível ao fluxo API. O aluno deve entregar o trabalho no Classroom, pois `studentSubmissions.turnIn` exige OAuth e identidade do próprio aluno.
 
 Uma atividade só muda de `draft` para `published` depois de existir um Form publicado e todas as turmas obrigatórias possuírem trabalho Classroom confirmado. Na mesma conclusão lógica, o plano é bloqueado e um `activity_collection_job` idempotente é criado para o prazo.
 

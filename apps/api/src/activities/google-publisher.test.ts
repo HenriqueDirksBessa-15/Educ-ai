@@ -70,7 +70,7 @@ describe("Google activity publisher", () => {
           responderUri: "https://forms.test/form-1",
           items: configured
             ? activity.questions.map((question) => ({
-                itemId: `educai${question.id.replaceAll("-", "")}`,
+                itemId: `google-item-${question.position}`,
                 questionItem: {
                   question: { questionId: `google-${question.position}` },
                 },
@@ -93,13 +93,13 @@ describe("Google activity publisher", () => {
       questions: [
         {
           questionId: activity.questions[0]!.id,
-          googleItemId: `educai${activity.questions[0]!.id.replaceAll("-", "")}`,
+          googleItemId: "google-item-0",
           googleQuestionId: "google-0",
           questionPosition: 0,
         },
         {
           questionId: activity.questions[1]!.id,
-          googleItemId: `educai${activity.questions[1]!.id.replaceAll("-", "")}`,
+          googleItemId: "google-item-1",
           googleQuestionId: "google-1",
           questionPosition: 1,
         },
@@ -115,9 +115,24 @@ describe("Google activity publisher", () => {
     expect(body.requests).toHaveLength(4);
     expect(JSON.stringify(body)).toContain("correctAnswers");
     expect(JSON.stringify(body)).toContain("textQuestion");
-    expect(JSON.stringify(body)).toContain(
-      `educai${activity.questions[0]!.id.replaceAll("-", "")}`,
-    );
+    expect(JSON.stringify(body)).toContain("VERIFIED");
+    expect(JSON.stringify(body)).not.toContain("itemId");
+    const discursiveRequest = body.requests.find((request) =>
+      JSON.stringify(request).includes("textQuestion"),
+    ) as {
+      createItem?: {
+        item?: {
+          questionItem?: {
+            question?: {
+              grading?: { pointValue?: number; correctAnswers?: unknown };
+            };
+          };
+        };
+      };
+    };
+    expect(
+      discursiveRequest.createItem?.item?.questionItem?.question?.grading,
+    ).toEqual({ pointValue: 2 });
     expect(
       fetcher.mock.calls.some(([url]) =>
         String(url).includes(":setPublishSettings"),
@@ -125,8 +140,7 @@ describe("Google activity publisher", () => {
     ).toBe(true);
   });
 
-  it("reconciles question ids by deterministic item id after external reordering", async () => {
-    const reversed = [...activity.questions].reverse();
+  it("reconciles Google-assigned ids by the confirmed creation order", async () => {
     const fetcher = vi.fn(async (url: string) => {
       if (url.includes("drive/v3/files?"))
         return jsonResponse({ files: [{ id: "form-1" }] });
@@ -134,8 +148,8 @@ describe("Google activity publisher", () => {
         return jsonResponse({
           formId: "form-1",
           responderUri: "https://forms.test/form-1",
-          items: reversed.map((question) => ({
-            itemId: `educai${question.id.replaceAll("-", "")}`,
+          items: activity.questions.map((question) => ({
+            itemId: `google-item-${question.position}`,
             questionItem: {
               question: { questionId: `google-${question.position}` },
             },
@@ -163,6 +177,11 @@ describe("Google activity publisher", () => {
         questionPosition: 1,
       }),
     ]);
+    const update = fetcher.mock.calls.find(([url]) =>
+      String(url).includes(":batchUpdate"),
+    );
+    expect(String(update?.[1]?.body)).toContain("VERIFIED");
+    expect(String(update?.[1]?.body)).not.toContain("createItem");
   });
 
   it("reuses Classroom work found through the deterministic marker", async () => {

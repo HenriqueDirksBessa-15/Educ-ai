@@ -218,7 +218,48 @@ export class ProductionGoogleActivityPublisher
       `https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}`,
       token,
     );
-    if ((current.items?.length ?? 0) > 0) return;
+    const itemRequests =
+      (current.items?.length ?? 0) > 0
+        ? []
+        : activity.questions.map((question, index) => ({
+            createItem: {
+              location: { index },
+              item: {
+                title: question.prompt,
+                questionItem: {
+                  question:
+                    question.kind === "objective"
+                      ? {
+                          required: true,
+                          grading: {
+                            pointValue: question.points,
+                            correctAnswers: {
+                              answers: [
+                                {
+                                  value:
+                                    question.alternatives[
+                                      question.correctAlternativeIndex
+                                    ],
+                                },
+                              ],
+                            },
+                          },
+                          choiceQuestion: {
+                            type: "RADIO",
+                            options: question.alternatives.map((value) => ({
+                              value,
+                            })),
+                          },
+                        }
+                      : {
+                          required: true,
+                          grading: { pointValue: question.points },
+                          textQuestion: { paragraph: true },
+                        },
+                },
+              },
+            },
+          }));
     const requests = [
       {
         updateFormInfo: {
@@ -228,55 +269,14 @@ export class ProductionGoogleActivityPublisher
       },
       {
         updateSettings: {
-          settings: { quizSettings: { isQuiz: true } },
-          updateMask: "quizSettings.isQuiz",
+          settings: {
+            quizSettings: { isQuiz: true },
+            emailCollectionType: "VERIFIED",
+          },
+          updateMask: "quizSettings.isQuiz,emailCollectionType",
         },
       },
-      ...activity.questions.map((question, index) => ({
-        createItem: {
-          location: { index },
-          item: {
-            itemId: googleItemId(question.id),
-            title: question.prompt,
-            questionItem: {
-              question:
-                question.kind === "objective"
-                  ? {
-                      required: true,
-                      grading: {
-                        pointValue: question.points,
-                        correctAnswers: {
-                          answers: [
-                            {
-                              value:
-                                question.alternatives[
-                                  question.correctAlternativeIndex
-                                ],
-                            },
-                          ],
-                        },
-                      },
-                      choiceQuestion: {
-                        type: "RADIO",
-                        options: question.alternatives.map((value) => ({
-                          value,
-                        })),
-                      },
-                    }
-                  : {
-                      required: true,
-                      grading: {
-                        pointValue: question.points,
-                        correctAnswers: {
-                          answers: [{ value: question.targetAnswer }],
-                        },
-                      },
-                      textQuestion: { paragraph: true },
-                    },
-            },
-          },
-        },
-      })),
+      ...itemRequests,
     ];
     await this.requestJson(
       `https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}:batchUpdate`,
@@ -442,7 +442,7 @@ export class FixtureGoogleActivityPublisher implements GoogleActivityPublisher {
       credential,
       questions: activity.questions.map((question) => ({
         questionId: question.id,
-        googleItemId: googleItemId(question.id),
+        googleItemId: `fixture-item-${question.position}`,
         googleQuestionId: `fixture-question-${question.id}`,
         questionPosition: question.position,
       })),
@@ -503,29 +503,15 @@ type GoogleFormItem = {
   questionItem?: { question?: { questionId?: string } };
 };
 
-function googleItemId(questionId: string): string {
-  return `educai${questionId.replaceAll("-", "")}`;
-}
-
 function mapFormQuestions(
   items: GoogleFormItem[],
   activity: Activity,
 ): GoogleFormQuestionReference[] {
-  const byItemId = new Map(
-    items
-      .filter((item) => item.itemId)
-      .map((item) => [item.itemId!, item] as const),
-  );
-  const deterministic = activity.questions.every((question) =>
-    byItemId.has(googleItemId(question.id)),
-  );
-  if (!deterministic && items.length !== activity.questions.length)
+  if (items.length !== activity.questions.length)
     throw new GooglePublishingError("GOOGLE_FORM_MAPPING_INVALID", true);
 
   const mappings = activity.questions.map((question) => {
-    const item = deterministic
-      ? byItemId.get(googleItemId(question.id))
-      : items[question.position];
+    const item = items[question.position];
     const googleQuestionId = item?.questionItem?.question?.questionId;
     if (!item?.itemId || !googleQuestionId)
       throw new GooglePublishingError("GOOGLE_FORM_MAPPING_INVALID", true);
@@ -537,8 +523,10 @@ function mapFormQuestions(
     };
   });
   if (
+    new Set(mappings.map((mapping) => mapping.googleItemId)).size !==
+      mappings.length ||
     new Set(mappings.map((mapping) => mapping.googleQuestionId)).size !==
-    mappings.length
+      mappings.length
   )
     throw new GooglePublishingError("GOOGLE_FORM_MAPPING_INVALID", true);
   return mappings;

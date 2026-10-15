@@ -8,8 +8,8 @@ vínculo explícito entre cada questão local e os IDs criados no Form.
 
 ## Cenários escritos antes da implementação
 
-1. Cada questão recebe um `itemId` determinístico derivado do UUID local e o
-   retorno do Forms persiste `itemId`, `questionId`, questão e posição locais.
+1. Cada questão recebe do Forms um `itemId` e `questionId`; o retorno confirmado
+   persiste ambos junto à questão e posição locais.
 2. Reordenar itens no Form não altera a questão local associada a uma resposta.
 3. Um Form incompleto ou sem IDs reconciliáveis interrompe a publicação em
    `reconciliation_required`; ele não é confirmado localmente.
@@ -31,8 +31,8 @@ vínculo explícito entre cada questão local e os IDs criados no Form.
 
 ## Decisões
 
-- o `itemId` do Forms usa o prefixo `educai` e o UUID local sem hífens, dentro
-  do limite de 40 caracteres;
+- `itemId` e `questionId` são opacos e atribuídos pelo Google; a confirmação
+  exige quantidade completa e unicidade de ambos;
 - Forms antigos sem IDs determinísticos podem ser reconciliados uma única vez
   por posição somente se a quantidade de itens for exatamente a esperada;
 - depois que a publicação é preparada, a estrutura da atividade fica bloqueada

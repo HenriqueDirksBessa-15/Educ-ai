@@ -2,6 +2,28 @@
 
 Atualizado em 15/10/2026.
 
+## Ciclo vertical — CV-HML: homologação Google real
+
+Executada em 15/10/2026 a homologação externa autorizada do caminho Google:
+
+- migrações 024–025 aplicadas a `educai-dev` e Drive API habilitada;
+- OAuth real renovado com os escopos planejados;
+- turma, Form e trabalho Classroom reais criados com dados fictícios;
+- roster de um aluno fictício sincronizado e resposta identificada por e-mail
+  verificado;
+- objetiva corrigida, discursiva revisada pelo professor, nota 4/10 aprovada e
+  devolvida como 2/5 no Classroom;
+- segunda coleta idempotente e boletim PDF válido gerado;
+- correções de produção para IDs opacos do Forms, parágrafo sem gabarito
+  automático e coleta verificada de e-mail.
+
+O Classroom só conclui automaticamente o envio para “Atividade com teste”
+criada pela interface; a API pública cria o Form como link, exigindo que o
+aluno marque o trabalho como entregue. O smoke OpenAI foi executado e bloqueado
+por `OPENAI_API_KEY_INVALID`; essa parte não está homologada. Evidências, IDs,
+limitações e rollback estão em
+[`ciclo-vertical/08-cv-hml.md`](./ciclo-vertical/08-cv-hml.md).
+
 ## Ciclo vertical — CV-D/E: coleta, correção e boletim simulados
 
 Concluída em 15/10/2026 a regressão sintética ponta a ponta:
