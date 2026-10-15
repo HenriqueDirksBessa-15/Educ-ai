@@ -278,6 +278,7 @@ function referenceError(
     CLASS_NOT_FOUND: "Uma das turmas não foi encontrada.",
     MATERIAL_NOT_FOUND: "Um dos materiais não foi encontrado.",
     SYLLABUS_NOT_FOUND: "A ementa selecionada não foi encontrada.",
+    BNCC_SKILL_NOT_FOUND: "Uma das habilidades BNCC não pertence à ementa.",
   };
   if (error instanceof Error) {
     const message = messages[error.message];

@@ -653,11 +653,13 @@ export class ActivitiesRepository {
 
   private async assertPlan(professorId: string, planId: string): Promise<void> {
     const result = (await this.database.query(
-      `SELECT id FROM lesson_plan
+      `SELECT id, status FROM lesson_plan
        WHERE id = $1 AND professor_id = $2 AND archived_at IS NULL`,
       [planId, professorId],
-    )) as QueryResult<{ id: string }>;
-    if (!result.rows[0]) throw new Error("LESSON_PLAN_NOT_FOUND");
+    )) as QueryResult<{ id: string; status: string }>;
+    const plan = result.rows[0];
+    if (!plan) throw new Error("LESSON_PLAN_NOT_FOUND");
+    if (plan.status !== "approved") throw new Error("LESSON_PLAN_NOT_APPROVED");
   }
 
   private aggregateMutationSql(update: boolean): string {

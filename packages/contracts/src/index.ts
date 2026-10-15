@@ -306,6 +306,8 @@ export const lessonPlanInputSchema = z.object({
   contents: z.string().trim().min(1).max(4_000),
   methodology: z.string().trim().min(1).max(6_000),
   evaluationStrategy: z.string().trim().min(1).max(4_000),
+  durationMinutes: z.number().int().min(1).max(600).nullable().optional(),
+  references: z.string().trim().max(4_000).nullable().optional(),
   classIds: z.array(z.uuid()).min(1),
   syllabusId: z.uuid().nullable().optional(),
   bnccSkillIds: z.array(z.uuid()).default([]),

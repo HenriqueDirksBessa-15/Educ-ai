@@ -71,6 +71,16 @@ export function registerActivitiesRoutes(
     } catch (error) {
       if (error instanceof Error && error.message === "LESSON_PLAN_NOT_FOUND")
         return notFound(reply, "Plano de aula não encontrado.");
+      if (
+        error instanceof Error &&
+        error.message === "LESSON_PLAN_NOT_APPROVED"
+      )
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Aprove o plano de aula antes de criar a atividade.",
+          },
+        });
       throw error;
     }
   });
@@ -160,6 +170,13 @@ export function registerActivitiesRoutes(
         activity.lessonPlanId,
       );
       if (!plan) return notFound(reply, "Plano de aula não encontrado.");
+      if (plan.status !== "approved")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Aprove novamente o plano antes de gerar a atividade.",
+          },
+        });
       let context;
       try {
         context = buildActivityPromptContext(

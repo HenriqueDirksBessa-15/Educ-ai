@@ -1,6 +1,8 @@
 import type {
   AuthSession,
+  ClassDetail,
   ClassSummary,
+  CurriculumSyllabus,
   Identity,
   IntegrationStatus,
   LessonPlan,
@@ -253,19 +255,28 @@ function ProfessorShell({
     setMaterials(Array.isArray(body.data) ? body.data : []);
   }, []);
 
+  const loadPlans = useCallback(async () => {
+    const response = await fetch(`${apiBaseUrl}/lesson-plans`, {
+      credentials: "include",
+    });
+    if (!response.ok) return;
+    const body = (await response.json()) as DataEnvelope<LessonPlan[]>;
+    setPlans(Array.isArray(body.data) ? body.data : []);
+  }, []);
+
   useEffect(() => {
     void Promise.all([
       fetch(`${apiBaseUrl}/timeline/milestones`, { credentials: "include" }),
-      fetch(`${apiBaseUrl}/lesson-plans`, { credentials: "include" }),
       loadClasses(),
       loadMaterials(),
+      loadPlans(),
     ])
       .then(
         async ([
           milestoneResponse,
-          plansResponse,
           _classesLoaded,
           _materialsLoaded,
+          _plansLoaded,
         ]) => {
           const read = async <T,>(response: Response): Promise<T[]> => {
             if (!response.ok) return [];
@@ -273,11 +284,10 @@ function ProfessorShell({
             return Array.isArray(body.data) ? body.data : [];
           };
           setMilestones(await read<Milestone>(milestoneResponse));
-          setPlans(await read<LessonPlan>(plansResponse));
         },
       )
       .catch(() => undefined);
-  }, [loadClasses, loadMaterials]);
+  }, [loadClasses, loadMaterials, loadPlans]);
 
   return (
     <>
@@ -322,7 +332,12 @@ function ProfessorShell({
         classes={classes}
         reloadMaterials={loadMaterials}
       />
-      <LessonPlansPanel plans={plans} classes={classes} />
+      <LessonPlansPanel
+        plans={plans}
+        classes={classes}
+        materials={materials}
+        reload={loadPlans}
+      />
       <Suspense fallback={<p className="empty-state">Carregando módulos…</p>}>
         <ActivitiesPanel plans={plans} />
         <FeedbackPanel classes={classes} materials={materials} />
@@ -389,14 +404,33 @@ function TimelinePanel({
   );
 }
 
-function LessonPlansPanel({
+export function LessonPlansPanel({
   plans,
   classes,
+  materials,
+  reload,
 }: {
   plans: LessonPlan[];
   classes: ClassSummary[];
+  materials: Material[];
+  reload: () => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const [classId, setClassId] = useState(classes[0]?.id ?? "");
+  const [component, setComponent] = useState("");
+  const [schoolYear, setSchoolYear] = useState("");
+  const [objectives, setObjectives] = useState("");
+  const [contents, setContents] = useState("");
+  const [methodology, setMethodology] = useState("");
+  const [evaluationStrategy, setEvaluationStrategy] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState(50);
+  const [references, setReferences] = useState("");
+  const [syllabuses, setSyllabuses] = useState<CurriculumSyllabus[]>([]);
+  const [syllabusId, setSyllabusId] = useState("");
+  const [bnccSkillIds, setBnccSkillIds] = useState<string[]>([]);
+  const [materialIds, setMaterialIds] = useState<string[]>([]);
+  const [components, setComponents] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<LessonPlan | null>(null);
@@ -408,34 +442,139 @@ function LessonPlansPanel({
   );
   const [generating, setGenerating] = useState(false);
 
-  const createPlan = async (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (!classes.some((group) => group.id === classId))
+      setClassId(classes[0]?.id ?? "");
+  }, [classes, classId]);
+
+  useEffect(() => {
+    if (!classId) return;
+    void fetch(`${apiBaseUrl}/classes/${classId}`, { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const body = (await response.json()) as DataEnvelope<ClassDetail>;
+        const profile = body.data.curriculum;
+        setSchoolYear(profile?.schoolYear ?? body.data.schoolYear);
+        setComponents(profile?.curricularComponents ?? []);
+        setComponent((current) =>
+          profile?.curricularComponents.includes(current)
+            ? current
+            : (profile?.curricularComponents[0] ?? ""),
+        );
+      })
+      .catch(() =>
+        setMessage("Não foi possível carregar o currículo da turma."),
+      );
+  }, [classId]);
+
+  useEffect(() => {
+    if (!component || !schoolYear) {
+      setSyllabuses([]);
+      return;
+    }
+    const query = new URLSearchParams({
+      component,
+      schoolYear,
+    });
+    void fetch(`${apiBaseUrl}/curriculum?${query}`, { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const body = (await response.json()) as { data: CurriculumSyllabus[] };
+        setSyllabuses(body.data);
+        setSyllabusId((current) =>
+          body.data.some((item) => item.id === current)
+            ? current
+            : (body.data[0]?.id ?? ""),
+        );
+        const availableSkills = new Set(
+          body.data.flatMap((item) => item.skills.map((skill) => skill.id)),
+        );
+        setBnccSkillIds((current) =>
+          current.filter((id) => availableSkills.has(id)),
+        );
+      })
+      .catch(() => setMessage("Não foi possível consultar a BNCC."));
+  }, [component, schoolYear]);
+
+  const savePlan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!classes[0] || !title.trim()) return;
+    if (!classId || !title.trim() || !component || !schoolYear) return;
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`${apiBaseUrl}/lesson-plans`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title,
-          curricularComponent: "A definir",
-          schoolYear: classes[0].schoolYear,
-          objectives: "Objetivos a detalhar pelo professor.",
-          contents: "Conteúdos a detalhar pelo professor.",
-          methodology: "Metodologia a detalhar pelo professor.",
-          evaluationStrategy: "Estratégia de avaliação a detalhar.",
-          classIds: [classes[0].id],
-          bnccSkillIds: [],
-          materialIds: [],
-        }),
-      });
+      const response = await fetch(
+        editingId
+          ? `${apiBaseUrl}/lesson-plans/${editingId}`
+          : `${apiBaseUrl}/lesson-plans`,
+        {
+          method: editingId ? "PATCH" : "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title,
+            curricularComponent: component,
+            schoolYear,
+            objectives,
+            contents,
+            methodology,
+            evaluationStrategy,
+            durationMinutes,
+            references: references.trim() || null,
+            classIds: [classId],
+            syllabusId: syllabusId || null,
+            bnccSkillIds,
+            materialIds,
+          }),
+        },
+      );
       if (!response.ok) throw new Error();
-      setMessage("Plano criado como rascunho manual.");
-      setTitle("");
+      setMessage(
+        editingId
+          ? "Plano atualizado e devolvido a rascunho."
+          : "Plano criado como rascunho manual.",
+      );
+      setEditingId(null);
+      await reload();
     } catch {
       setMessage("Não foi possível criar o plano.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editPlan = (plan: LessonPlan) => {
+    setEditingId(plan.id);
+    setTitle(plan.title);
+    setClassId(plan.classIds[0] ?? "");
+    setComponent(plan.curricularComponent);
+    setSchoolYear(plan.schoolYear);
+    setObjectives(plan.objectives);
+    setContents(plan.contents);
+    setMethodology(plan.methodology);
+    setEvaluationStrategy(plan.evaluationStrategy);
+    setDurationMinutes(plan.durationMinutes ?? 50);
+    setReferences(plan.references ?? "");
+    setSyllabusId(plan.syllabusId ?? "");
+    setBnccSkillIds(plan.bnccSkillIds);
+    setMaterialIds(plan.materialIds);
+  };
+
+  const approvePlan = async (plan: LessonPlan) => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/lesson-plans/${plan.id}/approve`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!response.ok) throw new Error();
+      setMessage("Plano aprovado explicitamente pelo professor.");
+      await reload();
+    } catch {
+      setMessage("Revise a sugestão de IA antes de aprovar este plano.");
     } finally {
       setSaving(false);
     }
@@ -483,6 +622,7 @@ function LessonPlansPanel({
       );
       if (!response.ok) throw new Error();
       setMessage("Sugestão revisada pelo professor e salva no plano.");
+      await reload();
     } catch {
       setMessage("Não foi possível registrar a revisão.");
     } finally {
@@ -517,6 +657,14 @@ function LessonPlansPanel({
                   <button
                     type="button"
                     className="secondary-action compact-action"
+                    disabled={saving || plan.isLocked}
+                    onClick={() => editPlan(plan)}
+                  >
+                    Editar plano
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-action compact-action"
                     disabled={generating || !plan.syllabusDescription}
                     onClick={() => void generateSuggestion(plan)}
                   >
@@ -527,29 +675,188 @@ function LessonPlansPanel({
                   {!plan.syllabusDescription && (
                     <small>Vincule uma ementa para habilitar a IA.</small>
                   )}
+                  {plan.status !== "approved" &&
+                    plan.status !== "generated" && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void approvePlan(plan)}
+                      >
+                        Aprovar plano
+                      </button>
+                    )}
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <form
-          className="plan-form"
-          onSubmit={(event) => void createPlan(event)}
-        >
-          <h3>Novo plano manual</h3>
+        <form className="plan-form" onSubmit={(event) => void savePlan(event)}>
+          <h3>{editingId ? "Editar plano" : "Novo plano manual"}</h3>
           <label>
-            Título
+            Turma
+            <select
+              value={classId}
+              onChange={(event) => setClassId(event.target.value)}
+              required
+            >
+              <option value="">Selecione</option>
+              {classes.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Componente curricular
+            <select
+              value={component}
+              onChange={(event) => setComponent(event.target.value)}
+              required
+            >
+              <option value="">Selecione</option>
+              {components.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Ano/série
+            <input
+              value={schoolYear}
+              onChange={(event) => setSchoolYear(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Título do plano
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Ex.: Frações na prática"
+              required
             />
           </label>
+          <label>
+            Objetivos
+            <textarea
+              value={objectives}
+              onChange={(event) => setObjectives(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Conteúdos
+            <textarea
+              value={contents}
+              onChange={(event) => setContents(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Metodologia/etapas
+            <textarea
+              value={methodology}
+              onChange={(event) => setMethodology(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Estratégia de avaliação
+            <textarea
+              value={evaluationStrategy}
+              onChange={(event) => setEvaluationStrategy(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Duração (minutos)
+            <input
+              type="number"
+              min="1"
+              max="600"
+              value={durationMinutes}
+              onChange={(event) =>
+                setDurationMinutes(Number(event.target.value))
+              }
+              required
+            />
+          </label>
+          <label>
+            Referências opcionais
+            <textarea
+              value={references}
+              onChange={(event) => setReferences(event.target.value)}
+            />
+          </label>
+          <fieldset>
+            <legend>Ementa e habilidades BNCC</legend>
+            <select
+              value={syllabusId}
+              onChange={(event) => {
+                setSyllabusId(event.target.value);
+                setBnccSkillIds([]);
+              }}
+            >
+              <option value="">Sem ementa</option>
+              {syllabuses.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.description} · {item.sourceLabel}
+                </option>
+              ))}
+            </select>
+            {syllabuses
+              .find((item) => item.id === syllabusId)
+              ?.skills.map((skill) => (
+                <label key={skill.id} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={bnccSkillIds.includes(skill.id)}
+                    onChange={(event) =>
+                      setBnccSkillIds((current) =>
+                        event.target.checked
+                          ? [...current, skill.id]
+                          : current.filter((id) => id !== skill.id),
+                      )
+                    }
+                  />
+                  {skill.code} — {skill.description} ({skill.sourceLabel})
+                </label>
+              ))}
+          </fieldset>
+          <fieldset>
+            <legend>Materiais da turma</legend>
+            {materials
+              .filter(
+                (material) =>
+                  !material.isArchived && material.classIds.includes(classId),
+              )
+              .map((material) => (
+                <label key={material.id} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={materialIds.includes(material.id)}
+                    onChange={(event) =>
+                      setMaterialIds((current) =>
+                        event.target.checked
+                          ? [...current, material.id]
+                          : current.filter((id) => id !== material.id),
+                      )
+                    }
+                  />
+                  {material.title}
+                </label>
+              ))}
+          </fieldset>
           <button
             type="submit"
-            disabled={saving || classes.length === 0 || !title.trim()}
+            disabled={
+              saving || !classId || !title.trim() || !component || !schoolYear
+            }
           >
-            {saving ? "Salvando…" : "Criar rascunho"}
+            {saving ? "Salvando…" : "Salvar rascunho"}
           </button>
           {message && (
             <small className="form-message" role="status">

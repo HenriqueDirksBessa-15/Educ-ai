@@ -24,6 +24,7 @@ import { FixtureBulletinEmailSender } from "../../src/bulletins/email.js";
 import { RetentionService } from "../../src/privacy/retention.js";
 import { ClassesRepository } from "../../src/classes/repository.js";
 import { TimelineRepository } from "../../src/timeline/repository.js";
+import { PlansRepository } from "../../src/plans/repository.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -88,6 +89,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "021_bulletins.sql",
       "022_security_privacy_audit.sql",
       "023_class_curriculum_profile.sql",
+      "024_lesson_plan_teacher_fields.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -269,6 +271,104 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     );
   }, 60_000);
 
+  it("persists and approves a complete plan before allowing an activity", async () => {
+    const professor = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Plano Completo') RETURNING id`,
+      [`plan-${randomUUID()}`, `plan-${randomUUID()}@example.invalid`],
+    );
+    const professorId = professor.rows[0]!.id;
+    const classes = new ClassesRepository(testPool);
+    const classId = await classes.create(professorId, {
+      name: "Turma do plano completo",
+      schoolYear: "8º ano EF",
+      localAccessCode: `plan-${randomUUID().slice(0, 8)}`,
+    });
+    const area = await testPool.query<{ id: string }>(
+      `INSERT INTO curriculum_area (name, source_label)
+       VALUES ($1, $2) RETURNING id`,
+      [`Matemática ${randomUUID()}`, `CV-B2 ${randomUUID()}`],
+    );
+    const syllabus = await testPool.query<{ id: string }>(
+      `INSERT INTO syllabus
+       (curriculum_area_id, curricular_component, school_year, description, source_label)
+       VALUES ($1, 'Matemática', '8º ano EF', 'Números e operações.', 'CV-B2')
+       RETURNING id`,
+      [area.rows[0]!.id],
+    );
+    const skill = await testPool.query<{ id: string }>(
+      `INSERT INTO bncc_skill
+       (syllabus_id, code, thematic_unit, knowledge_object, description,
+        source_label, is_official)
+       VALUES ($1, $2, 'Números', 'Frações', 'Resolver problemas com frações.',
+               'BNCC', true) RETURNING id`,
+      [
+        syllabus.rows[0]!.id,
+        `T${randomUUID().replaceAll("-", "").slice(0, 20)}`,
+      ],
+    );
+    const materialId = await new TimelineRepository(
+      testPool,
+    ).createMaterialLink(professorId, {
+      title: "Guia do plano",
+      category: "reading",
+      classIds: [classId],
+      bnccSkillIds: [skill.rows[0]!.id],
+      url: "https://example.invalid/plano",
+    });
+    const plans = new PlansRepository(testPool);
+    const planId = await plans.create(professorId, {
+      title: "Frações na prática",
+      curricularComponent: "Matemática",
+      schoolYear: "8º ano EF",
+      objectives: "Resolver problemas com frações.",
+      contents: "Frações equivalentes.",
+      methodology: "Investigação em grupos.",
+      evaluationStrategy: "Registro e discussão.",
+      durationMinutes: 100,
+      references: "BNCC.",
+      classIds: [classId],
+      syllabusId: syllabus.rows[0]!.id,
+      bnccSkillIds: [skill.rows[0]!.id],
+      materialIds: [materialId],
+    });
+    expect(await plans.get(professorId, planId)).toMatchObject({
+      durationMinutes: 100,
+      references: "BNCC.",
+      classIds: [classId],
+      bnccSkillIds: [skill.rows[0]!.id],
+      materialIds: [materialId],
+      status: "draft",
+    });
+
+    const activities = new ActivitiesRepository(testPool);
+    const activityInput = {
+      lessonPlanId: planId,
+      title: "Atividade de frações",
+      description: "Verificação do plano aprovado.",
+      type: "objective" as const,
+      difficulty: "medium" as const,
+      dueAt: "2026-10-30T12:00:00.000Z",
+      latePolicy: { mode: "blocked" as const },
+      questions: [
+        {
+          kind: "objective" as const,
+          prompt: "Qual fração equivale a 1/2?",
+          points: 10,
+          alternatives: ["2/4", "1/3"],
+          correctAlternativeIndex: 0,
+        },
+      ],
+    };
+    await expect(activities.create(professorId, activityInput)).rejects.toThrow(
+      "LESSON_PLAN_NOT_APPROVED",
+    );
+    expect(await plans.approve(professorId, planId)).toBe("approved");
+    await expect(
+      activities.create(professorId, activityInput),
+    ).resolves.toEqual(expect.any(String));
+  }, 60_000);
+
   it("seeds fictitious isolated data repeatedly without duplication", async () => {
     const seedsDirectory = join(findRepositoryRoot(), "database", "seeds");
 
@@ -344,10 +444,10 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     const plan = await testPool.query<{ id: string }>(
       `INSERT INTO lesson_plan
        (professor_id, title, curricular_component, school_year, objectives,
-        contents, methodology, evaluation_strategy)
+        contents, methodology, evaluation_strategy, status, approved_at)
        VALUES ($1, 'Plano para atividade', 'Matemática', '5º ano',
         'Compreender frações', 'Frações', 'Resolução de problemas',
-        'Avaliação formativa') RETURNING id`,
+        'Avaliação formativa', 'approved', now()) RETURNING id`,
       [professorId],
     );
     await testPool.query(

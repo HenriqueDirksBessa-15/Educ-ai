@@ -12,12 +12,39 @@ import {
   classCreateSchema,
   identitySchema,
   integrationStatusSchema,
+  lessonPlanInputSchema,
   materialLinkInputSchema,
   professorProfileUpdateSchema,
   readyResponseSchema,
 } from "./index.js";
 
 describe("shared contracts", () => {
+  it("validates a complete teacher-authored lesson plan", () => {
+    const input = {
+      title: "Frações na prática",
+      curricularComponent: "Matemática",
+      schoolYear: "8º ano EF",
+      objectives: "Resolver problemas com frações.",
+      contents: "Frações equivalentes.",
+      methodology: "Investigação em grupos.",
+      evaluationStrategy: "Registro e discussão coletiva.",
+      durationMinutes: 100,
+      references: "Material autoral e BNCC.",
+      classIds: ["11111111-1111-4111-8111-111111111111"],
+      syllabusId: "21111111-1111-4111-8111-111111111111",
+      bnccSkillIds: ["31111111-1111-4111-8111-111111111111"],
+      materialIds: ["41111111-1111-4111-8111-111111111111"],
+    };
+
+    expect(lessonPlanInputSchema.parse(input).durationMinutes).toBe(100);
+    expect(() =>
+      lessonPlanInputSchema.parse({ ...input, durationMinutes: 0 }),
+    ).toThrow();
+    expect(() =>
+      lessonPlanInputSchema.parse({ ...input, durationMinutes: 601 }),
+    ).toThrow();
+  });
+
   it("accepts only unique HTTP(S) links bound to classes", () => {
     const valid = {
       title: "Guia de frações",

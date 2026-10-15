@@ -2,6 +2,31 @@
 
 Atualizado em 15/10/2026.
 
+## Ciclo vertical — CV-B2: plano completo e aprovado
+
+Concluído em 15/10/2026 o planejamento docente completo:
+
+- formulário de plano com turma, componente curricular, ano/série, ementa,
+  habilidades BNCC, materiais, objetivos, conteúdos, metodologia, avaliação,
+  duração e referências;
+- currículo carregado do perfil explícito da turma e da fonte curricular, sem
+  inferência pelo nome do curso Google;
+- criação e edição de plano, vínculos e revisão protegidas por transação com
+  rollback em falha intermediária;
+- retorno dos IDs reais de turmas, habilidades e materiais para edição fiel;
+- aprovação manual explícita e exigência de revisão para sugestão de IA;
+- edição devolve o plano a rascunho; criação e geração de atividade exigem plano
+  aprovado no banco;
+- migração `024_lesson_plan_teacher_fields.sql` para duração e referências.
+
+Verificações: `npm run check` aprovado (16 contratos, 84 API e 9 web); 8 testes
+PostgreSQL aprovados em banco temporário com migrações 001–024, incluindo plano
+completo, aprovação e gate de atividade; smoke OpenAI ignorado por ser
+opt-in. A base temporária foi removida e o proxy encerrado. A migração 024 não
+foi aplicada ao banco `educai`; nenhuma API Google/OpenAI foi chamada. O roteiro
+e as decisões estão em
+[`ciclo-vertical/05-cv-b2-plano-completo.md`](./ciclo-vertical/05-cv-b2-plano-completo.md).
+
 ## Ciclo vertical — CV-B1: materiais por link
 
 Concluído em 15/10/2026 o cadastro de materiais externos utilizáveis:

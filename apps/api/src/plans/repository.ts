@@ -7,7 +7,11 @@ import type {
   LessonPlanUpdate,
 } from "@educai/contracts";
 
-import type { DatabaseClient } from "../database.js";
+import {
+  withTransaction,
+  type DatabaseClient,
+  type QueryClient,
+} from "../database.js";
 import type {
   LessonPlanGenerationResult,
   LessonPlanPromptContext,
@@ -24,9 +28,14 @@ type PlanRow = {
   contents: string;
   methodology: string;
   evaluation_strategy: string;
+  duration_minutes: number | null;
+  reference_notes: string | null;
   syllabus_id: string | null;
   syllabus_description: string | null;
   class_names: string[];
+  class_ids: string[];
+  bncc_skill_ids: string[];
+  material_ids: string[];
   bncc_codes: string[];
   material_titles: string[];
   archived_at: Date | null;
@@ -66,28 +75,33 @@ export class PlansRepository {
   }
 
   async create(professorId: string, input: LessonPlanInput): Promise<string> {
-    await this.assertReferences(professorId, input);
-    const result = (await this.database.query(
-      `INSERT INTO lesson_plan
-       (professor_id, title, curricular_component, school_year, objectives,
-        contents, methodology, evaluation_strategy, syllabus_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-      [
-        professorId,
-        input.title,
-        input.curricularComponent,
-        input.schoolYear,
-        input.objectives,
-        input.contents,
-        input.methodology,
-        input.evaluationStrategy,
-        input.syllabusId ?? null,
-      ],
-    )) as QueryResult<{ id: string }>;
-    const planId = result.rows[0]!.id;
-    await this.replaceLinks(planId, input);
-    await this.saveRevision(planId, 1, input);
-    return planId;
+    return withTransaction(this.database, async (database) => {
+      await this.assertReferences(professorId, input, database);
+      const result = (await database.query(
+        `INSERT INTO lesson_plan
+         (professor_id, title, curricular_component, school_year, objectives,
+          contents, methodology, evaluation_strategy, syllabus_id,
+          duration_minutes, reference_notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [
+          professorId,
+          input.title,
+          input.curricularComponent,
+          input.schoolYear,
+          input.objectives,
+          input.contents,
+          input.methodology,
+          input.evaluationStrategy,
+          input.syllabusId ?? null,
+          input.durationMinutes ?? null,
+          input.references ?? null,
+        ],
+      )) as QueryResult<{ id: string }>;
+      const planId = result.rows[0]!.id;
+      await this.replaceLinks(planId, input, database);
+      await this.saveRevision(planId, 1, input, "manual", null, null, database);
+      return planId;
+    });
   }
 
   async update(
@@ -95,65 +109,83 @@ export class PlansRepository {
     planId: string,
     input: LessonPlanUpdate,
   ): Promise<"updated" | "not_found" | "locked"> {
-    const current = await this.get(professorId, planId);
-    if (!current) return "not_found";
-    if (current.isArchived || current.isLocked) return "locked";
-    const merged: LessonPlanInput = {
-      title: input.title ?? current.title,
-      curricularComponent:
-        input.curricularComponent ?? current.curricularComponent,
-      schoolYear: input.schoolYear ?? current.schoolYear,
-      objectives: input.objectives ?? current.objectives,
-      contents: input.contents ?? current.contents,
-      methodology: input.methodology ?? current.methodology,
-      evaluationStrategy:
-        input.evaluationStrategy ?? current.evaluationStrategy,
-      classIds: input.classIds ?? [],
-      syllabusId: input.syllabusId ?? current.syllabusId,
-      bnccSkillIds: input.bnccSkillIds ?? [],
-      materialIds: input.materialIds ?? [],
-    };
-    if (!input.classIds)
-      merged.classIds = await this.idsFor(
-        "lesson_plan_class",
-        planId,
-        "class_group_id",
-      );
-    if (!input.bnccSkillIds)
-      merged.bnccSkillIds = await this.idsFor(
-        "lesson_plan_bncc_skill",
-        planId,
-        "bncc_skill_id",
-      );
-    if (!input.materialIds)
-      merged.materialIds = await this.idsFor(
-        "lesson_plan_material",
-        planId,
-        "material_id",
-      );
-    await this.assertReferences(professorId, merged);
-    await this.database.query(
-      `UPDATE lesson_plan SET title = $3, curricular_component = $4,
+    return withTransaction(this.database, async (database) => {
+      const current = await this.getUsing(database, professorId, planId);
+      if (!current) return "not_found";
+      if (current.isArchived || current.isLocked) return "locked";
+      const merged: LessonPlanInput = {
+        title: input.title ?? current.title,
+        curricularComponent:
+          input.curricularComponent ?? current.curricularComponent,
+        schoolYear: input.schoolYear ?? current.schoolYear,
+        objectives: input.objectives ?? current.objectives,
+        contents: input.contents ?? current.contents,
+        methodology: input.methodology ?? current.methodology,
+        evaluationStrategy:
+          input.evaluationStrategy ?? current.evaluationStrategy,
+        durationMinutes: input.durationMinutes ?? current.durationMinutes,
+        references: input.references ?? current.references,
+        classIds: input.classIds ?? [],
+        syllabusId: input.syllabusId ?? current.syllabusId,
+        bnccSkillIds: input.bnccSkillIds ?? [],
+        materialIds: input.materialIds ?? [],
+      };
+      if (!input.classIds)
+        merged.classIds = await this.idsFor(
+          "lesson_plan_class",
+          planId,
+          "class_group_id",
+          database,
+        );
+      if (!input.bnccSkillIds)
+        merged.bnccSkillIds = await this.idsFor(
+          "lesson_plan_bncc_skill",
+          planId,
+          "bncc_skill_id",
+          database,
+        );
+      if (!input.materialIds)
+        merged.materialIds = await this.idsFor(
+          "lesson_plan_material",
+          planId,
+          "material_id",
+          database,
+        );
+      await this.assertReferences(professorId, merged, database);
+      await database.query(
+        `UPDATE lesson_plan SET title = $3, curricular_component = $4,
        school_year = $5, objectives = $6, contents = $7, methodology = $8,
-       evaluation_strategy = $9, syllabus_id = $10, status = 'draft',
+       evaluation_strategy = $9, syllabus_id = $10, duration_minutes = $11,
+       reference_notes = $12, status = 'draft',
        reviewed_at = NULL, approved_at = NULL
        WHERE id = $1 AND professor_id = $2`,
-      [
+        [
+          planId,
+          professorId,
+          merged.title,
+          merged.curricularComponent,
+          merged.schoolYear,
+          merged.objectives,
+          merged.contents,
+          merged.methodology,
+          merged.evaluationStrategy,
+          merged.syllabusId ?? null,
+          merged.durationMinutes ?? null,
+          merged.references ?? null,
+        ],
+      );
+      await this.replaceLinks(planId, merged, database);
+      await this.saveRevision(
         planId,
-        professorId,
-        merged.title,
-        merged.curricularComponent,
-        merged.schoolYear,
-        merged.objectives,
-        merged.contents,
-        merged.methodology,
-        merged.evaluationStrategy,
-        merged.syllabusId ?? null,
-      ],
-    );
-    await this.replaceLinks(planId, merged);
-    await this.saveRevision(planId, await this.nextVersion(planId), merged);
-    return "updated";
+        await this.nextVersion(planId, database),
+        merged,
+        "manual",
+        null,
+        null,
+        database,
+      );
+      return "updated";
+    });
   }
 
   async reuse(professorId: string, planId: string): Promise<string | null> {
@@ -167,6 +199,8 @@ export class PlansRepository {
       contents: source.contents,
       methodology: source.methodology,
       evaluationStrategy: source.evaluationStrategy,
+      durationMinutes: source.durationMinutes,
+      references: source.references,
       classIds: await this.idsFor(
         "lesson_plan_class",
         planId,
@@ -301,6 +335,8 @@ export class PlansRepository {
       contents: review.suggestion.contents,
       methodology: review.suggestion.methodology,
       evaluationStrategy: review.suggestion.evaluationStrategy,
+      durationMinutes: plan.durationMinutes,
+      references: plan.references,
       classIds: await this.idsFor(
         "lesson_plan_class",
         planId,
@@ -335,7 +371,8 @@ export class PlansRepository {
   ): Promise<"approved" | "not_found" | "review_required"> {
     const result = (await this.database.query(
       `UPDATE lesson_plan SET status = 'approved', approved_at = now()
-       WHERE id = $1 AND professor_id = $2 AND status = 'reviewed'
+       WHERE id = $1 AND professor_id = $2
+         AND status IN ('draft', 'reviewed')
        RETURNING id`,
       [planId, professorId],
     )) as QueryResult<{ id: string }>;
@@ -347,58 +384,75 @@ export class PlansRepository {
   private async assertReferences(
     professorId: string,
     input: LessonPlanInput,
+    database: QueryClient = this.database,
   ): Promise<void> {
-    const classes = (await this.database.query(
+    const classes = (await database.query(
       `SELECT id FROM class_group WHERE professor_id = $1 AND id = ANY($2::uuid[])`,
       [professorId, input.classIds],
     )) as QueryResult<{ id: string }>;
     if (classes.rows.length !== new Set(input.classIds).size)
       throw new Error("CLASS_NOT_FOUND");
     if (input.materialIds.length > 0) {
-      const materials = (await this.database.query(
-        `SELECT id FROM material WHERE professor_id = $1 AND id = ANY($2::uuid[])`,
-        [professorId, input.materialIds],
+      const materials = (await database.query(
+        `SELECT DISTINCT material.id FROM material
+         JOIN material_class ON material_class.material_id = material.id
+         WHERE material.professor_id = $1 AND material.id = ANY($2::uuid[])
+           AND material.archived_at IS NULL
+           AND material_class.class_group_id = ANY($3::uuid[])`,
+        [professorId, input.materialIds, input.classIds],
       )) as QueryResult<{ id: string }>;
       if (materials.rows.length !== new Set(input.materialIds).size)
         throw new Error("MATERIAL_NOT_FOUND");
     }
     if (input.syllabusId) {
-      const syllabus = (await this.database.query(
-        "SELECT id FROM syllabus WHERE id = $1",
-        [input.syllabusId],
+      const syllabus = (await database.query(
+        `SELECT id FROM syllabus WHERE id = $1
+           AND lower(curricular_component) = lower($2)
+           AND lower(school_year) = lower($3)`,
+        [input.syllabusId, input.curricularComponent, input.schoolYear],
       )) as QueryResult<{ id: string }>;
       if (!syllabus.rows[0]) throw new Error("SYLLABUS_NOT_FOUND");
+    }
+    if (input.bnccSkillIds.length > 0) {
+      const skills = (await database.query(
+        `SELECT id FROM bncc_skill WHERE id = ANY($1::uuid[])
+           AND syllabus_id = $2`,
+        [input.bnccSkillIds, input.syllabusId ?? null],
+      )) as QueryResult<{ id: string }>;
+      if (skills.rows.length !== new Set(input.bnccSkillIds).size)
+        throw new Error("BNCC_SKILL_NOT_FOUND");
     }
   }
 
   private async replaceLinks(
     planId: string,
     input: LessonPlanInput,
+    database: QueryClient = this.database,
   ): Promise<void> {
-    await this.database.query(
+    await database.query(
       "DELETE FROM lesson_plan_class WHERE lesson_plan_id = $1",
       [planId],
     );
-    await this.database.query(
+    await database.query(
       "DELETE FROM lesson_plan_bncc_skill WHERE lesson_plan_id = $1",
       [planId],
     );
-    await this.database.query(
+    await database.query(
       "DELETE FROM lesson_plan_material WHERE lesson_plan_id = $1",
       [planId],
     );
     for (const id of input.classIds)
-      await this.database.query(
+      await database.query(
         "INSERT INTO lesson_plan_class (lesson_plan_id, class_group_id) VALUES ($1, $2)",
         [planId, id],
       );
     for (const id of input.bnccSkillIds)
-      await this.database.query(
+      await database.query(
         "INSERT INTO lesson_plan_bncc_skill (lesson_plan_id, bncc_skill_id) VALUES ($1, $2)",
         [planId, id],
       );
     for (const id of input.materialIds)
-      await this.database.query(
+      await database.query(
         "INSERT INTO lesson_plan_material (lesson_plan_id, material_id) VALUES ($1, $2)",
         [planId, id],
       );
@@ -411,8 +465,9 @@ export class PlansRepository {
     origin = "manual",
     model: string | null = null,
     generationId: string | null = null,
+    database: QueryClient = this.database,
   ): Promise<void> {
-    await this.database.query(
+    await database.query(
       `INSERT INTO lesson_plan_revision
        (lesson_plan_id, version, snapshot, origin, model, generation_id)
        VALUES ($1, $2, $3::jsonb, $4, $5, $6)`,
@@ -428,8 +483,11 @@ export class PlansRepository {
     return result.rows[0]!.version;
   }
 
-  private async nextVersion(planId: string): Promise<number> {
-    const result = (await this.database.query(
+  private async nextVersion(
+    planId: string,
+    database: QueryClient = this.database,
+  ): Promise<number> {
+    const result = (await database.query(
       "SELECT COALESCE(MAX(version), 0) + 1 AS version FROM lesson_plan_revision WHERE lesson_plan_id = $1",
       [planId],
     )) as QueryResult<{ version: number }>;
@@ -440,8 +498,9 @@ export class PlansRepository {
     table: string,
     planId: string,
     column: string,
+    database: QueryClient = this.database,
   ): Promise<string[]> {
-    const result = (await this.database.query(
+    const result = (await database.query(
       `SELECT ${column} AS id FROM ${table} WHERE lesson_plan_id = $1`,
       [planId],
     )) as QueryResult<{ id: string }>;
@@ -452,12 +511,16 @@ export class PlansRepository {
     return `SELECT lesson_plan.id, lesson_plan.professor_id, lesson_plan.title,
       lesson_plan.curricular_component, lesson_plan.school_year,
       lesson_plan.objectives, lesson_plan.contents, lesson_plan.methodology,
-      lesson_plan.evaluation_strategy, lesson_plan.syllabus_id,
+      lesson_plan.evaluation_strategy, lesson_plan.duration_minutes,
+      lesson_plan.reference_notes, lesson_plan.syllabus_id,
       syllabus.description AS syllabus_description, lesson_plan.archived_at,
       lesson_plan.status, lesson_plan.reviewed_at, lesson_plan.approved_at,
       lesson_plan.created_at, lesson_plan.updated_at,
+      COALESCE(array_agg(DISTINCT class_group.id) FILTER (WHERE class_group.id IS NOT NULL), '{}') AS class_ids,
       COALESCE(array_agg(DISTINCT class_group.name) FILTER (WHERE class_group.name IS NOT NULL), '{}') AS class_names,
+      COALESCE(array_agg(DISTINCT bncc_skill.id) FILTER (WHERE bncc_skill.id IS NOT NULL), '{}') AS bncc_skill_ids,
       COALESCE(array_agg(DISTINCT bncc_skill.code) FILTER (WHERE bncc_skill.code IS NOT NULL), '{}') AS bncc_codes,
+      COALESCE(array_agg(DISTINCT material.id) FILTER (WHERE material.id IS NOT NULL), '{}') AS material_ids,
       COALESCE(array_agg(DISTINCT material.title) FILTER (WHERE material.title IS NOT NULL), '{}') AS material_titles,
       EXISTS (SELECT 1 FROM published_lesson_plan_link published WHERE published.lesson_plan_id = lesson_plan.id) AS is_locked
       , generation.id AS generation_id, generation.version AS generation_version,
@@ -497,10 +560,12 @@ export class PlansRepository {
       contents: row.contents,
       methodology: row.methodology,
       evaluationStrategy: row.evaluation_strategy,
-      classIds: [],
+      durationMinutes: row.duration_minutes,
+      references: row.reference_notes,
+      classIds: row.class_ids,
       syllabusId: row.syllabus_id,
-      bnccSkillIds: [],
-      materialIds: [],
+      bnccSkillIds: row.bncc_skill_ids,
+      materialIds: row.material_ids,
       classNames: row.class_names,
       syllabusDescription: row.syllabus_description,
       bnccCodes: row.bncc_codes,
@@ -532,5 +597,17 @@ export class PlansRepository {
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
     };
+  }
+
+  private async getUsing(
+    database: QueryClient,
+    professorId: string,
+    planId: string,
+  ): Promise<LessonPlan | null> {
+    const result = (await database.query(this.planQuery(true), [
+      professorId,
+      planId,
+    ])) as QueryResult<PlanRow>;
+    return result.rows[0] ? this.toPlan(result.rows[0]) : null;
   }
 }

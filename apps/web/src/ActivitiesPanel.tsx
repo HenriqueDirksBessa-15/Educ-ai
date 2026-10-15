@@ -109,7 +109,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     setSelected(null);
     setTitle("");
     setDescription("");
-    setLessonPlanId(plans[0]?.id ?? "");
+    setLessonPlanId(plans.find((plan) => plan.status === "approved")?.id ?? "");
     setType("objective");
     setDifficulty("medium");
     setDueAt("");
@@ -609,7 +609,9 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
             >
               <option value="">Selecione um plano</option>
               {plans
-                .filter((plan) => !plan.isArchived)
+                .filter(
+                  (plan) => !plan.isArchived && plan.status === "approved",
+                )
                 .map((plan) => (
                   <option key={plan.id} value={plan.id}>
                     {plan.title}

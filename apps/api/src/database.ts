@@ -1,7 +1,34 @@
 import { Pool } from "pg";
 
-export interface DatabaseClient {
+export interface QueryClient {
   query(text: string, values?: unknown[]): Promise<unknown>;
+}
+
+export interface DatabaseClient extends QueryClient {
+  connect?: () => Promise<TransactionClient>;
+}
+
+export interface TransactionClient extends QueryClient {
+  release(): void;
+}
+
+export async function withTransaction<T>(
+  database: DatabaseClient,
+  operation: (client: QueryClient) => Promise<T>,
+): Promise<T> {
+  if (!database.connect) return operation(database);
+  const client = await database.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await operation(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export function createDatabasePool(databaseUrl: string): Pool {
