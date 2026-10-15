@@ -1,6 +1,28 @@
 # Progresso
 
-Atualizado em 14/10/2026.
+Atualizado em 15/10/2026.
+
+## Ciclo vertical — CV-B1: materiais por link
+
+Concluído em 15/10/2026 o cadastro de materiais externos utilizáveis:
+
+- contrato estrito para links HTTP(S), sem aceitar `storageKey` ou metadados de
+  arquivo enviados pelo navegador;
+- criação atômica do material e dos vínculos com turmas/habilidades em uma única
+  instrução PostgreSQL;
+- isolamento por professor, retorno dos IDs reais vinculados e filtro explícito
+  entre materiais ativos e arquivados;
+- interface para selecionar turma, cadastrar título, descrição, categoria e URL,
+  atualizar a lista e abrir o recurso com `noopener noreferrer`;
+- limpeza da suíte PostgreSQL limitada às conexões do próprio usuário de teste.
+
+Verificações: `npm run check` aprovado (15 contratos, 80 API e 7 web); 7 testes
+PostgreSQL aprovados em banco temporário, incluindo atomicidade, isolamento e
+arquivamento do material; smoke OpenAI ignorado por ser opt-in. A base temporária
+foi removida e o proxy encerrado. Nenhuma migração foi aplicada ao banco
+`educai`, nenhuma API externa foi chamada e nenhum bucket foi criado. O roteiro
+e as decisões estão em
+[`ciclo-vertical/04-cv-b1-materiais-link.md`](./ciclo-vertical/04-cv-b1-materiais-link.md).
 
 ## Ciclo vertical — CV-A2: turmas, roster e currículo
 

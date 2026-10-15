@@ -12,11 +12,37 @@ import {
   classCreateSchema,
   identitySchema,
   integrationStatusSchema,
+  materialLinkInputSchema,
   professorProfileUpdateSchema,
   readyResponseSchema,
 } from "./index.js";
 
 describe("shared contracts", () => {
+  it("accepts only unique HTTP(S) links bound to classes", () => {
+    const valid = {
+      title: "Guia de frações",
+      description: "Leitura complementar.",
+      category: "reading" as const,
+      classIds: ["11111111-1111-4111-8111-111111111111"],
+      bnccSkillIds: ["21111111-1111-4111-8111-111111111111"],
+      url: "https://example.invalid/guia",
+    };
+
+    expect(materialLinkInputSchema.parse(valid).url).toBe(valid.url);
+    expect(() =>
+      materialLinkInputSchema.parse({ ...valid, url: "file:///segredo.pdf" }),
+    ).toThrow();
+    expect(() =>
+      materialLinkInputSchema.parse({
+        ...valid,
+        classIds: [valid.classIds[0], valid.classIds[0]],
+      }),
+    ).toThrow();
+    expect(() =>
+      materialLinkInputSchema.parse({ ...valid, storageKey: "private/key" }),
+    ).toThrow();
+  });
+
   it("requires Google as the identity provider", () => {
     expect(() =>
       identitySchema.parse({

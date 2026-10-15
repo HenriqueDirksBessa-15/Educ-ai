@@ -275,7 +275,9 @@ h1 {
   font-weight: 700;
 }
 
-.plan-form input {
+.plan-form input,
+.plan-form select,
+.plan-form textarea {
   min-width: 0;
   border: 1px solid #b8d8d0;
   border-radius: 0.65rem;
@@ -283,6 +285,15 @@ h1 {
   color: #15332f;
   font: inherit;
   background: #ffffff;
+}
+
+.material-form textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.resource-list a {
+  color: #087f6b;
 }
 
 .form-message {

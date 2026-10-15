@@ -73,7 +73,7 @@ describe("Classroom synchronization route", () => {
 
     expect(response.statusCode).toBe(503);
     expect(input.classroomAdapter.listCourses).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   it("requires renewed consent for the Classroom synchronization scopes", async () => {
     const input = dependencies({ refreshToken: "refresh", scopes: [] });

@@ -23,6 +23,7 @@ import { BulletinService } from "../../src/bulletins/service.js";
 import { FixtureBulletinEmailSender } from "../../src/bulletins/email.js";
 import { RetentionService } from "../../src/privacy/retention.js";
 import { ClassesRepository } from "../../src/classes/repository.js";
+import { TimelineRepository } from "../../src/timeline/repository.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -48,7 +49,8 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
   afterAll(async () => {
     if (testPool) await testPool.end();
     await adminPool.query(
-      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1",
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+       WHERE datname = $1 AND usename = current_user AND pid <> pg_backend_pid()`,
       [databaseName],
     );
     await adminPool.query(`DROP DATABASE IF EXISTS "${databaseName}"`);
@@ -194,6 +196,77 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     });
     expect(detail?.students).toHaveLength(1);
     expect(await repository.getDetail(professorB, classId)).toBeNull();
+  }, 60_000);
+
+  it("creates material links atomically and isolates them by professor", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Material A'), ($3, $4, 'Professor Material B')
+       RETURNING id`,
+      [
+        `material-a-${randomUUID()}`,
+        `material-a-${randomUUID()}@example.invalid`,
+        `material-b-${randomUUID()}`,
+        `material-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const professorA = professors.rows[0]!.id;
+    const professorB = professors.rows[1]!.id;
+    const classes = new ClassesRepository(testPool);
+    const classA = await classes.create(professorA, {
+      name: "Turma de materiais A",
+      schoolYear: "8º ano EF",
+      localAccessCode: `mat-a-${randomUUID().slice(0, 8)}`,
+    });
+    const classB = await classes.create(professorB, {
+      name: "Turma de materiais B",
+      schoolYear: "8º ano EF",
+      localAccessCode: `mat-b-${randomUUID().slice(0, 8)}`,
+    });
+    const repository = new TimelineRepository(testPool);
+    const before = await testPool.query<{ count: string }>(
+      "SELECT count(*) FROM material WHERE professor_id = $1",
+      [professorA],
+    );
+
+    await expect(
+      repository.createMaterialLink(professorA, {
+        title: "Material alheio",
+        category: "link",
+        classIds: [classB],
+        bnccSkillIds: [],
+        url: "https://example.invalid/alheio",
+      }),
+    ).rejects.toThrow("MATERIAL_RELATION_NOT_FOUND");
+    const afterRejected = await testPool.query<{ count: string }>(
+      "SELECT count(*) FROM material WHERE professor_id = $1",
+      [professorA],
+    );
+    expect(afterRejected.rows[0]!.count).toBe(before.rows[0]!.count);
+
+    const materialId = await repository.createMaterialLink(professorA, {
+      title: "Guia de frações",
+      description: "Leitura de apoio",
+      category: "reading",
+      classIds: [classA],
+      bnccSkillIds: [],
+      url: "https://example.invalid/guia",
+    });
+    expect(await repository.listMaterials(professorB)).toEqual([]);
+    expect(await repository.listMaterials(professorA)).toEqual([
+      expect.objectContaining({
+        id: materialId,
+        classIds: [classA],
+        classNames: ["Turma de materiais A"],
+        url: "https://example.invalid/guia",
+      }),
+    ]);
+
+    expect(await repository.archiveMaterial(professorA, materialId)).toBe(true);
+    expect(await repository.listMaterials(professorA)).toEqual([]);
+    expect(await repository.listMaterials(professorA, undefined, true)).toEqual(
+      [expect.objectContaining({ id: materialId, isArchived: true })],
+    );
   }, 60_000);
 
   it("seeds fictitious isolated data repeatedly without duplication", async () => {

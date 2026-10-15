@@ -12,6 +12,7 @@ import type {
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { ClassesPanel } from "./ClassesPanel";
+import { MaterialsPanel } from "./MaterialsPanel";
 
 const ActivitiesPanel = lazy(() =>
   import("./ActivitiesPanel").then((module) => ({
@@ -243,19 +244,28 @@ function ProfessorShell({
     setClasses(Array.isArray(body.data) ? body.data : []);
   }, []);
 
+  const loadMaterials = useCallback(async () => {
+    const response = await fetch(`${apiBaseUrl}/materials`, {
+      credentials: "include",
+    });
+    if (!response.ok) return;
+    const body = (await response.json()) as DataEnvelope<Material[]>;
+    setMaterials(Array.isArray(body.data) ? body.data : []);
+  }, []);
+
   useEffect(() => {
     void Promise.all([
       fetch(`${apiBaseUrl}/timeline/milestones`, { credentials: "include" }),
-      fetch(`${apiBaseUrl}/materials`, { credentials: "include" }),
       fetch(`${apiBaseUrl}/lesson-plans`, { credentials: "include" }),
       loadClasses(),
+      loadMaterials(),
     ])
       .then(
         async ([
           milestoneResponse,
-          materialResponse,
           plansResponse,
           _classesLoaded,
+          _materialsLoaded,
         ]) => {
           const read = async <T,>(response: Response): Promise<T[]> => {
             if (!response.ok) return [];
@@ -263,12 +273,11 @@ function ProfessorShell({
             return Array.isArray(body.data) ? body.data : [];
           };
           setMilestones(await read<Milestone>(milestoneResponse));
-          setMaterials(await read<Material>(materialResponse));
           setPlans(await read<LessonPlan>(plansResponse));
         },
       )
       .catch(() => undefined);
-  }, [loadClasses]);
+  }, [loadClasses, loadMaterials]);
 
   return (
     <>
@@ -311,6 +320,7 @@ function ProfessorShell({
         milestones={milestones}
         materials={materials}
         classes={classes}
+        reloadMaterials={loadMaterials}
       />
       <LessonPlansPanel plans={plans} classes={classes} />
       <Suspense fallback={<p className="empty-state">Carregando módulos…</p>}>
@@ -327,10 +337,12 @@ function TimelinePanel({
   milestones,
   materials,
   classes,
+  reloadMaterials,
 }: {
   milestones: Milestone[];
   materials: Material[];
   classes: ClassSummary[];
+  reloadMaterials: () => Promise<void>;
 }) {
   return (
     <section className="timeline-panel" aria-labelledby="timeline-title">
@@ -367,22 +379,11 @@ function TimelinePanel({
             </ul>
           )}
         </div>
-        <div>
-          <h3>Materiais recentes</h3>
-          {materials.length === 0 ? (
-            <p className="empty-state">Nenhum material cadastrado.</p>
-          ) : (
-            <ul className="resource-list">
-              {materials.slice(0, 5).map((material) => (
-                <li key={material.id}>
-                  <strong>{material.title}</strong>
-                  <span>{material.category}</span>
-                  <small>{material.classNames.join(", ")}</small>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <MaterialsPanel
+          materials={materials}
+          classes={classes}
+          reload={reloadMaterials}
+        />
       </div>
     </section>
   );

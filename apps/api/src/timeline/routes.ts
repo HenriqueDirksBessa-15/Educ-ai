@@ -1,6 +1,6 @@
 import {
-  materialCategorySchema,
-  materialInputSchema,
+  materialLinkInputSchema,
+  materialListQuerySchema,
   milestoneCreateSchema,
   milestoneUpdateSchema,
 } from "@educai/contracts";
@@ -102,42 +102,49 @@ export function registerTimelineRoutes(
     return reply.code(204).send();
   });
 
-  app.get<{ Querystring: { category?: string } }>(
+  app.get<{ Querystring: unknown }>(
     "/api/materials",
     async (request, reply) => {
       const user = await identity(request, reply);
       if (!user) return;
-      const category = request.query.category
-        ? materialCategorySchema.safeParse(request.query.category)
-        : null;
-      if (category && !category.success) return validationError(reply);
+      const query = materialListQuerySchema.safeParse(request.query);
+      if (!query.success) return validationError(reply);
       return {
         data: await dependencies.timelineRepository.listMaterials(
           user.professorId,
-          category?.data,
+          query.data.category,
+          query.data.archived ?? false,
         ),
       };
     },
   );
 
-  app.post<{ Body: unknown }>("/api/materials", async (request, reply) => {
+  const createMaterialLink = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) => {
     const user = await identity(request, reply);
     if (!user) return;
-    const parsed = materialInputSchema.safeParse(request.body);
-    if (!parsed.success || (!parsed.data.url && !parsed.data.storageKey))
-      return validationError(reply);
+    const parsed = materialLinkInputSchema.safeParse(request.body);
+    if (!parsed.success) return validationError(reply);
     try {
-      const id = await dependencies.timelineRepository.createMaterial(
+      const id = await dependencies.timelineRepository.createMaterialLink(
         user.professorId,
         parsed.data,
       );
       return reply.code(201).send({ data: { id } });
     } catch (error) {
-      if (error instanceof Error && error.message === "CLASS_NOT_FOUND")
-        return notFound(reply, "Uma das turmas não foi encontrada.");
+      if (
+        error instanceof Error &&
+        error.message === "MATERIAL_RELATION_NOT_FOUND"
+      )
+        return notFound(reply, "Uma turma ou habilidade não foi encontrada.");
       throw error;
     }
-  });
+  };
+
+  app.post("/api/materials/links", createMaterialLink);
+  app.post("/api/materials", createMaterialLink);
 
   app.post<{ Params: { materialId: string } }>(
     "/api/materials/:materialId/archive",

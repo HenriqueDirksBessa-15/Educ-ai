@@ -1,6 +1,6 @@
 import type {
   Material,
-  MaterialInput,
+  MaterialLinkInput,
   Milestone,
   MilestoneCreate,
   MilestoneUpdate,
@@ -32,6 +32,8 @@ type MaterialRow = {
   archived_at: Date | null;
   created_at: Date;
   class_names: string[];
+  class_ids: string[];
+  bncc_skill_ids: string[];
   has_published_content: boolean;
 };
 
@@ -127,64 +129,74 @@ export class TimelineRepository {
   async listMaterials(
     professorId: string,
     category?: Material["category"],
+    archived = false,
   ): Promise<Material[]> {
     const result = (await this.database.query(
       `SELECT material.id, material.title, material.description, material.category,
               material.url, material.file_name, material.mime_type, material.size_bytes,
               material.storage_key, material.archived_at, material.created_at,
+              COALESCE(array_agg(DISTINCT class_group.id) FILTER (WHERE class_group.id IS NOT NULL), '{}') AS class_ids,
               COALESCE(array_agg(DISTINCT class_group.name) FILTER (WHERE class_group.name IS NOT NULL), '{}') AS class_names,
+              COALESCE(array_agg(DISTINCT material_bncc_skill.bncc_skill_id) FILTER (WHERE material_bncc_skill.bncc_skill_id IS NOT NULL), '{}') AS bncc_skill_ids,
               EXISTS (SELECT 1 FROM published_material_link link
                       WHERE link.material_id = material.id) AS has_published_content
        FROM material
        LEFT JOIN material_class ON material_class.material_id = material.id
        LEFT JOIN class_group ON class_group.id = material_class.class_group_id
+       LEFT JOIN material_bncc_skill ON material_bncc_skill.material_id = material.id
        WHERE material.professor_id = $1 AND ($2::material_category IS NULL OR material.category = $2)
+         AND ((material.archived_at IS NOT NULL) IS NOT DISTINCT FROM $3::boolean)
        GROUP BY material.id
        ORDER BY material.created_at DESC, material.id`,
-      [professorId, category ?? null],
+      [professorId, category ?? null, archived],
     )) as QueryResult<MaterialRow>;
     return result.rows.map((row) => this.toMaterial(row));
   }
 
-  async createMaterial(
+  async createMaterialLink(
     professorId: string,
-    input: MaterialInput,
+    input: MaterialLinkInput,
   ): Promise<string> {
-    const classes = (await this.database.query(
-      `SELECT id FROM class_group WHERE professor_id = $1 AND id = ANY($2::uuid[])`,
-      [professorId, input.classIds],
-    )) as QueryResult<{ id: string }>;
-    if (classes.rows.length !== new Set(input.classIds).size)
-      throw new Error("CLASS_NOT_FOUND");
     const result = (await this.database.query(
-      `INSERT INTO material
-       (professor_id, title, description, category, url, file_name, mime_type, size_bytes, storage_key)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      `WITH requested_classes AS (
+         SELECT unnest($2::uuid[]) AS id
+       ), owned_classes AS (
+         SELECT class_group.id FROM class_group
+         JOIN requested_classes ON requested_classes.id = class_group.id
+         WHERE class_group.professor_id = $1
+       ), requested_skills AS (
+         SELECT unnest($3::uuid[]) AS id
+       ), valid_skills AS (
+         SELECT bncc_skill.id FROM bncc_skill
+         JOIN requested_skills ON requested_skills.id = bncc_skill.id
+       ), inserted_material AS (
+         INSERT INTO material (professor_id, title, description, category, url)
+         SELECT $1, $4, $5, $6, $7
+         WHERE (SELECT count(*) FROM owned_classes) = cardinality($2::uuid[])
+           AND (SELECT count(*) FROM valid_skills) = cardinality($3::uuid[])
+         RETURNING id
+       ), linked_classes AS (
+         INSERT INTO material_class (material_id, class_group_id)
+         SELECT inserted_material.id, owned_classes.id
+         FROM inserted_material CROSS JOIN owned_classes
+       ), linked_skills AS (
+         INSERT INTO material_bncc_skill (material_id, bncc_skill_id)
+         SELECT inserted_material.id, valid_skills.id
+         FROM inserted_material CROSS JOIN valid_skills
+       )
+       SELECT id FROM inserted_material`,
       [
         professorId,
+        input.classIds,
+        input.bnccSkillIds,
         input.title,
         input.description ?? null,
         input.category,
-        input.url ?? null,
-        input.fileName ?? null,
-        input.mimeType ?? null,
-        input.sizeBytes ?? null,
-        input.storageKey ?? null,
+        input.url,
       ],
     )) as QueryResult<{ id: string }>;
-    const materialId = result.rows[0]!.id;
-    for (const classId of input.classIds) {
-      await this.database.query(
-        "INSERT INTO material_class (material_id, class_group_id) VALUES ($1, $2)",
-        [materialId, classId],
-      );
-    }
-    for (const skillId of input.bnccSkillIds) {
-      await this.database.query(
-        "INSERT INTO material_bncc_skill (material_id, bncc_skill_id) VALUES ($1, $2)",
-        [materialId, skillId],
-      );
-    }
+    const materialId = result.rows[0]?.id;
+    if (!materialId) throw new Error("MATERIAL_RELATION_NOT_FOUND");
     return materialId;
   }
 
@@ -241,8 +253,8 @@ export class TimelineRepository {
       title: row.title,
       description: row.description,
       category: row.category,
-      classIds: [],
-      bnccSkillIds: [],
+      classIds: row.class_ids,
+      bnccSkillIds: row.bncc_skill_ids,
       url: row.url,
       fileName: row.file_name,
       mimeType: row.mime_type,

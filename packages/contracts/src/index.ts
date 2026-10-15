@@ -253,6 +253,38 @@ export const materialInputSchema = z.object({
   storageKey: z.string().trim().max(500).nullable().optional(),
 });
 
+export const materialLinkInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160),
+    description: z.string().trim().max(2_000).nullable().optional(),
+    category: materialCategorySchema,
+    classIds: z.array(z.uuid()).min(1),
+    bnccSkillIds: z.array(z.uuid()).default([]),
+    url: z
+      .url()
+      .refine(
+        (value) => ["http:", "https:"].includes(new URL(value).protocol),
+        {
+          message: "O material deve usar HTTP ou HTTPS.",
+        },
+      ),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.classIds).size !== value.classIds.length)
+      context.addIssue({
+        code: "custom",
+        path: ["classIds"],
+        message: "Cada turma deve aparecer uma única vez.",
+      });
+    if (new Set(value.bnccSkillIds).size !== value.bnccSkillIds.length)
+      context.addIssue({
+        code: "custom",
+        path: ["bnccSkillIds"],
+        message: "Cada habilidade deve aparecer uma única vez.",
+      });
+  });
+
 export const materialSchema = materialInputSchema.extend({
   id: z.uuid(),
   classNames: z.array(z.string().min(1)),
@@ -982,6 +1014,7 @@ export type MilestoneUpdate = z.infer<typeof milestoneUpdateSchema>;
 export type MaterialCategory = z.infer<typeof materialCategorySchema>;
 export type Material = z.infer<typeof materialSchema>;
 export type MaterialInput = z.infer<typeof materialInputSchema>;
+export type MaterialLinkInput = z.infer<typeof materialLinkInputSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type LessonPlanInput = z.infer<typeof lessonPlanInputSchema>;
 export type LessonPlanUpdate = z.infer<typeof lessonPlanUpdateSchema>;
