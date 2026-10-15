@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { Pool } from "pg";
@@ -15,8 +16,14 @@ import { runMigrations } from "../../src/db/migrations.js";
 import { findRepositoryRoot } from "../../src/db/paths.js";
 import { runSeeds } from "../../src/db/seeds.js";
 import { CorrectionsRepository } from "../../src/corrections/repository.js";
-import { gradeObjectiveAnswers } from "../../src/corrections/objective-grader.js";
+import { ActivityCollectionService } from "../../src/corrections/collection.js";
+import {
+  FixtureGoogleResponseCollector,
+  type GoogleFormsResponseFixtureV1,
+} from "../../src/corrections/google-response-collector.js";
 import { DiscursiveCorrectionsRepository } from "../../src/corrections/discursive-repository.js";
+import { SubmissionReleaseService } from "../../src/corrections/release.js";
+import { FixtureClassroomGradeReturner } from "../../src/corrections/classroom-return.js";
 import { FeedbackRepository } from "../../src/feedback/repository.js";
 import { BulletinsRepository } from "../../src/bulletins/repository.js";
 import { BulletinService } from "../../src/bulletins/service.js";
@@ -29,6 +36,19 @@ import { PlansRepository } from "../../src/plans/repository.js";
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
 const describeWithDatabase = baseUrl ? describe : describe.skip;
+const formsResponseFixture = JSON.parse(
+  readFileSync(
+    join(
+      findRepositoryRoot(),
+      "apps",
+      "api",
+      "tests",
+      "fixtures",
+      "google-forms-responses-v1.json",
+    ),
+    "utf8",
+  ),
+) as GoogleFormsResponseFixtureV1;
 
 describeWithDatabase("PostgreSQL migrations and seeds", () => {
   const databaseName = `educai_test_${randomUUID().replaceAll("-", "")}`;
@@ -653,58 +673,62 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(
       await corrections.startCollection(otherProfessor.rows[0]!.id, activityId),
     ).toBe("not_found");
-    const lease = await corrections.startCollection(professorId, activityId);
-    expect(lease).toMatchObject({ googleFormId: "form-fixture-1" });
     const student = await testPool.query<{ email: string }>(
       `SELECT student.email::text
        FROM student JOIN enrollment ON enrollment.student_id = student.id
        WHERE enrollment.class_group_id = $1 LIMIT 1`,
       [classId],
     );
-    const collected = {
-      externalResponseId: "response-fixture-1",
-      respondentEmail: student.rows[0]!.email,
-      submittedAt: "2026-10-20T17:00:00.000Z",
-      rawPayload: { responseId: "response-fixture-1" },
-      answers: [
-        { externalQuestionId: "q1", questionPosition: 0, answerText: "0,5" },
-        {
-          externalQuestionId: "q2",
-          questionPosition: 1,
-          answerText: "Metade do inteiro.",
-        },
-      ],
+    const corpus = structuredClone(formsResponseFixture);
+    for (const response of corpus.pages.flatMap(
+      (page) => page.responses ?? [],
+    )) {
+      if (
+        ["response-fixture-1", "response-empty-objective"].includes(
+          response.responseId ?? "",
+        )
+      )
+        response.respondentEmail = student.rows[0]!.email;
+    }
+    const collectionAuth = {
+      getCredential: vi.fn().mockResolvedValue({
+        accessToken: "fixture-token",
+        scopes: [],
+      }),
+      saveCredential: vi.fn(),
     };
-    const published = await repository.get(professorId, activityId);
+    const collectionService = new ActivityCollectionService(
+      repository,
+      corrections,
+      collectionAuth as unknown as AuthRepository,
+      new FixtureGoogleResponseCollector(corpus),
+    );
+    await expect(
+      collectionService.collect(otherProfessor.rows[0]!.id, activityId),
+    ).resolves.toEqual({ status: "not_found" });
+    await expect(
+      collectionService.collect(professorId, activityId),
+    ).resolves.toMatchObject({
+      status: "collected",
+      summary: {
+        submissionCount: 4,
+        manualReviewCount: 3,
+      },
+    });
+    await expect(
+      collectionService.collect(professorId, activityId),
+    ).resolves.toMatchObject({
+      status: "collected",
+      summary: {
+        attemptCount: 2,
+        submissionCount: 4,
+        manualReviewCount: 3,
+      },
+    });
     const reconciliation = await corrections.reconcileStudent(
       professorId,
       activityId,
-      collected.respondentEmail,
-    );
-    const grading = gradeObjectiveAnswers(published!, collected.answers);
-    expect(
-      await corrections.persistSubmission(
-        professorId,
-        activityId,
-        collected,
-        reconciliation,
-        grading,
-      ),
-    ).toEqual({ created: true, manualReview: false });
-    expect(
-      await corrections.persistSubmission(
-        professorId,
-        activityId,
-        collected,
-        reconciliation,
-        grading,
-      ),
-    ).toEqual({ created: false, manualReview: false });
-    await corrections.completeCollection(
-      professorId,
-      activityId,
-      (lease as { runId: string }).runId,
-      { received: 1, created: 1, updated: 0, manualReview: 0 },
+      student.rows[0]!.email,
     );
     const collectedSummary = await corrections.getSummary(
       professorId,
@@ -712,16 +736,23 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     );
     expect(collectedSummary).toMatchObject({
       status: "completed",
-      submissionCount: 1,
-      submissions: [
-        {
-          status: "collected",
-          grade: null,
-          objectivePointsAwarded: 2,
-        },
-      ],
+      attemptCount: 2,
+      submissionCount: 4,
+      manualReviewCount: 3,
     });
-    const submission = collectedSummary!.submissions[0]!;
+    expect(
+      collectedSummary!.submissions.filter(
+        (item) => item.status === "manual_review_required",
+      ),
+    ).toHaveLength(3);
+    const submission = collectedSummary!.submissions.find(
+      (item) => item.externalResponseId === "response-fixture-1",
+    )!;
+    expect(submission).toMatchObject({
+      status: "collected",
+      grade: null,
+      objectivePointsAwarded: 2,
+    });
     const discursiveAnswer = submission.answers.find(
       (answer) => answer.kind === "discursive",
     )!;
@@ -771,31 +802,38 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await discursiveRepository.approve(professorId, submission.id)).toBe(
       "approved",
     );
-    expect(
-      await discursiveRepository.markReleased(
-        professorId,
-        submission.id,
-        "not_available",
-      ),
-    ).toBe(true);
+    const releaseService = new SubmissionReleaseService(
+      discursiveRepository,
+      collectionAuth as unknown as AuthRepository,
+      new FixtureClassroomGradeReturner(),
+    );
+    await expect(
+      releaseService.release(professorId, submission.id),
+    ).resolves.toEqual({
+      status: "released",
+      classroomStatus: "not_available",
+    });
+    await expect(
+      releaseService.release(professorId, submission.id),
+    ).resolves.toEqual({ status: "already_released" });
     const correctedSummary = await corrections.getSummary(
       professorId,
       activityId,
     );
-    expect(correctedSummary).toMatchObject({
-      gradedCount: 1,
-      submissions: [
-        {
-          correctionStatus: "released",
-          grade: 8,
-          classroomReturnStatus: "not_available",
-          correctionHistory: [
-            { version: 1, action: "ai_suggestion" },
-            { version: 2, action: "teacher_revision" },
-            { version: 3, action: "approval" },
-            { version: 4, action: "release" },
-          ],
-        },
+    expect(correctedSummary?.gradedCount).toBe(1);
+    expect(
+      correctedSummary?.submissions.find(
+        (item) => item.externalResponseId === "response-fixture-1",
+      ),
+    ).toMatchObject({
+      correctionStatus: "released",
+      grade: 8,
+      classroomReturnStatus: "not_available",
+      correctionHistory: [
+        { version: 1, action: "ai_suggestion" },
+        { version: 2, action: "teacher_revision" },
+        { version: 3, action: "approval" },
+        { version: 4, action: "release" },
       ],
     });
     await expect(
@@ -1016,7 +1054,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     ).rejects.toThrow("feedback history is immutable");
     expect(await repository.archive(professorId, activityId)).toBe(true);
     const archived = await repository.get(professorId, activityId);
-    expect(archived?.responseCount).toBe(1);
+    expect(archived?.responseCount).toBe(3);
     expect(archived?.archivedAt).not.toBeNull();
   }, 60_000);
 

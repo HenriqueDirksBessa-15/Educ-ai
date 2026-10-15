@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ProductionGoogleResponseCollector } from "./google-response-collector.js";
+import {
+  FixtureGoogleResponseCollector,
+  ProductionGoogleResponseCollector,
+} from "./google-response-collector.js";
 
 describe("Google Forms response collector", () => {
   it("paginates responses without trusting the mutable Form order", async () => {
@@ -27,6 +30,33 @@ describe("Google Forms response collector", () => {
       answerText: "A",
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("replays a versioned raw Forms corpus without external calls", async () => {
+    const collector = new FixtureGoogleResponseCollector({
+      version: 1,
+      formId: "form-1",
+      pages: [
+        { responses: [response("r1", "q1", "A")] },
+        { responses: [response("r2", "q2", "")] },
+      ],
+    });
+
+    const result = await collector.collect({ scopes: [] }, "form-1");
+
+    expect(result.submissions).toEqual([
+      expect.objectContaining({
+        externalResponseId: "r1",
+        answers: [expect.objectContaining({ answerText: "A" })],
+      }),
+      expect.objectContaining({
+        externalResponseId: "r2",
+        answers: [expect.objectContaining({ answerText: "" })],
+      }),
+    ]);
+    await expect(
+      collector.collect({ scopes: [] }, "other-form"),
+    ).rejects.toThrow("FIXTURE_FORM_NOT_FOUND");
   });
 });
 

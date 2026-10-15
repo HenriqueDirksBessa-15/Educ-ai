@@ -126,6 +126,8 @@ Uma atividade só muda de `draft` para `published` depois de existir um Form pub
 
 O worker consulta somente trabalhos vencidos e usa uma aquisição persistida para impedir duas execuções simultâneas. A API do Forms é paginada e o `responseId` externo forma, com a atividade, a chave de idempotência. Cada nova coleta substitui atomicamente o detalhamento daquela submissão e registra uma execução com contagens e resultado.
 
+Em teste, `FixtureGoogleResponseCollector` aceita um corpus bruto versionado no formato de páginas e respostas do Forms; sem corpus, retorna uma coleção vazia. Isso permite repetir exatamente cenários de aluno externo, identidade ausente, respostas vazias e reprocessamento sem introduzir submissões fictícias na execução comum de desenvolvimento.
+
 O aluno é reconciliado por e-mail apenas entre matrículas ativas das turmas presentes em `activity_classroom_distribution`. O corretor objetivo é uma função pura: compara o texto recebido com a alternativa do gabarito, soma pesos e normaliza atividades totalmente objetivas para 0–10. Questões discursivas permanecem pendentes; vazio, ausência, questão desconhecida e aluno não reconciliado exigem correção manual.
 
 ## Correção discursiva e liberação

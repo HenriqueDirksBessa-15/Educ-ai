@@ -36,7 +36,7 @@ type AccessTokenProvider = (credential: GoogleCredential) => Promise<{
   credential: Partial<GoogleCredential>;
 }>;
 
-type GoogleFormResponse = {
+export type GoogleFormResponseFixture = {
   responseId?: string;
   respondentEmail?: string;
   createTime?: string;
@@ -45,6 +45,12 @@ type GoogleFormResponse = {
     string,
     { textAnswers?: { answers?: Array<{ value?: string }> } }
   >;
+};
+
+export type GoogleFormsResponseFixtureV1 = {
+  version: 1;
+  formId: string;
+  pages: Array<{ responses?: GoogleFormResponseFixture[] }>;
 };
 
 export class ProductionGoogleResponseCollector
@@ -64,14 +70,14 @@ export class ProductionGoogleResponseCollector
     formId: string,
   ): Promise<GoogleCollectionResult> {
     const authorization = await this.accessTokenProvider(credential);
-    const responses: GoogleFormResponse[] = [];
+    const responses: GoogleFormResponseFixture[] = [];
     let pageToken: string | undefined;
     do {
       const suffix = pageToken
         ? `?pageToken=${encodeURIComponent(pageToken)}`
         : "";
       const page = await this.requestJson<{
-        responses?: GoogleFormResponse[];
+        responses?: GoogleFormResponseFixture[];
         nextPageToken?: string;
       }>(
         `https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}/responses${suffix}`,
@@ -141,16 +147,28 @@ export class ProductionGoogleResponseCollector
 export class FixtureGoogleResponseCollector implements GoogleResponseCollector {
   readonly isFixture = true;
 
+  constructor(private readonly corpus?: GoogleFormsResponseFixtureV1) {}
+
   async collect(
     credential: GoogleCredential,
-    _formId: string,
+    formId: string,
   ): Promise<GoogleCollectionResult> {
-    return { submissions: [], credential };
+    if (!this.corpus) return { submissions: [], credential };
+    if (this.corpus.version !== 1)
+      throw new GooglePublishingError("FIXTURE_VERSION_UNSUPPORTED");
+    if (this.corpus.formId !== formId)
+      throw new GooglePublishingError("FIXTURE_FORM_NOT_FOUND");
+    return {
+      submissions: this.corpus.pages.flatMap((page) =>
+        (page.responses ?? []).map((response) => normalizeResponse(response)),
+      ),
+      credential,
+    };
   }
 }
 
 function normalizeResponse(
-  response: GoogleFormResponse,
+  response: GoogleFormResponseFixture,
 ): GoogleCollectedSubmission {
   if (
     !response.responseId ||

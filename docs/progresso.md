@@ -2,6 +2,28 @@
 
 Atualizado em 15/10/2026.
 
+## Ciclo vertical — CV-D/E: coleta, correção e boletim simulados
+
+Concluída em 15/10/2026 a regressão sintética ponta a ponta:
+
+- corpus v1 em formato bruto do Google Forms, com duas páginas e quatro
+  submissões cobrindo aluno matriculado, aluno externo, e-mail ausente e
+  resposta vazia;
+- coletor fixture parametrizável e vazio por padrão, sem chamadas externas nem
+  dados fictícios implícitos em desenvolvimento;
+- duas coletas idempotentes, quatro submissões persistidas e três encaminhadas
+  para revisão manual;
+- submissão válida corrigida objetiva e discursivamente, revisada, aprovada e
+  liberada localmente com nota 8 e histórico imutável;
+- boletim PDF gerado com nota/feedback e isolamento negativo Professor A/B.
+
+Verificações: `npm run check` aprovado (16 contratos, 87 API e 9 web); 8 testes
+PostgreSQL aprovados em banco temporário com migrações 001–025; smoke OpenAI
+ignorado por ser opt-in. As bases temporárias foram removidas e o proxy
+encerrado. Nenhuma API Google/OpenAI ou migração no banco `educai` foi
+executada. Cenários, corpus e roteiro estão em
+[`ciclo-vertical/07-cv-de-simulado.md`](./ciclo-vertical/07-cv-de-simulado.md).
+
 ## Ciclo vertical — CV-C: publicação idempotente
 
 Concluída em 15/10/2026 a proteção do ciclo Forms/Classroom:
