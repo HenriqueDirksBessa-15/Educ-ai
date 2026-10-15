@@ -108,6 +108,14 @@ describe("activity publication service", () => {
         formId: "form-1",
         responderUri: "https://forms.test/form-1",
         credential: {},
+        questions: [
+          {
+            questionId: activity.questions[0].id,
+            googleItemId: "item-1",
+            googleQuestionId: "question-1",
+            questionPosition: 0,
+          },
+        ],
       }),
       ensureCourseWork: vi.fn().mockResolvedValue({
         courseWorkId: "work-1",
@@ -130,6 +138,52 @@ describe("activity publication service", () => {
     });
     expect(google.ensureForm).toHaveBeenCalledTimes(1);
     expect(google.ensureCourseWork).toHaveBeenCalledTimes(1);
+    expect(activities.savePublishedForm).toHaveBeenCalledWith(
+      activity.professorId,
+      activity.id,
+      "form-1",
+      "https://forms.test/form-1",
+      [expect.objectContaining({ googleQuestionId: "question-1" })],
+    );
     expect(activities.completeExternalPublication).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not duplicate remote resources while another publication owns the lease", async () => {
+    const activities = {
+      get: vi.fn().mockResolvedValue(activity),
+      preparePublication: vi.fn().mockResolvedValue("ready"),
+      getPublication: vi
+        .fn()
+        .mockResolvedValueOnce(publication())
+        .mockResolvedValueOnce(publication({ status: "creating_form" })),
+      markPublicationAttempt: vi.fn().mockResolvedValue(false),
+      markPublicationFailure: vi.fn(),
+    };
+    const auth = {
+      getCredential: vi.fn().mockResolvedValue({
+        accessToken: "token",
+        scopes: [],
+      }),
+    };
+    const google = {
+      isFixture: true,
+      ensureForm: vi.fn(),
+      ensureCourseWork: vi.fn(),
+      getForm: vi.fn(),
+    } satisfies GoogleActivityPublisher;
+    const service = new ActivityPublicationService(
+      activities as unknown as ActivitiesRepository,
+      auth as unknown as AuthRepository,
+      google,
+    );
+
+    const result = await service.publish(activity.professorId, activity.id);
+
+    expect(result).toMatchObject({
+      status: "publication",
+      publication: { status: "creating_form" },
+    });
+    expect(google.ensureForm).not.toHaveBeenCalled();
+    expect(google.ensureCourseWork).not.toHaveBeenCalled();
   });
 });

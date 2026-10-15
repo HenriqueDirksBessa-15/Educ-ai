@@ -90,6 +90,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "022_security_privacy_audit.sql",
       "023_class_curriculum_profile.sql",
       "024_lesson_plan_teacher_fields.sql",
+      "025_activity_form_question_mapping.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -586,6 +587,11 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await repository.preparePublication(professorId, activityId)).toBe(
       "ready",
     );
+    expect(
+      await repository.update(professorId, activityId, {
+        description: "Não pode mudar durante a publicação.",
+      }),
+    ).toBe("locked");
     const prepared = await repository.getPublication(professorId, activityId);
     expect(prepared).toMatchObject({
       status: "pending",
@@ -593,12 +599,25 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         { googleClassroomId: "course-fixture-1", status: "pending" },
       ],
     });
+    const preparedActivity = await repository.get(professorId, activityId);
     await repository.savePublishedForm(
       professorId,
       activityId,
       "form-fixture-1",
       "https://forms.test/form-fixture-1",
+      preparedActivity!.questions.map((question) => ({
+        questionId: question.id,
+        googleItemId: `item-${question.position}`,
+        googleQuestionId: `q${question.position + 1}`,
+        questionPosition: question.position,
+      })),
     );
+    expect(
+      await repository.getFormQuestionMappings(professorId, activityId),
+    ).toEqual([
+      expect.objectContaining({ googleQuestionId: "q1", questionPosition: 0 }),
+      expect.objectContaining({ googleQuestionId: "q2", questionPosition: 1 }),
+    ]);
     await repository.saveDistribution(
       professorId,
       activityId,

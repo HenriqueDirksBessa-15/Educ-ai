@@ -3,15 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ProductionGoogleResponseCollector } from "./google-response-collector.js";
 
 describe("Google Forms response collector", () => {
-  it("paginates and maps external question ids to form positions", async () => {
+  it("paginates responses without trusting the mutable Form order", async () => {
     const fetcher = vi.fn(async (url: string) => {
-      if (url.endsWith("/forms/form-1"))
-        return json({
-          items: [
-            { questionItem: { question: { questionId: "q1" } } },
-            { questionItem: { question: { questionId: "q2" } } },
-          ],
-        });
       if (url.endsWith("/responses"))
         return json({
           responses: [response("r1", "q1", "A")],
@@ -30,10 +23,10 @@ describe("Google Forms response collector", () => {
     expect(result.submissions).toHaveLength(2);
     expect(result.submissions[0]?.answers[0]).toMatchObject({
       externalQuestionId: "q1",
-      questionPosition: 0,
+      questionPosition: null,
       answerText: "A",
     });
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
 

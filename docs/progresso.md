@@ -2,6 +2,28 @@
 
 Atualizado em 15/10/2026.
 
+## Ciclo vertical — CV-C: publicação idempotente
+
+Concluída em 15/10/2026 a proteção do ciclo Forms/Classroom:
+
+- `itemId` determinístico por questão e persistência explícita do vínculo entre
+  questão local, item e `questionId` do Google Forms;
+- confirmação atômica do Form apenas quando todos os mapeamentos pertencem à
+  atividade e estão completos;
+- coleta reconciliada pelos IDs persistidos, sem depender da ordem mutável do
+  Form;
+- preparação transacional, bloqueio estrutural após seu início e lease contra
+  publicações concorrentes;
+- retentativa preservando Form e trabalhos já reconciliados por marcadores;
+- migração `025_activity_form_question_mapping.sql`.
+
+Verificações: `npm run check` aprovado (16 contratos, 86 API e 9 web); 8 testes
+PostgreSQL aprovados em banco temporário com migrações 001–025; smoke OpenAI
+ignorado por ser opt-in. A base temporária foi removida e o proxy encerrado. A
+migração 025 não foi aplicada ao banco `educai` e nenhuma API Google/OpenAI foi
+chamada. Cenários e roteiro estão em
+[`ciclo-vertical/06-cv-c-publicacao.md`](./ciclo-vertical/06-cv-c-publicacao.md).
+
 ## Ciclo vertical — CV-B2: plano completo e aprovado
 
 Concluído em 15/10/2026 o planejamento docente completo:

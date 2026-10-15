@@ -36,12 +36,6 @@ type AccessTokenProvider = (credential: GoogleCredential) => Promise<{
   credential: Partial<GoogleCredential>;
 }>;
 
-type GoogleForm = {
-  items?: Array<{
-    questionItem?: { question?: { questionId?: string } };
-  }>;
-};
-
 type GoogleFormResponse = {
   responseId?: string;
   respondentEmail?: string;
@@ -70,16 +64,6 @@ export class ProductionGoogleResponseCollector
     formId: string,
   ): Promise<GoogleCollectionResult> {
     const authorization = await this.accessTokenProvider(credential);
-    const form = await this.requestJson<GoogleForm>(
-      `https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}`,
-      authorization.token,
-    );
-    const positions = new Map<string, number>();
-    form.items?.forEach((item, position) => {
-      const questionId = item.questionItem?.question?.questionId;
-      if (questionId) positions.set(questionId, position);
-    });
-
     const responses: GoogleFormResponse[] = [];
     let pageToken: string | undefined;
     do {
@@ -99,9 +83,7 @@ export class ProductionGoogleResponseCollector
 
     return {
       credential: authorization.credential,
-      submissions: responses.map((response) =>
-        normalizeResponse(response, positions),
-      ),
+      submissions: responses.map((response) => normalizeResponse(response)),
     };
   }
 
@@ -169,7 +151,6 @@ export class FixtureGoogleResponseCollector implements GoogleResponseCollector {
 
 function normalizeResponse(
   response: GoogleFormResponse,
-  positions: Map<string, number>,
 ): GoogleCollectedSubmission {
   if (
     !response.responseId ||
@@ -183,7 +164,7 @@ function normalizeResponse(
     answers: Object.entries(response.answers ?? {}).map(
       ([questionId, answer]) => ({
         externalQuestionId: questionId,
-        questionPosition: positions.get(questionId) ?? null,
+        questionPosition: null,
         answerText:
           answer.textAnswers?.answers
             ?.map((entry) => entry.value ?? "")

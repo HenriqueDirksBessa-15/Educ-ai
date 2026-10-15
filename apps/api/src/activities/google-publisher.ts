@@ -11,6 +11,17 @@ export type GoogleFormReference = {
   credential: Partial<GoogleCredential>;
 };
 
+export type GoogleFormQuestionReference = {
+  questionId: string;
+  googleItemId: string;
+  googleQuestionId: string;
+  questionPosition: number;
+};
+
+export type PublishedGoogleFormReference = GoogleFormReference & {
+  questions: GoogleFormQuestionReference[];
+};
+
 export type ClassroomWorkReference = {
   courseWorkId: string;
   alternateLink: string;
@@ -28,7 +39,7 @@ export interface GoogleActivityPublisher {
   ensureForm(
     credential: GoogleCredential,
     activity: Activity,
-  ): Promise<GoogleFormReference>;
+  ): Promise<PublishedGoogleFormReference>;
   ensureCourseWork(
     credential: GoogleCredential,
     input: ClassroomWorkInput,
@@ -69,7 +80,7 @@ export class ProductionGoogleActivityPublisher
   async ensureForm(
     credential: GoogleCredential,
     activity: Activity,
-  ): Promise<GoogleFormReference> {
+  ): Promise<PublishedGoogleFormReference> {
     assertIntegerPoints(activity);
     const authorization = await this.accessTokenProvider(credential);
     const existing = await this.findForm(
@@ -122,11 +133,18 @@ export class ProductionGoogleActivityPublisher
       },
       true,
     );
-    return this.getFormWithToken(
+    const reference = await this.getFormWithToken(
       authorization.token,
       formId,
       authorization.credential,
     );
+    const questions = mapFormQuestions(reference.items, activity);
+    return {
+      formId: reference.formId,
+      responderUri: reference.responderUri,
+      credential: reference.credential,
+      questions,
+    };
   }
 
   async ensureCourseWork(
@@ -218,6 +236,7 @@ export class ProductionGoogleActivityPublisher
         createItem: {
           location: { index },
           item: {
+            itemId: googleItemId(question.id),
             title: question.prompt,
             questionItem: {
               question:
@@ -323,15 +342,21 @@ export class ProductionGoogleActivityPublisher
     token: string,
     formId: string,
     credential: Partial<GoogleCredential>,
-  ): Promise<GoogleFormReference> {
+  ): Promise<GoogleFormReference & { items: GoogleFormItem[] }> {
     const form = await this.requestJson<{
       formId: string;
       responderUri: string;
+      items?: GoogleFormItem[];
     }>(
       `https://forms.googleapis.com/v1/forms/${encodeURIComponent(formId)}`,
       token,
     );
-    return { formId: form.formId, responderUri: form.responderUri, credential };
+    return {
+      formId: form.formId,
+      responderUri: form.responderUri,
+      credential,
+      items: form.items ?? [],
+    };
   }
 
   private async refreshAccessToken(credential: GoogleCredential): Promise<{
@@ -410,11 +435,17 @@ export class FixtureGoogleActivityPublisher implements GoogleActivityPublisher {
   async ensureForm(
     credential: GoogleCredential,
     activity: Activity,
-  ): Promise<GoogleFormReference> {
+  ): Promise<PublishedGoogleFormReference> {
     return {
       formId: `fixture-form-${activity.id}`,
       responderUri: `https://docs.google.com/forms/d/${activity.id}/viewform`,
       credential,
+      questions: activity.questions.map((question) => ({
+        questionId: question.id,
+        googleItemId: googleItemId(question.id),
+        googleQuestionId: `fixture-question-${question.id}`,
+        questionPosition: question.position,
+      })),
     };
   }
 
@@ -465,4 +496,50 @@ function assertIntegerPoints(activity: Activity): void {
     activity.questions.some((question) => !Number.isInteger(question.points))
   )
     throw new GooglePublishingError("GOOGLE_POINTS_MUST_BE_INTEGER");
+}
+
+type GoogleFormItem = {
+  itemId?: string;
+  questionItem?: { question?: { questionId?: string } };
+};
+
+function googleItemId(questionId: string): string {
+  return `educai${questionId.replaceAll("-", "")}`;
+}
+
+function mapFormQuestions(
+  items: GoogleFormItem[],
+  activity: Activity,
+): GoogleFormQuestionReference[] {
+  const byItemId = new Map(
+    items
+      .filter((item) => item.itemId)
+      .map((item) => [item.itemId!, item] as const),
+  );
+  const deterministic = activity.questions.every((question) =>
+    byItemId.has(googleItemId(question.id)),
+  );
+  if (!deterministic && items.length !== activity.questions.length)
+    throw new GooglePublishingError("GOOGLE_FORM_MAPPING_INVALID", true);
+
+  const mappings = activity.questions.map((question) => {
+    const item = deterministic
+      ? byItemId.get(googleItemId(question.id))
+      : items[question.position];
+    const googleQuestionId = item?.questionItem?.question?.questionId;
+    if (!item?.itemId || !googleQuestionId)
+      throw new GooglePublishingError("GOOGLE_FORM_MAPPING_INVALID", true);
+    return {
+      questionId: question.id,
+      googleItemId: item.itemId,
+      googleQuestionId,
+      questionPosition: question.position,
+    };
+  });
+  if (
+    new Set(mappings.map((mapping) => mapping.googleQuestionId)).size !==
+    mappings.length
+  )
+    throw new GooglePublishingError("GOOGLE_FORM_MAPPING_INVALID", true);
+  return mappings;
 }

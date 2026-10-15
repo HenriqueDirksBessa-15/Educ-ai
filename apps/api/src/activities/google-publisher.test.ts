@@ -56,6 +56,7 @@ describe("Google activity publisher", () => {
   });
 
   it("creates, configures and publishes a quiz form", async () => {
+    let configured = false;
     const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.includes("drive/v3/files?")) return jsonResponse({ files: [] });
       if (
@@ -67,8 +68,16 @@ describe("Google activity publisher", () => {
         return jsonResponse({
           formId: "form-1",
           responderUri: "https://forms.test/form-1",
-          items: [],
+          items: configured
+            ? activity.questions.map((question) => ({
+                itemId: `educai${question.id.replaceAll("-", "")}`,
+                questionItem: {
+                  question: { questionId: `google-${question.position}` },
+                },
+              }))
+            : [],
         });
+      if (url.includes(":batchUpdate")) configured = true;
       return jsonResponse({});
     });
     const publisher = new ProductionGoogleActivityPublisher(
@@ -81,6 +90,20 @@ describe("Google activity publisher", () => {
       formId: "form-1",
       responderUri: "https://forms.test/form-1",
       credential: { accessToken: "access-token" },
+      questions: [
+        {
+          questionId: activity.questions[0]!.id,
+          googleItemId: `educai${activity.questions[0]!.id.replaceAll("-", "")}`,
+          googleQuestionId: "google-0",
+          questionPosition: 0,
+        },
+        {
+          questionId: activity.questions[1]!.id,
+          googleItemId: `educai${activity.questions[1]!.id.replaceAll("-", "")}`,
+          googleQuestionId: "google-1",
+          questionPosition: 1,
+        },
+      ],
     });
 
     const batchCall = fetcher.mock.calls.find(([url]) =>
@@ -92,11 +115,54 @@ describe("Google activity publisher", () => {
     expect(body.requests).toHaveLength(4);
     expect(JSON.stringify(body)).toContain("correctAnswers");
     expect(JSON.stringify(body)).toContain("textQuestion");
+    expect(JSON.stringify(body)).toContain(
+      `educai${activity.questions[0]!.id.replaceAll("-", "")}`,
+    );
     expect(
       fetcher.mock.calls.some(([url]) =>
         String(url).includes(":setPublishSettings"),
       ),
     ).toBe(true);
+  });
+
+  it("reconciles question ids by deterministic item id after external reordering", async () => {
+    const reversed = [...activity.questions].reverse();
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes("drive/v3/files?"))
+        return jsonResponse({ files: [{ id: "form-1" }] });
+      if (url.endsWith("/forms/form-1"))
+        return jsonResponse({
+          formId: "form-1",
+          responderUri: "https://forms.test/form-1",
+          items: reversed.map((question) => ({
+            itemId: `educai${question.id.replaceAll("-", "")}`,
+            questionItem: {
+              question: { questionId: `google-${question.position}` },
+            },
+          })),
+        });
+      return jsonResponse({});
+    });
+    const publisher = new ProductionGoogleActivityPublisher(
+      config,
+      fetcher as typeof fetch,
+      tokenProvider,
+    );
+
+    const form = await publisher.ensureForm(credential, activity);
+
+    expect(form.questions).toEqual([
+      expect.objectContaining({
+        questionId: activity.questions[0]!.id,
+        googleQuestionId: "google-0",
+        questionPosition: 0,
+      }),
+      expect.objectContaining({
+        questionId: activity.questions[1]!.id,
+        googleQuestionId: "google-1",
+        questionPosition: 1,
+      }),
+    ]);
   });
 
   it("reuses Classroom work found through the deterministic marker", async () => {

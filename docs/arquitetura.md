@@ -116,7 +116,9 @@ Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, geraçõe
 
 ## Publicação externa de atividades
 
-A publicação não mantém transação aberta durante chamadas Google. Cada passo é persistido antes e depois da operação externa. Um marcador derivado do UUID local permite reconciliar Forms pelo Drive e trabalhos pela descrição do Classroom. Repetições ignoram IDs já confirmados; respostas ambíguas entram em `reconciliation_required` e nunca disparam recriação cega.
+A publicação não mantém transação aberta durante chamadas Google. A preparação adquire lock da atividade, fixa a geração aprovada quando aplicável e bloqueia edições estruturais a partir desse ponto. Cada passo é persistido antes e depois da operação externa. Um marcador derivado do UUID local permite reconciliar Forms pelo Drive e trabalhos pela descrição do Classroom. Repetições ignoram IDs já confirmados; respostas ambíguas entram em `reconciliation_required` e nunca disparam recriação cega.
+
+Cada pergunta criada no Forms recebe um `itemId` determinístico derivado da questão local. A confirmação do Form grava atomicamente questão local, `itemId`, `questionId` externo e posição original; conjuntos incompletos não são confirmados. A coleta usa esse vínculo persistido, portanto uma reordenação externa do Form não troca as respostas entre questões.
 
 Uma atividade só muda de `draft` para `published` depois de existir um Form publicado e todas as turmas obrigatórias possuírem trabalho Classroom confirmado. Na mesma conclusão lógica, o plano é bloqueado e um `activity_collection_job` idempotente é criado para o prazo.
 

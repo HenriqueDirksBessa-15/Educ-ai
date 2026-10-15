@@ -25,7 +25,7 @@ export class ActivityPublicationService {
     | { status: "not_found" | "locked" }
     | { status: "publication"; publication: ActivityPublication }
   > {
-    const activity = await this.activities.get(professorId, activityId);
+    let activity = await this.activities.get(professorId, activityId);
     if (!activity) return { status: "not_found" };
     if (activity.status === "published") {
       const existing = await this.activities.getPublication(
@@ -47,6 +47,8 @@ export class ActivityPublicationService {
       activityId,
     );
     if (prepared !== "ready") return { status: prepared };
+    activity = await this.activities.get(professorId, activityId);
+    if (!activity || activity.status !== "draft") return { status: "locked" };
 
     let publication = await this.activities.getPublication(
       professorId,
@@ -95,6 +97,7 @@ export class ActivityPublicationService {
           activityId,
           form.formId,
           form.responderUri,
+          form.questions,
         );
       } catch (error) {
         const normalized = normalizePublishingError(error);

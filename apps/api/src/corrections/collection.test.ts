@@ -9,7 +9,17 @@ import type { CorrectionsRepository } from "./repository.js";
 
 describe("activity collection service", () => {
   it("upserts repeated external responses through the repository boundary", async () => {
-    const activities = { get: vi.fn().mockResolvedValue(activity()) };
+    const activities = {
+      get: vi.fn().mockResolvedValue(activity()),
+      getFormQuestionMappings: vi.fn().mockResolvedValue([
+        {
+          questionId: "31111111-1111-4111-8111-111111111111",
+          googleItemId: "item-1",
+          googleQuestionId: "q1",
+          questionPosition: 0,
+        },
+      ]),
+    };
     const corrections = {
       startCollection: vi
         .fn()
@@ -67,6 +77,15 @@ describe("activity collection service", () => {
       "run-1",
       { received: 2, created: 1, updated: 1, manualReview: 0 },
     );
+    expect(corrections.persistSubmission).toHaveBeenCalledWith(
+      "professor-1",
+      expect.any(String),
+      expect.objectContaining({
+        answers: [expect.objectContaining({ questionPosition: 0 })],
+      }),
+      expect.any(Object),
+      expect.any(Object),
+    );
   });
 });
 
@@ -95,7 +114,7 @@ function submission(id: string) {
     submittedAt: "2026-10-16T11:00:00.000Z",
     rawPayload: { responseId: id },
     answers: [
-      { externalQuestionId: "q1", questionPosition: 0, answerText: "1" },
+      { externalQuestionId: "q1", questionPosition: null, answerText: "1" },
     ],
   };
 }

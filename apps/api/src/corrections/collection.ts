@@ -47,20 +47,37 @@ export class ActivityCollectionService {
         lease.googleFormId,
       );
       await this.auth.saveCredential(professorId, collected.credential);
+      const mappings = await this.activities.getFormQuestionMappings(
+        professorId,
+        activityId,
+      );
+      const positions = new Map(
+        mappings.map((mapping) => [
+          mapping.googleQuestionId,
+          mapping.questionPosition,
+        ]),
+      );
       let created = 0;
       let updated = 0;
       let manualReview = 0;
       for (const submission of collected.submissions) {
+        const reconciled = {
+          ...submission,
+          answers: submission.answers.map((answer) => ({
+            ...answer,
+            questionPosition: positions.get(answer.externalQuestionId) ?? null,
+          })),
+        };
         const student = await this.corrections.reconcileStudent(
           professorId,
           activityId,
-          submission.respondentEmail,
+          reconciled.respondentEmail,
         );
-        const grading = gradeObjectiveAnswers(activity, submission.answers);
+        const grading = gradeObjectiveAnswers(activity, reconciled.answers);
         const persisted = await this.corrections.persistSubmission(
           professorId,
           activityId,
-          submission,
+          reconciled,
           student,
           grading,
         );

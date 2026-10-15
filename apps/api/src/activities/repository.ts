@@ -13,8 +13,9 @@ import type {
   ActivityGenerationResult,
   ActivityPromptContext,
 } from "../openai/adapter.js";
+import type { GoogleFormQuestionReference } from "./google-publisher.js";
 
-import type { DatabaseClient } from "../database.js";
+import { withTransaction, type DatabaseClient } from "../database.js";
 
 type QueryResult<Row> = { rows: Row[]; rowCount?: number | null };
 type ActivityRow = {
@@ -422,51 +423,57 @@ export class ActivitiesRepository {
     professorId: string,
     activityId: string,
   ): Promise<"ready" | "not_found" | "locked"> {
-    const eligible = (await this.database.query(
-      `SELECT activity.id,
-         (SELECT generation.id FROM activity_generation generation
-          WHERE generation.activity_id = activity.id
-            AND generation.status = 'succeeded'
-            AND generation.review_status = 'approved'
-          ORDER BY generation.version DESC LIMIT 1) AS generation_id,
-         EXISTS (SELECT 1 FROM activity_generation generation
-          WHERE generation.activity_id = activity.id
-            AND generation.status = 'succeeded') AS has_generation
-       FROM activity
-       WHERE activity.id = $1 AND activity.professor_id = $2
-         AND activity.status = 'draft' AND activity.archived_at IS NULL`,
-      [activityId, professorId],
-    )) as QueryResult<{
-      id: string;
-      generation_id: string | null;
-      has_generation: boolean;
-    }>;
-    const row = eligible.rows[0];
-    if (!row) {
-      const current = await this.get(professorId, activityId);
-      return current ? "locked" : "not_found";
-    }
-    if (row.has_generation && !row.generation_id) return "locked";
-    await this.database.query(
-      `INSERT INTO activity_publication (activity_id, generation_id)
-       VALUES ($1, $2)
-       ON CONFLICT (activity_id) DO UPDATE SET
-         generation_id = COALESCE(activity_publication.generation_id, EXCLUDED.generation_id)`,
-      [activityId, row.generation_id],
-    );
-    await this.database.query(
-      `INSERT INTO activity_classroom_distribution
-         (activity_id, class_group_id, google_classroom_id)
-       SELECT $1, class_group.id, class_group.google_classroom_id
-       FROM activity
-       JOIN lesson_plan_class ON lesson_plan_class.lesson_plan_id = activity.lesson_plan_id
-       JOIN class_group ON class_group.id = lesson_plan_class.class_group_id
-       WHERE activity.id = $1 AND activity.professor_id = $2
-       ON CONFLICT (activity_id, class_group_id) DO UPDATE SET
-         google_classroom_id = EXCLUDED.google_classroom_id`,
-      [activityId, professorId],
-    );
-    return "ready";
+    return withTransaction(this.database, async (client) => {
+      const eligible = (await client.query(
+        `SELECT activity.id,
+           (SELECT generation.id FROM activity_generation generation
+            WHERE generation.activity_id = activity.id
+              AND generation.status = 'succeeded'
+              AND generation.review_status = 'approved'
+            ORDER BY generation.version DESC LIMIT 1) AS generation_id,
+           EXISTS (SELECT 1 FROM activity_generation generation
+            WHERE generation.activity_id = activity.id
+              AND generation.status = 'succeeded') AS has_generation
+         FROM activity
+         WHERE activity.id = $1 AND activity.professor_id = $2
+           AND activity.status = 'draft' AND activity.archived_at IS NULL
+         FOR UPDATE OF activity`,
+        [activityId, professorId],
+      )) as QueryResult<{
+        id: string;
+        generation_id: string | null;
+        has_generation: boolean;
+      }>;
+      const row = eligible.rows[0];
+      if (!row) {
+        const current = (await client.query(
+          `SELECT id FROM activity WHERE id = $1 AND professor_id = $2`,
+          [activityId, professorId],
+        )) as QueryResult<{ id: string }>;
+        return current.rows[0] ? "locked" : "not_found";
+      }
+      if (row.has_generation && !row.generation_id) return "locked";
+      await client.query(
+        `INSERT INTO activity_publication (activity_id, generation_id)
+         VALUES ($1, $2)
+         ON CONFLICT (activity_id) DO UPDATE SET
+           generation_id = EXCLUDED.generation_id`,
+        [activityId, row.generation_id],
+      );
+      await client.query(
+        `INSERT INTO activity_classroom_distribution
+           (activity_id, class_group_id, google_classroom_id)
+         SELECT $1, class_group.id, class_group.google_classroom_id
+         FROM activity
+         JOIN lesson_plan_class ON lesson_plan_class.lesson_plan_id = activity.lesson_plan_id
+         JOIN class_group ON class_group.id = lesson_plan_class.class_group_id
+         WHERE activity.id = $1 AND activity.professor_id = $2
+         ON CONFLICT (activity_id, class_group_id) DO UPDATE SET
+           google_classroom_id = EXCLUDED.google_classroom_id`,
+        [activityId, professorId],
+      );
+      return "ready";
+    });
   }
 
   async getPublication(
@@ -547,15 +554,98 @@ export class ActivitiesRepository {
     activityId: string,
     formId: string,
     responderUri: string,
+    questions: GoogleFormQuestionReference[],
   ): Promise<void> {
     await this.database.query(
-      `UPDATE activity_publication publication
+      `WITH input AS (
+         SELECT * FROM jsonb_to_recordset($5::jsonb) AS item(
+           question_id uuid, google_item_id text, google_question_id text,
+           question_position smallint
+         )
+       ), owned AS (
+         SELECT publication.activity_id
+         FROM activity_publication publication
+         JOIN activity ON activity.id = publication.activity_id
+         WHERE publication.activity_id = $1 AND activity.professor_id = $2
+       ), valid_input AS (
+         SELECT owned.activity_id
+         FROM owned
+         WHERE (SELECT count(*) FROM input) =
+               (SELECT count(*) FROM activity_question
+                WHERE activity_id = owned.activity_id)
+           AND NOT EXISTS (
+             SELECT 1 FROM input
+             LEFT JOIN activity_question question
+               ON question.id = input.question_id
+              AND question.activity_id = owned.activity_id
+             WHERE question.id IS NULL
+           )
+       ), mapped AS (
+         INSERT INTO activity_form_question_mapping
+           (activity_id, question_id, google_item_id, google_question_id,
+            question_position)
+         SELECT valid_input.activity_id, item.question_id, item.google_item_id,
+                item.google_question_id, item.question_position
+         FROM valid_input
+         CROSS JOIN input item
+         ON CONFLICT (activity_id, question_id) DO UPDATE SET
+           google_item_id = EXCLUDED.google_item_id,
+           google_question_id = EXCLUDED.google_question_id,
+           question_position = EXCLUDED.question_position
+         RETURNING question_id
+       ), complete AS (
+         SELECT valid_input.activity_id
+         FROM valid_input
+         WHERE (SELECT count(*) FROM mapped) =
+               (SELECT count(*) FROM activity_question
+                WHERE activity_id = valid_input.activity_id)
+       )
+       UPDATE activity_publication publication
        SET google_form_id = $3, responder_uri = $4, status = 'pending',
-         error_code = NULL, last_synced_at = now()
-       FROM activity WHERE publication.activity_id = $1
-         AND activity.id = publication.activity_id AND activity.professor_id = $2`,
-      [activityId, professorId, formId, responderUri],
+           error_code = NULL, last_synced_at = now()
+       FROM complete
+       WHERE publication.activity_id = complete.activity_id`,
+      [
+        activityId,
+        professorId,
+        formId,
+        responderUri,
+        JSON.stringify(
+          questions.map((question) => ({
+            question_id: question.questionId,
+            google_item_id: question.googleItemId,
+            google_question_id: question.googleQuestionId,
+            question_position: question.questionPosition,
+          })),
+        ),
+      ],
     );
+  }
+
+  async getFormQuestionMappings(
+    professorId: string,
+    activityId: string,
+  ): Promise<GoogleFormQuestionReference[]> {
+    const result = (await this.database.query(
+      `SELECT mapping.question_id, mapping.google_item_id,
+              mapping.google_question_id, mapping.question_position
+       FROM activity_form_question_mapping mapping
+       JOIN activity ON activity.id = mapping.activity_id
+       WHERE mapping.activity_id = $1 AND activity.professor_id = $2
+       ORDER BY mapping.question_position`,
+      [activityId, professorId],
+    )) as QueryResult<{
+      question_id: string;
+      google_item_id: string;
+      google_question_id: string;
+      question_position: number;
+    }>;
+    return result.rows.map((row) => ({
+      questionId: row.question_id,
+      googleItemId: row.google_item_id,
+      googleQuestionId: row.google_question_id,
+      questionPosition: row.question_position,
+    }));
   }
 
   async markPublicationFailure(
@@ -667,7 +757,10 @@ export class ActivitiesRepository {
       ? `UPDATE activity SET title = $3, description = $4, type = $5,
            difficulty = $6, due_at = $7, late_mode = $8, late_penalty_percent = $9
          WHERE id = $1 AND professor_id = $2 AND status = 'draft'
-           AND archived_at IS NULL RETURNING id`
+           AND archived_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM activity_publication publication
+             WHERE publication.activity_id = activity.id)
+         RETURNING id`
       : `INSERT INTO activity
            (professor_id, lesson_plan_id, title, description, type, difficulty,
             due_at, late_mode, late_penalty_percent)
