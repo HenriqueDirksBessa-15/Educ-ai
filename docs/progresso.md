@@ -2,6 +2,14 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — pendências de backend consolidadas
+
+As pendências de backend encontradas nas etapas 02 a 10 do redesenho estão
+reunidas, com prioridade e impacto na interface, em
+[`telas/pendencias-backend.md`](./telas/pendencias-backend.md). P0: B-01
+(plano com IA, bloqueia a etapa 07), BK-01 (habilidades BNCC de vários anos)
+e BK-02 (questões editadas depois da aprovação).
+
 ## Interface — etapa 10: Minha conta
 
 Concluída em 16/10/2026 ([etapa](./telas/10-minha-conta.md)):
