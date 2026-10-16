@@ -184,4 +184,55 @@ describe("complete lesson plan flow", () => {
       { method: "POST", credentials: "include" },
     );
   });
+
+  it("lists every plan with a translated status", () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const plans = Array.from({ length: 6 }, (_, index) => ({
+      ...draftPlan,
+      id: `5111111${index}-1111-4111-8111-111111111111`,
+      title: `Plano ${index + 1}`,
+    }));
+    render(
+      <LessonPlansPanel
+        plans={plans}
+        classes={[]}
+        materials={[]}
+        reload={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Plano 6")).toBeInTheDocument();
+    expect(screen.getAllByText("Rascunho")).toHaveLength(6);
+    expect(screen.queryByText(/draft/)).not.toBeInTheDocument();
+  });
 });
+
+const draftPlan = {
+  id: "51111111-1111-4111-8111-111111111111",
+  professorId: "61111111-1111-4111-8111-111111111111",
+  title: "Plano manual",
+  curricularComponent: "Matemática",
+  schoolYear: "8º ano EF",
+  objectives: "Resolver problemas.",
+  contents: "Frações.",
+  methodology: "Investigação.",
+  evaluationStrategy: "Discussão.",
+  durationMinutes: 50,
+  references: null,
+  classIds: [group.id],
+  syllabusId: null,
+  bnccSkillIds: [],
+  materialIds: [],
+  classNames: [group.name],
+  syllabusDescription: null,
+  bnccCodes: [],
+  materialTitles: [],
+  isArchived: false,
+  isLocked: false,
+  status: "draft" as const,
+  reviewedAt: null,
+  approvedAt: null,
+  latestGeneration: null,
+  createdAt: "2026-10-15T10:00:00.000Z",
+  updatedAt: "2026-10-15T10:00:00.000Z",
+};

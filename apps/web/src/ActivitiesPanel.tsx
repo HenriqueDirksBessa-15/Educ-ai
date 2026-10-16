@@ -12,6 +12,9 @@ import type {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
+import { useConfirm } from "./ConfirmDialog.js";
+import { errorMessage } from "./labels.js";
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 type DataEnvelope<T> = { data: T };
 type Filter = "all" | ActivityStatus;
@@ -32,9 +35,16 @@ const emptyDiscursive = (): ActivityQuestionInput => ({
   criteria: "",
 });
 
-export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
+export function ActivitiesPanel({
+  plans,
+  initialFilter = "all",
+}: {
+  plans: LessonPlan[];
+  initialFilter?: Filter;
+}) {
+  const confirm = useConfirm();
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [selected, setSelected] = useState<Activity | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -252,6 +262,26 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     activity: Activity,
     action: "publish" | "finish" | "archive",
   ) => {
+    const confirmed = await confirm(
+      {
+        publish: {
+          title: "Enviar para a turma?",
+          body: `“${activity.title}” será publicada no Google Formulários e aparecerá no Google Sala de Aula da turma. Depois de enviada, as questões não podem mais ser alteradas.`,
+          confirmLabel: "Enviar para a turma",
+        },
+        finish: {
+          title: "Encerrar as respostas?",
+          body: `Os alunos não poderão mais responder “${activity.title}”.`,
+          confirmLabel: "Encerrar respostas",
+        },
+        archive: {
+          title: "Guardar esta atividade?",
+          body: `“${activity.title}” sai da lista. As respostas e notas já recebidas são mantidas.`,
+          confirmLabel: "Guardar atividade",
+        },
+      }[action],
+    );
+    if (!confirmed) return;
     setSaving(true);
     setMessage(null);
     try {
@@ -275,14 +305,14 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
         setMessage(
           action === "finish"
             ? "Atividade finalizada."
-            : "Atividade arquivada sem excluir respostas.",
+            : "Atividade guardada. As respostas foram mantidas.",
         );
       }
       if (selected?.id === activity.id && action !== "publish")
         setSelected(null);
       await loadActivities();
     } catch {
-      setMessage("A mudança de estado não pôde ser concluída.");
+      setMessage("Não foi possível concluir agora. Tente de novo.");
     } finally {
       setSaving(false);
     }
@@ -291,7 +321,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
   const generateActivity = async () => {
     if (!selected) return;
     setSaving(true);
-    setMessage("Gerando uma sugestão estruturada…");
+    setMessage("Pedindo questões à IA…");
     try {
       const response = await fetch(
         `${apiBaseUrl}/activities/${selected.id}/generate`,
@@ -307,7 +337,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
       setGeneration(body.data);
       setMessage("Sugestão gerada. Carregue-a no editor e revise cada campo.");
     } catch {
-      setMessage("A IA não respondeu corretamente; o rascunho foi preservado.");
+      setMessage(errorMessage("OPENAI_GENERATION_FAILED"));
       await loadAssistState(selected.id);
     } finally {
       setSaving(false);
@@ -390,12 +420,12 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
         (await response.json()) as DataEnvelope<ActivityCollectionSummary>;
       setCollection(body.data);
       setMessage(
-        `${body.data.submissionCount} submissões processadas; ${body.data.manualReviewCount} exigem revisão manual.`,
+        `${body.data.submissionCount} respostas recebidas; ${body.data.manualReviewCount} precisam da sua correção.`,
       );
       await loadActivities();
     } catch {
       setMessage(
-        "A coleta ainda não está disponível ou falhou. A repetição não duplicará respostas.",
+        "Não foi possível buscar as respostas agora. Você pode tentar de novo sem perder nada.",
       );
       await loadAssistState(selected.id);
     } finally {
@@ -409,7 +439,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
   ) => {
     if (!selected) return;
     setSaving(true);
-    setMessage("Gerando sugestão discursiva para revisão…");
+    setMessage("Pedindo sugestão de correção à IA…");
     try {
       const response = await fetch(
         `${apiBaseUrl}/submissions/${submissionId}/corrections/suggest`,
@@ -474,6 +504,15 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     action: "approve" | "release",
   ) => {
     if (!selected) return;
+    if (
+      action === "release" &&
+      !(await confirm({
+        title: "Devolver a nota ao aluno?",
+        body: "O aluno verá a nota e seus comentários no Google Sala de Aula. Isso não pode ser desfeito.",
+        confirmLabel: "Devolver nota",
+      }))
+    )
+      return;
     setSaving(true);
     try {
       const response = await fetch(
@@ -484,14 +523,14 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
       setMessage(
         action === "approve"
           ? "Nota aprovada pelo professor."
-          : "Nota liberada; o estado do Classroom foi registrado.",
+          : "Nota devolvida ao aluno.",
       );
       await loadAssistState(selected.id);
     } catch {
       setMessage(
         action === "approve"
           ? "Revise todas as discursivas antes de aprovar."
-          : "A nota segue aprovada; tente novamente a devolução ao Classroom.",
+          : "A nota continua aprovada, mas não chegou ao Google Sala de Aula. Tente devolver de novo.",
       );
     } finally {
       setSaving(false);
@@ -511,10 +550,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
     <section className="timeline-panel" aria-labelledby="activities-title">
       <div className="status-heading">
         <div>
-          <span className="section-label">Dia 11 · RF012</span>
-          <h2 id="activities-title">
-            Atividades assistidas e publicação Google
-          </h2>
+          <h2 id="activities-title">Suas atividades</h2>
         </div>
         <button className="secondary-action" type="button" onClick={resetForm}>
           Nova atividade
@@ -538,7 +574,10 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
         <div>
           <h3>Atividades</h3>
           {activities.length === 0 ? (
-            <p className="empty-state">Nenhuma atividade neste filtro.</p>
+            <p className="empty-state">
+              Nenhuma atividade aqui. Toque em “Nova atividade” para criar a
+              partir de um plano aprovado.
+            </p>
           ) : (
             <ul className="resource-list">
               {activities.map((activity) => (
@@ -711,11 +750,10 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                   <strong>
                     Versão {generation.version} · {generationStatus(generation)}
                   </strong>
-                  <small>
-                    {generation.model} · origem {generation.origin}
-                  </small>
                   {generation.errorCode && (
-                    <span className="status-error">{generation.errorCode}</span>
+                    <span className="status-error">
+                      {errorMessage(generation.errorCode)}
+                    </span>
                   )}
                   {generation.suggestion && (
                     <div className="inline-actions">
@@ -1010,12 +1048,14 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
               <span className="section-label">Coleta e correção objetiva</span>
               <h3>{collectionStatusLabel(collection.status)}</h3>
               <p>
-                {collection.submissionCount} submissões ·{" "}
+                {collection.submissionCount} respostas ·{" "}
                 {collection.gradedCount} corrigidas ·{" "}
-                {collection.manualReviewCount} para revisão manual
+                {collection.manualReviewCount} precisam da sua correção
               </p>
               {collection.lastErrorCode && (
-                <p className="status-error">{collection.lastErrorCode}</p>
+                <p className="status-error">
+                  {errorMessage(collection.lastErrorCode)}
+                </p>
               )}
               <ul className="publication-targets">
                 {collection.submissions.map((submission) => (
@@ -1023,7 +1063,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                     <strong>
                       {submission.studentName ??
                         submission.respondentEmail ??
-                        "Aluno não reconciliado"}
+                        "Resposta sem aluno identificado"}
                     </strong>
                     <span>{submissionStatusLabel(submission.status)}</span>
                     <small>
@@ -1037,7 +1077,7 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                     <small>
                       Correção:{" "}
                       {correctionStatusLabel(submission.correctionStatus)}
-                      {" · "}Classroom:{" "}
+                      {" · "}Google Sala de Aula:{" "}
                       {classroomStatusLabel(submission.classroomReturnStatus)}
                     </small>
                     {submission.answers
@@ -1204,7 +1244,9 @@ export function ActivitiesPanel({ plans }: { plans: LessonPlan[] }) {
                   : "Criar rascunho"}
             </button>
           ) : (
-            <small>A estrutura foi bloqueada após a publicação.</small>
+            <small>
+              Atividade já enviada aos alunos; as questões não podem mais mudar.
+            </small>
           )}
           {message && (
             <small className="form-message" role="status">
@@ -1288,12 +1330,12 @@ function generationStatus(generation: ActivityGeneration): string {
 
 function publicationStatusLabel(status: ActivityPublication["status"]): string {
   return {
-    pending: "Publicação preparada",
-    creating_form: "Criando Google Form",
-    distributing: "Distribuindo no Classroom",
-    published: "Publicada no Google",
-    failed: "Publicação incompleta",
-    reconciliation_required: "Reconciliação necessária",
+    pending: "Preparando envio…",
+    creating_form: "Criando o formulário…",
+    distributing: "Enviando para as turmas…",
+    published: "Enviada para a turma",
+    failed: "Envio incompleto – tente de novo",
+    reconciliation_required: "Envio não confirmado – tente de novo",
   }[status];
 }
 
@@ -1308,40 +1350,27 @@ function distributionStatusLabel(
 }
 
 function publicationErrorLabel(code: string): string {
-  const labels: Record<string, string> = {
-    GOOGLE_CREDENTIAL_MISSING: "Conecte novamente sua conta Google.",
-    GOOGLE_RECONSENT_REQUIRED:
-      "Autorize os novos escopos de Forms e Classroom entrando novamente.",
-    GOOGLE_CLASSROOM_ID_MISSING:
-      "A turma ainda não possui vínculo com o Google Classroom.",
-    GOOGLE_POINTS_MUST_BE_INTEGER:
-      "O Google Forms exige pontuações inteiras em todas as questões.",
-    GOOGLE_PERMISSION_DENIED: "A conta não tem permissão para publicar.",
-    GOOGLE_RATE_LIMITED: "O limite temporário do Google foi atingido.",
-    GOOGLE_DISTRIBUTION_INCOMPLETE:
-      "Algumas turmas ainda não receberam a atividade.",
-  };
-  return labels[code] ?? `Falha externa: ${code}`;
+  return errorMessage(code);
 }
 
 function publicationMessage(publication: ActivityPublication): string {
   if (publication.status === "published")
-    return "Atividade publicada no Forms e distribuída no Classroom.";
+    return "Atividade enviada! Ela já aparece no Google Sala de Aula da turma.";
   if (publication.status === "reconciliation_required")
-    return "A resposta do Google foi ambígua. Tente novamente para reconciliar sem duplicar.";
+    return "O Google não confirmou o envio. Toque em Publicar de novo; nada será duplicado.";
   if (publication.errorCode)
     return publicationErrorLabel(publication.errorCode);
-  return "Publicação iniciada. Consulte o estado de cada turma.";
+  return "Envio iniciado. Acompanhe a situação de cada turma abaixo.";
 }
 
 function collectionStatusLabel(
   status: ActivityCollectionSummary["status"],
 ): string {
   return {
-    pending: "Coleta agendada",
-    running: "Coleta em andamento",
-    completed: "Coleta concluída",
-    failed: "Coleta com falha recuperável",
+    pending: "Busca de respostas agendada",
+    running: "Buscando respostas…",
+    completed: "Respostas recebidas",
+    failed: "Não foi possível buscar – tente de novo",
   }[status];
 }
 
@@ -1351,7 +1380,7 @@ function submissionStatusLabel(
   return {
     collected: "Objetivas corrigidas; discursivas pendentes",
     objective_graded: "Correção objetiva concluída",
-    manual_review_required: "Correção manual necessária",
+    manual_review_required: "Precisa da sua correção",
   }[status];
 }
 
@@ -1361,10 +1390,10 @@ function correctionStatusLabel(
   return {
     pending: "Pendente",
     suggested: "Sugestão disponível",
-    manual_required: "Correção manual necessária",
-    reviewed: "Revisada pelo professor",
+    manual_required: "Precisa da sua correção",
+    reviewed: "Revisada",
     approved: "Aprovada",
-    released: "Liberada",
+    released: "Nota devolvida",
   }[status];
 }
 
@@ -1373,9 +1402,9 @@ function classroomStatusLabel(
 ): string {
   return {
     pending: "Pendente",
-    not_available: "Não disponível",
+    not_available: "Não se aplica",
     returned: "Devolvida",
-    failed: "Falha recuperável",
+    failed: "Não chegou – tente de novo",
   }[status];
 }
 

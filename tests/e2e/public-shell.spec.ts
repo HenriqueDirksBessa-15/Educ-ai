@@ -60,9 +60,13 @@ test("opens the authenticated local demonstration when explicitly enabled", asyn
   await expect(page.getByRole("heading", { name: /Olá,/ })).toBeVisible({
     timeout: 60_000,
   });
-  await expect(page.getByText("professora.ana@example.invalid")).toBeVisible();
+  const menu = page.getByRole("navigation", { name: "Menu principal" });
+  await expect(menu.getByText("professora.ana@example.invalid")).toBeVisible();
+  await menu.getByRole("link", { name: /Boletins/ }).click();
   await expect(
-    page.getByRole("heading", { name: "Boletins e envio" }),
+    page.getByRole("heading", { level: 1, name: "Boletins" }),
   ).toBeVisible();
+  await expect(page).toHaveTitle("Boletins · EDUC.AI");
+  await menu.getByRole("link", { name: /Minha conta/ }).click();
   await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
 });

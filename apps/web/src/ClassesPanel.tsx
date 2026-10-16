@@ -6,6 +6,8 @@ import type {
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { classSourceLabel, errorMessage } from "./labels.js";
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
 type DataEnvelope<T> = { data: T };
@@ -36,9 +38,9 @@ export function ClassesPanel({
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
-          error?: { message?: string };
+          error?: { code?: string };
         } | null;
-        throw new Error(body?.error?.message || "Operação não concluída.");
+        throw new Error(errorMessage(body?.error?.code));
       }
       return response;
     } finally {
@@ -57,9 +59,7 @@ export function ClassesPanel({
         body.data.curriculum?.curricularComponents.join(", ") ?? "",
       );
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Falha ao abrir turma.",
-      );
+      setMessage(error instanceof Error ? error.message : errorMessage(null));
     }
   };
 
@@ -79,11 +79,9 @@ export function ClassesPanel({
       setSchoolYear("");
       setAccessCode("");
       await reload();
-      setMessage("Turma local criada.");
+      setMessage("Turma criada.");
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Falha ao criar turma.",
-      );
+      setMessage(error instanceof Error ? error.message : errorMessage(null));
     }
   };
 
@@ -94,7 +92,7 @@ export function ClassesPanel({
       if (selected) await loadDetail(selected.id);
       setMessage(success);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Operação falhou.");
+      setMessage(error instanceof Error ? error.message : errorMessage(null));
     }
   };
 
@@ -117,27 +115,25 @@ export function ClassesPanel({
       });
       await reload();
       await loadDetail(selected.id);
-      setMessage("Perfil curricular salvo.");
+      setMessage("Pronto! O que esta turma estuda foi salvo.");
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Falha ao salvar currículo.",
-      );
+      setMessage(error instanceof Error ? error.message : errorMessage(null));
     }
   };
 
   return (
     <section className="timeline-panel" aria-labelledby="classes-title">
       <div className="status-heading">
-        <div>
-          <span className="section-label">Ciclo vertical · Etapa A</span>
-          <h2 id="classes-title">Turmas e alunos</h2>
-        </div>
+        <h2 id="classes-title">Turmas e alunos</h2>
         <button
           type="button"
           className="secondary-action compact-action"
           disabled={saving}
           onClick={() =>
-            void action("/classes/sync", "Turmas do Classroom sincronizadas.")
+            void action(
+              "/classes/sync",
+              "Turmas atualizadas a partir do Google Sala de Aula.",
+            )
           }
         >
           Importar Classroom
@@ -147,14 +143,17 @@ export function ClassesPanel({
         <div>
           <h3>Suas turmas</h3>
           {classes.length === 0 ? (
-            <p className="empty-state">Nenhuma turma cadastrada.</p>
+            <p className="empty-state">
+              Você ainda não tem turmas. Use “Importar Classroom” para trazer
+              suas turmas do Google Sala de Aula ou crie uma ao lado.
+            </p>
           ) : (
             <ul className="resource-list">
               {classes.map((group) => (
                 <li key={group.id}>
                   <strong>{group.name}</strong>
                   <span>{group.schoolYear}</span>
-                  <small>Origem: {group.source}</small>
+                  <small>{classSourceLabel(group.source)}</small>
                   <button
                     type="button"
                     className="secondary-action compact-action"
@@ -171,7 +170,7 @@ export function ClassesPanel({
           className="plan-form"
           onSubmit={(event) => void createClass(event)}
         >
-          <h3>Nova turma local</h3>
+          <h3>Nova turma</h3>
           <label>
             Nome
             <input
@@ -214,7 +213,10 @@ export function ClassesPanel({
             <span className="section-label">Turma selecionada</span>
             <h3>{selected.name}</h3>
             <p>{selected.description || "Sem descrição."}</p>
-            <p>{selected.students.length} alunos sincronizados.</p>
+            <p>
+              {selected.students.length}{" "}
+              {selected.students.length === 1 ? "aluno" : "alunos"}
+            </p>
             <div className="inline-actions">
               {selected.source === "local" && (
                 <button
@@ -223,7 +225,7 @@ export function ClassesPanel({
                   onClick={() =>
                     void action(
                       `/classes/${selected.id}/google`,
-                      "Turma publicada no Classroom.",
+                      "Turma criada no Google Sala de Aula.",
                     )
                   }
                 >
@@ -237,7 +239,7 @@ export function ClassesPanel({
                   onClick={() =>
                     void action(
                       `/classes/${selected.id}/students/sync`,
-                      "Alunos sincronizados.",
+                      "Lista de alunos atualizada.",
                     )
                   }
                 >
@@ -247,7 +249,7 @@ export function ClassesPanel({
             </div>
           </article>
           <form onSubmit={(event) => void saveCurriculum(event)}>
-            <span className="section-label">Perfil curricular EDUC.AI</span>
+            <span className="section-label">O que esta turma estuda</span>
             <label>
               Etapa
               <select

@@ -82,7 +82,7 @@ describe("material links", () => {
     const file = new File(["%PDF"], "guia.pdf", {
       type: "application/pdf",
     });
-    const fileInput = screen.getByLabelText(/^Arquivo privado/);
+    const fileInput = screen.getByLabelText(/^Arquivo do computador/);
     Object.defineProperty(fileInput, "files", { value: [file] });
     fireEvent.submit(fileInput.closest("form")!);
 

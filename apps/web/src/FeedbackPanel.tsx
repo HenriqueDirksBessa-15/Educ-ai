@@ -8,6 +8,9 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
+import { useConfirm } from "./ConfirmDialog.js";
+import { notificationLabel } from "./labels.js";
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 type DataEnvelope<T> = { data: T };
 
@@ -18,6 +21,7 @@ export function FeedbackPanel({
   classes: ClassSummary[];
   materials: Material[];
 }) {
+  const confirm = useConfirm();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [eligible, setEligible] = useState<EligibleFeedbackSubmission[]>([]);
   const [scope, setScope] = useState<FeedbackScope>("individual");
@@ -74,7 +78,7 @@ export function FeedbackPanel({
 
   useEffect(() => {
     void load().catch(() =>
-      setMessage("Não foi possível carregar feedbacks e avisos."),
+      setMessage("Não foi possível carregar seus recados. Tente de novo."),
     );
   }, [load]);
 
@@ -113,10 +117,14 @@ export function FeedbackPanel({
       setObservation("");
       setLinkUrl("");
       setMaterialId("");
-      setMessage(scope === "individual" ? "Feedback criado." : "Aviso criado.");
+      setMessage(
+        "Recado salvo. Revise o texto e toque em Enviar quando estiver pronto.",
+      );
       await load();
     } catch {
-      setMessage("Revise o destinatário, o texto, o link e os anexos.");
+      setMessage(
+        "Não foi possível salvar. Confira para quem vai, o texto e o link.",
+      );
     } finally {
       setBusyId(null);
     }
@@ -126,6 +134,29 @@ export function FeedbackPanel({
     feedback: Feedback,
     action: "generate" | "review" | "send" | "save" | "delete",
   ) => {
+    const recipient =
+      feedback.scope === "individual"
+        ? `${feedback.studentName} por e-mail`
+        : `a turma ${feedback.className} no Google Sala de Aula`;
+    if (
+      action === "send" &&
+      !(await confirm({
+        title: "Enviar este recado?",
+        body: `“${feedback.title}” será enviado para ${recipient}.`,
+        confirmLabel: "Enviar recado",
+      }))
+    )
+      return;
+    if (
+      action === "delete" &&
+      !(await confirm({
+        title: "Excluir este recado?",
+        body: `“${feedback.title}” sai da lista de recados.`,
+        confirmLabel: "Excluir recado",
+        danger: true,
+      }))
+    )
+      return;
     setBusyId(feedback.id);
     setMessage(null);
     try {
@@ -167,8 +198,8 @@ export function FeedbackPanel({
     } catch {
       setMessage(
         feedback.canEdit
-          ? "A ação exige revisão ou dados válidos. Tente novamente."
-          : "A janela configurada para alteração expirou.",
+          ? "Não foi possível concluir. Se houver sugestão da IA, revise-a antes."
+          : "Este recado não pode mais ser alterado: o prazo para mudanças acabou.",
       );
     } finally {
       setBusyId(null);
@@ -178,28 +209,27 @@ export function FeedbackPanel({
   return (
     <section className="timeline-panel" aria-labelledby="feedback-title">
       <div className="status-heading">
-        <div>
-          <span className="section-label">Dia 12 · RF013</span>
-          <h2 id="feedback-title">Feedbacks e avisos</h2>
-        </div>
-        <span className="timeline-count">{feedbacks.length} registros</span>
+        <h2 id="feedback-title">Seus recados</h2>
+        <span className="timeline-count">
+          {feedbacks.length} {feedbacks.length === 1 ? "recado" : "recados"}
+        </span>
       </div>
       <div className="activities-layout">
         <form
           className="activity-form"
           onSubmit={(event) => void createFeedback(event)}
         >
-          <h3>Nova comunicação</h3>
+          <h3>Novo recado</h3>
           <label>
-            Tipo
+            Para quem
             <select
               value={scope}
               onChange={(event) =>
                 setScope(event.target.value as FeedbackScope)
               }
             >
-              <option value="individual">Feedback individual</option>
-              <option value="global">Aviso global</option>
+              <option value="individual">Um aluno (por e-mail)</option>
+              <option value="global">A turma toda (aviso)</option>
             </select>
           </label>
           <label>
@@ -237,7 +267,7 @@ export function FeedbackPanel({
             />
           </label>
           <label>
-            Observação docente
+            Observação para você (opcional)
             <textarea
               value={observation}
               onChange={(event) => setObservation(event.target.value)}
@@ -272,13 +302,15 @@ export function FeedbackPanel({
               busyId === "new" || !targetId || !title.trim() || !content.trim()
             }
           >
-            {busyId === "new" ? "Salvando…" : "Criar comunicação"}
+            {busyId === "new" ? "Salvando…" : "Salvar recado"}
           </button>
         </form>
         <div>
-          <h3>Histórico de comunicações</h3>
+          <h3>Recados anteriores</h3>
           {feedbacks.length === 0 ? (
-            <p className="empty-state">Nenhum feedback ou aviso criado.</p>
+            <p className="empty-state">
+              Nenhum recado ainda. Escreva o primeiro ao lado.
+            </p>
           ) : (
             <ul className="resource-list feedback-list">
               {feedbacks.map((feedback) => (
@@ -317,7 +349,7 @@ export function FeedbackPanel({
                         [feedback.id]: event.target.value,
                       }))
                     }
-                    placeholder="Observação docente"
+                    placeholder="Observação para você (opcional)"
                   />
                   {feedback.latestGeneration?.suggestion && (
                     <small>
@@ -328,16 +360,14 @@ export function FeedbackPanel({
                       )}
                     </small>
                   )}
-                  <small>
-                    {feedback.attachments.length} anexos ·{" "}
-                    {feedback.links.length} links · {feedback.history.length}{" "}
-                    eventos
-                  </small>
-                  {feedback.notification && (
+                  {feedback.attachments.length + feedback.links.length > 0 && (
                     <small>
-                      Notificação: {feedback.notification.channel} ·{" "}
-                      {feedback.notification.status}
+                      {feedback.attachments.length} anexos ·{" "}
+                      {feedback.links.length} links
                     </small>
+                  )}
+                  {feedback.notification && (
+                    <small>{notificationLabel(feedback.notification)}</small>
                   )}
                   <div className="inline-actions">
                     <button
@@ -362,7 +392,7 @@ export function FeedbackPanel({
                       }
                       onClick={() => void act(feedback, "generate")}
                     >
-                      Gerar com IA
+                      Pedir ajuda à IA
                     </button>
                     {feedback.status === "generated" && (
                       <button
@@ -428,9 +458,9 @@ function actionMessage(
 ) {
   return {
     generate: "Sugestão gerada; revise o texto antes do envio.",
-    review: "Sugestão revisada pelo professor.",
-    send: "Comunicação enviada e notificação registrada.",
-    save: "Edição salva no histórico.",
-    delete: "Comunicação excluída logicamente.",
+    review: "Sugestão revisada.",
+    send: "Recado enviado.",
+    save: "Alterações salvas.",
+    delete: "Recado excluído.",
   }[action];
 }

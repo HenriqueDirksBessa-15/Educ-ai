@@ -2,6 +2,28 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 02: base
+
+Concluída em 16/10/2026 a base do redesenho da interface do professor
+([diagnóstico](./telas/00-diagnostico-ui.md),
+[proposta](./telas/01-proposta-ui.md), [etapa](./telas/02-base.md)):
+
+- menu por tarefas (lateral no computador, barra inferior no celular) com
+  roteador próprio por endereço e título de aba por tela;
+- marcas do plano ("Dia N", "RFxxx") e painel técnico de serviços Google
+  removidos; aviso aparece só quando o Google está fora do ar;
+- situações e códigos de erro traduzidos em um módulo único de rótulos;
+- listas completas, estados vazios com próximo passo e falhas de carregamento
+  visíveis;
+- confirmação acessível antes de publicar, encerrar, guardar, devolver nota,
+  enviar ou excluir recado, enviar boletim e excluir conta;
+- cores, foco e tamanhos dentro de WCAG 2.2 AA.
+
+Verificações: 30 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados. O `npm run check` completo ficou bloqueado
+por alterações em andamento da API, fora desta etapa. E2E atualizado, não
+executado (exige API e banco).
+
 ## Ciclo vertical — CV-F: Resend e outbox operacional
 
 Concluída em 16/10/2026 a implementação da entrega híbrida:

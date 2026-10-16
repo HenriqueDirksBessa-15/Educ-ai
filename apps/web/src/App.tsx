@@ -12,9 +12,17 @@ import type {
   Milestone,
 } from "@educai/contracts";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, MouseEvent, ReactNode } from "react";
+import { AppShell, Page } from "./AppShell";
 import { ClassesPanel } from "./ClassesPanel";
+import { ConfirmProvider, useConfirm } from "./ConfirmDialog";
+import {
+  formatDate,
+  lessonPlanStatusLabel,
+  milestoneTypeLabel,
+} from "./labels";
 import { MaterialsPanel } from "./MaterialsPanel";
+import { pageTitle, routeHref, useRoute, type RouteId } from "./router";
 
 const ActivitiesPanel = lazy(() =>
   import("./ActivitiesPanel").then((module) => ({
@@ -85,7 +93,7 @@ export function App() {
     } catch {
       setState({
         kind: "error",
-        message: "Não foi possível consultar sua sessão na API local.",
+        message: "Verifique sua conexão com a internet e tente de novo.",
       });
     }
   }, []);
@@ -126,225 +134,328 @@ export function App() {
   };
 
   const authError = readAuthError();
+  const route = useRoute();
 
-  return (
-    <main className="page-shell" id="main-content">
-      <a className="skip-link" href="#main-content">
-        Ir para o conteúdo principal
-      </a>
-      <header className="app-header">
-        <span className="brand">EDUC.AI</span>
-        {state.kind === "authenticated" && (
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={loggingOut}
-            onClick={() => void logout()}
-          >
-            {loggingOut ? "Saindo…" : "Sair"}
-          </button>
-        )}
-      </header>
+  useEffect(() => {
+    document.title =
+      state.kind === "authenticated" ? pageTitle(route) : "Entrar · EDUC.AI";
+  }, [state.kind, route]);
 
-      {state.kind === "loading" && (
-        <section className="center-card" aria-live="polite">
-          <span className="eyebrow">Identidade Google</span>
-          <h1>Carregando sua sessão…</h1>
-        </section>
-      )}
+  // The hash belongs to the router, so the skip link moves focus itself.
+  const skipToContent = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    document.getElementById("conteudo")?.focus();
+  };
 
-      {state.kind === "error" && (
-        <section className="center-card" role="alert">
-          <span className="eyebrow">Falha de comunicação</span>
-          <h1>Não conseguimos abrir o EDUC.AI.</h1>
-          <p>{state.message}</p>
-          <button type="button" onClick={() => void loadSession()}>
-            Tentar novamente
-          </button>
-        </section>
-      )}
+  const skipLink = (
+    <a className="skip-link" href="#conteudo" onClick={skipToContent}>
+      Ir para o conteúdo principal
+    </a>
+  );
 
-      {state.kind === "unauthenticated" && (
-        <section className="login-layout">
-          <div className="login-copy">
-            <span className="eyebrow">Dia 2 · acesso do professor</span>
-            <h1>Seu planejamento começa com uma conta Google.</h1>
-            <p>
-              O EDUC.AI usa exclusivamente o Google para confirmar sua
-              identidade e conectar Classroom e Forms com sua autorização.
-            </p>
-            {authError && (
-              <div className="notice error" role="alert">
-                <strong>Não foi possível entrar</strong>
-                <span>{authError}</span>
-              </div>
-            )}
-            <a
-              className="primary-action"
-              href={`${apiBaseUrl}/auth/google/start`}
-            >
-              Entrar com Google
-            </a>
-            {devAuthEnabled && (
-              <button
-                className="secondary-action"
-                type="button"
-                onClick={() => void devLogin()}
-              >
-                Entrar na demonstração local
-              </button>
-            )}
-            <small>
-              Nenhuma senha Google é recebida ou armazenada pelo EDUC.AI.
-            </small>
-          </div>
-          <aside className="security-card">
-            <span className="section-label">Limites desta etapa</span>
-            <h2>Conexão explícita e revogável</h2>
-            <ul>
-              <li>Sessão protegida em cookie HTTP-only.</li>
-              <li>Tokens criptografados somente no servidor.</li>
-              <li>Nenhum conteúdo é publicado automaticamente.</li>
-            </ul>
-          </aside>
-        </section>
-      )}
-
-      {state.kind === "authenticated" && (
+  if (state.kind === "authenticated")
+    return (
+      <ConfirmProvider>
+        {skipLink}
         <ProfessorShell
+          route={route}
           identity={state.identity}
           integrations={state.integrations}
+          loggingOut={loggingOut}
+          onLogout={() => void logout()}
         />
-      )}
+      </ConfirmProvider>
+    );
 
-      <footer>
-        <span>Dia 14 de 14</span>
-        <span>Segurança · privacidade · operação</span>
-      </footer>
-    </main>
+  return (
+    <>
+      {skipLink}
+      <main className="page-shell" id="conteudo" tabIndex={-1}>
+        <header className="app-header">
+          <span className="brand">
+            <span className="brand-mark" aria-hidden="true">
+              E
+            </span>
+            EDUC.AI
+          </span>
+        </header>
+
+        {state.kind === "loading" && (
+          <section className="center-card" aria-live="polite">
+            <h1>Abrindo o EDUC.AI…</h1>
+          </section>
+        )}
+
+        {state.kind === "error" && (
+          <section className="center-card" role="alert">
+            <h1>Não conseguimos abrir o EDUC.AI.</h1>
+            <p>{state.message}</p>
+            <button type="button" onClick={() => void loadSession()}>
+              Tentar novamente
+            </button>
+          </section>
+        )}
+
+        {state.kind === "unauthenticated" && (
+          <section className="login-layout">
+            <div className="login-copy">
+              <h1>Seu planejamento começa com uma conta Google.</h1>
+              <p>
+                Entre com a mesma conta do Google que você usa no Google Sala de
+                Aula.
+              </p>
+              {authError && (
+                <div className="notice error" role="alert">
+                  <strong>Não foi possível entrar</strong>
+                  <span>{authError}</span>
+                </div>
+              )}
+              <a
+                className="primary-action"
+                href={`${apiBaseUrl}/auth/google/start`}
+              >
+                Entrar com Google
+              </a>
+              {devAuthEnabled && (
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => void devLogin()}
+                >
+                  Entrar na demonstração local
+                </button>
+              )}
+              <small>
+                Não vemos sua senha do Google. Nada é enviado aos alunos sem a
+                sua aprovação.
+              </small>
+            </div>
+          </section>
+        )}
+      </main>
+    </>
   );
 }
 
+type LoadState = "loading" | "ready" | "failed";
+
 function ProfessorShell({
+  route,
   identity,
   integrations,
+  loggingOut,
+  onLogout,
 }: {
+  route: RouteId;
   identity: Identity;
   integrations: IntegrationStatus[];
+  loggingOut: boolean;
+  onLogout: () => void;
 }) {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [classes, setClasses] = useState<ClassSummary[]>([]);
   const [plans, setPlans] = useState<LessonPlan[]>([]);
+  const [loadState, setLoadState] = useState<LoadState>("loading");
 
-  const loadClasses = useCallback(async () => {
-    const response = await fetch(`${apiBaseUrl}/classes`, {
+  const readList = async <T,>(path: string): Promise<T[]> => {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
       credentials: "include",
     });
-    if (!response.ok) return;
-    const body = (await response.json()) as DataEnvelope<ClassSummary[]>;
-    setClasses(Array.isArray(body.data) ? body.data : []);
-  }, []);
+    if (!response.ok) throw new Error(path);
+    const body = (await response.json()) as DataEnvelope<T[]>;
+    return Array.isArray(body.data) ? body.data : [];
+  };
 
-  const loadMaterials = useCallback(async () => {
-    const response = await fetch(`${apiBaseUrl}/materials`, {
-      credentials: "include",
-    });
-    if (!response.ok) return;
-    const body = (await response.json()) as DataEnvelope<Material[]>;
-    setMaterials(Array.isArray(body.data) ? body.data : []);
-  }, []);
+  const loadClasses = useCallback(
+    async () => setClasses(await readList<ClassSummary>("/classes")),
+    [],
+  );
+  const loadMaterials = useCallback(
+    async () => setMaterials(await readList<Material>("/materials")),
+    [],
+  );
+  const loadPlans = useCallback(
+    async () => setPlans(await readList<LessonPlan>("/lesson-plans")),
+    [],
+  );
 
-  const loadPlans = useCallback(async () => {
-    const response = await fetch(`${apiBaseUrl}/lesson-plans`, {
-      credentials: "include",
-    });
-    if (!response.ok) return;
-    const body = (await response.json()) as DataEnvelope<LessonPlan[]>;
-    setPlans(Array.isArray(body.data) ? body.data : []);
-  }, []);
-
-  useEffect(() => {
-    void Promise.all([
-      fetch(`${apiBaseUrl}/timeline/milestones`, { credentials: "include" }),
-      loadClasses(),
-      loadMaterials(),
-      loadPlans(),
-    ])
-      .then(
-        async ([
-          milestoneResponse,
-          _classesLoaded,
-          _materialsLoaded,
-          _plansLoaded,
-        ]) => {
-          const read = async <T,>(response: Response): Promise<T[]> => {
-            if (!response.ok) return [];
-            const body = (await response.json()) as DataEnvelope<T[]>;
-            return Array.isArray(body.data) ? body.data : [];
-          };
-          setMilestones(await read<Milestone>(milestoneResponse));
-        },
-      )
-      .catch(() => undefined);
+  const loadAll = useCallback(async () => {
+    setLoadState("loading");
+    try {
+      await Promise.all([
+        readList<Milestone>("/timeline/milestones").then(setMilestones),
+        loadClasses(),
+        loadMaterials(),
+        loadPlans(),
+      ]);
+      setLoadState("ready");
+    } catch {
+      setLoadState("failed");
+    }
   }, [loadClasses, loadMaterials, loadPlans]);
 
-  return (
-    <>
-      <section className="hero compact">
-        <span className="eyebrow">Sessão autenticada</span>
-        <h1>Olá, {identity.displayName}.</h1>
-        <p>
-          Sua identidade veio da sessão Google validada pela API. O navegador
-          não envia um identificador de professor como prova de acesso.
-        </p>
-        <span className="identity-email">{identity.email}</span>
-      </section>
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
-      <section className="status-panel" aria-labelledby="integrations-title">
-        <div className="status-heading">
-          <div>
-            <span className="section-label">Monitoramento técnico</span>
-            <h2 id="integrations-title">Serviços Google</h2>
-          </div>
-        </div>
-        <div className="status-grid three-columns">
-          {(["google_oauth", "google_classroom", "google_forms"] as const).map(
-            (service) => {
-              const status = integrations.find(
-                (item) => item.service === service,
-              );
-              return (
-                <IntegrationCard
-                  key={service}
-                  service={service}
-                  status={status}
-                />
-              );
-            },
-          )}
-        </div>
-      </section>
-      <ClassesPanel classes={classes} reload={loadClasses} />
-      <TimelinePanel
-        milestones={milestones}
-        materials={materials}
-        classes={classes}
-        reloadMaterials={loadMaterials}
-      />
-      <LessonPlansPanel
-        plans={plans}
-        classes={classes}
-        materials={materials}
-        reload={loadPlans}
-      />
-      <Suspense fallback={<p className="empty-state">Carregando módulos…</p>}>
+  const loadFailure = loadState === "failed" && (
+    <div className="notice error" role="alert">
+      <strong>Não conseguimos carregar todos os seus dados.</strong>
+      <span>Verifique a internet e tente de novo.</span>
+      <button type="button" onClick={() => void loadAll()}>
+        Tentar de novo
+      </button>
+    </div>
+  );
+
+  const pages: Record<RouteId, () => ReactNode> = {
+    inicio: () => (
+      <Page
+        title={`Olá, ${identity.displayName}`}
+        subtitle="O que você quer fazer agora?"
+      >
+        {loadFailure}
+        <Shortcuts
+          items={[
+            ["aulas", "Planejar uma aula", "Com ou sem ajuda da IA"],
+            [
+              "atividades",
+              "Criar uma atividade",
+              "A partir de um plano aprovado",
+            ],
+            ["recados", "Mandar um recado", "Para um aluno ou para a turma"],
+          ]}
+        />
+      </Page>
+    ),
+    criar: () => (
+      <Page
+        title="O que você quer criar?"
+        subtitle="Escolha uma opção para começar."
+      >
+        <Shortcuts
+          items={[
+            [
+              "atividades",
+              "Nova atividade",
+              "Questões para a turma responder no Google Formulários, a partir de um plano aprovado.",
+            ],
+            [
+              "aulas",
+              "Novo plano de aula",
+              "Tema, habilidades da BNCC e roteiro da aula, com ou sem ajuda da IA.",
+            ],
+            [
+              "turmas",
+              "Nova turma",
+              "Para turmas que ainda não estão no Google Sala de Aula.",
+            ],
+          ]}
+        />
+      </Page>
+    ),
+    turmas: () => (
+      <Page
+        title="Turmas"
+        subtitle="Turmas do Google Sala de Aula e turmas criadas aqui."
+      >
+        {loadFailure}
+        <ClassesPanel classes={classes} reload={loadClasses} />
+      </Page>
+    ),
+    aulas: () => (
+      <Page
+        title="Aulas"
+        subtitle="Planos de aula, materiais e datas das suas turmas."
+      >
+        {loadFailure}
+        <LessonPlansPanel
+          plans={plans}
+          classes={classes}
+          materials={materials}
+          reload={loadPlans}
+        />
+        <TimelinePanel
+          milestones={milestones}
+          materials={materials}
+          classes={classes}
+          reloadMaterials={loadMaterials}
+        />
+      </Page>
+    ),
+    atividades: () => (
+      <Page
+        title="Atividades"
+        subtitle="Crie, envie e acompanhe as atividades das suas turmas."
+      >
         <ActivitiesPanel plans={plans} />
+      </Page>
+    ),
+    correcoes: () => (
+      <Page
+        title="Correções"
+        subtitle="Abra uma atividade já enviada e toque em “Coletar respostas”. As questões de múltipla escolha vêm corrigidas; você corrige as respostas escritas."
+      >
+        <ActivitiesPanel plans={plans} initialFilter="published" />
+      </Page>
+    ),
+    recados: () => (
+      <Page
+        title="Recados"
+        subtitle="Mensagens para um aluno ou avisos para a turma toda."
+      >
         <FeedbackPanel classes={classes} materials={materials} />
+      </Page>
+    ),
+    boletins: () => (
+      <Page
+        title="Boletins"
+        subtitle="Gere boletins em PDF com as notas já devolvidas."
+      >
         <BulletinsPanel />
+      </Page>
+    ),
+    conta: () => (
+      <Page title="Minha conta">
+        <section className="timeline-panel" aria-labelledby="account-title">
+          <h2 id="account-title">{identity.displayName}</h2>
+          <p className="identity-email">{identity.email}</p>
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={loggingOut}
+            onClick={onLogout}
+          >
+            {loggingOut ? "Saindo…" : "Sair"}
+          </button>
+        </section>
+        <PrivacyPanel />
+      </Page>
+    ),
+  };
+
+  return (
+    <AppShell route={route} identity={identity} integrations={integrations}>
+      <Suspense fallback={<p className="empty-state">Carregando…</p>}>
+        {pages[route]()}
       </Suspense>
-      <PrivacyPanel />
-    </>
+    </AppShell>
+  );
+}
+
+function Shortcuts({ items }: { items: Array<[RouteId, string, string]> }) {
+  return (
+    <ul className="shortcut-grid">
+      {items.map(([route, title, description]) => (
+        <li key={title}>
+          <a className="shortcut" href={routeHref(route)}>
+            <strong>{title}</strong>
+            <span>{description}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -361,33 +472,23 @@ function TimelinePanel({
 }) {
   return (
     <section className="timeline-panel" aria-labelledby="timeline-title">
-      <div className="status-heading">
-        <div>
-          <span className="section-label">Dia 5 · RF008 + RF010</span>
-          <h2 id="timeline-title">Linha do tempo e materiais</h2>
-        </div>
-        <span className="timeline-count">{classes.length} turmas</span>
-      </div>
+      <h2 id="timeline-title">Calendário e materiais</h2>
       <div className="timeline-grid">
         <div>
-          <h3>Próximos marcos</h3>
+          <h3>Próximas datas</h3>
           {milestones.length === 0 ? (
-            <p className="empty-state">Nenhum marco cadastrado.</p>
+            <p className="empty-state">Nenhuma data marcada ainda.</p>
           ) : (
             <ul className="resource-list">
-              {milestones.slice(0, 5).map((milestone) => (
+              {milestones.map((milestone) => (
                 <li
                   key={milestone.id}
                   className={milestone.isPast ? "muted-item" : ""}
                 >
-                  <span>
-                    {new Date(`${milestone.date}T12:00:00`).toLocaleDateString(
-                      "pt-BR",
-                    )}
-                  </span>
+                  <span>{formatDate(milestone.date)}</span>
                   <strong>{milestone.description}</strong>
                   <small>
-                    {milestone.className} · {milestone.type}
+                    {milestone.className} · {milestoneTypeLabel(milestone.type)}
                   </small>
                 </li>
               ))}
@@ -530,13 +631,15 @@ export function LessonPlansPanel({
       if (!response.ok) throw new Error();
       setMessage(
         editingId
-          ? "Plano atualizado e devolvido a rascunho."
-          : "Plano criado como rascunho manual.",
+          ? "Plano atualizado. Ele voltou para rascunho e precisa ser aprovado de novo."
+          : "Plano salvo como rascunho.",
       );
       setEditingId(null);
       await reload();
     } catch {
-      setMessage("Não foi possível criar o plano.");
+      setMessage(
+        "Não foi possível salvar o plano. Confira os campos e tente de novo.",
+      );
     } finally {
       setSaving(false);
     }
@@ -571,10 +674,14 @@ export function LessonPlansPanel({
         },
       );
       if (!response.ok) throw new Error();
-      setMessage("Plano aprovado explicitamente pelo professor.");
+      setMessage(
+        "Plano aprovado. Agora você pode criar atividades a partir dele.",
+      );
       await reload();
     } catch {
-      setMessage("Revise a sugestão de IA antes de aprovar este plano.");
+      setMessage(
+        "Não foi possível aprovar. Se houver sugestão da IA, revise-a antes.",
+      );
     } finally {
       setSaving(false);
     }
@@ -599,8 +706,8 @@ export function LessonPlansPanel({
     } catch {
       setMessage(
         plan.syllabusDescription
-          ? "A sugestão falhou; o plano manual foi preservado."
-          : "Selecione uma ementa antes de gerar sugestões.",
+          ? "A IA não conseguiu responder agora. Seu plano foi mantido. Tente de novo ou escreva você mesmo."
+          : "Escolha as habilidades da BNCC antes de pedir sugestão à IA.",
       );
     } finally {
       setGenerating(false);
@@ -621,7 +728,7 @@ export function LessonPlansPanel({
         },
       );
       if (!response.ok) throw new Error();
-      setMessage("Sugestão revisada pelo professor e salva no plano.");
+      setMessage("Sugestão revisada e salva no plano.");
       await reload();
     } catch {
       setMessage("Não foi possível registrar a revisão.");
@@ -633,27 +740,29 @@ export function LessonPlansPanel({
   return (
     <section className="timeline-panel" aria-labelledby="plans-title">
       <div className="status-heading">
-        <div>
-          <span className="section-label">Dia 7 · RF009</span>
-          <h2 id="plans-title">Planos de aula e assistência de IA</h2>
-        </div>
-        <span className="timeline-count">{plans.length} planos</span>
+        <h2 id="plans-title">Planos de aula</h2>
+        <span className="timeline-count">
+          {plans.length} {plans.length === 1 ? "plano" : "planos"}
+        </span>
       </div>
       <div className="plans-layout">
         <div>
           <h3>Seus planos</h3>
           {plans.length === 0 ? (
-            <p className="empty-state">Nenhum plano criado.</p>
+            <p className="empty-state">
+              Você ainda não tem planos. Preencha o formulário ao lado para
+              criar o primeiro.
+            </p>
           ) : (
             <ul className="resource-list">
-              {plans.slice(0, 5).map((plan) => (
+              {plans.map((plan) => (
                 <li key={plan.id}>
                   <strong>{plan.title}</strong>
                   <span>
                     {plan.curricularComponent} · {plan.schoolYear}
                   </span>
                   <small>{plan.classNames.join(", ")}</small>
-                  <small>Estado: {plan.status}</small>
+                  <small>{lessonPlanStatusLabel(plan.status)}</small>
                   <button
                     type="button"
                     className="secondary-action compact-action"
@@ -670,10 +779,12 @@ export function LessonPlansPanel({
                   >
                     {generating && selectedPlan?.id === plan.id
                       ? "Gerando…"
-                      : "Gerar sugestão"}
+                      : "Pedir sugestão à IA"}
                   </button>
                   {!plan.syllabusDescription && (
-                    <small>Vincule uma ementa para habilitar a IA.</small>
+                    <small>
+                      Escolha as habilidades da BNCC para pedir sugestão à IA.
+                    </small>
                   )}
                   {plan.status !== "approved" &&
                     plan.status !== "generated" && (
@@ -691,7 +802,7 @@ export function LessonPlansPanel({
           )}
         </div>
         <form className="plan-form" onSubmit={(event) => void savePlan(event)}>
-          <h3>{editingId ? "Editar plano" : "Novo plano manual"}</h3>
+          <h3>{editingId ? "Editar plano" : "Novo plano"}</h3>
           <label>
             Turma
             <select
@@ -792,7 +903,7 @@ export function LessonPlansPanel({
             />
           </label>
           <fieldset>
-            <legend>Ementa e habilidades BNCC</legend>
+            <legend>Habilidades da BNCC</legend>
             <select
               value={syllabusId}
               onChange={(event) => {
@@ -800,10 +911,10 @@ export function LessonPlansPanel({
                 setBnccSkillIds([]);
               }}
             >
-              <option value="">Sem ementa</option>
+              <option value="">Nenhuma</option>
               {syllabuses.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.description} · {item.sourceLabel}
+                  {item.description}
                 </option>
               ))}
             </select>
@@ -822,7 +933,7 @@ export function LessonPlansPanel({
                       )
                     }
                   />
-                  {skill.code} — {skill.description} ({skill.sourceLabel})
+                  {skill.code} — {skill.description}
                 </label>
               ))}
           </fieldset>
@@ -879,7 +990,9 @@ export function LessonPlansPanel({
               void reviewSuggestion();
             }}
           >
-            <span className="section-label">Sugestão editável</span>
+            <span className="section-label">
+              Sugestão da IA (edite à vontade)
+            </span>
             <label>
               Título
               <input
@@ -937,9 +1050,6 @@ export function LessonPlansPanel({
             <button type="submit" disabled={saving}>
               Revisar e aplicar
             </button>
-            <small>
-              Modelo: {generation.model} · origem: {generation.origin}
-            </small>
           </form>
         </div>
       )}
@@ -947,53 +1057,20 @@ export function LessonPlansPanel({
   );
 }
 
-function IntegrationCard({
-  service,
-  status,
-}: {
-  service: "google_oauth" | "google_classroom" | "google_forms";
-  status?: IntegrationStatus;
-}) {
-  const available = status?.status === "active";
-  const labels = {
-    google_oauth: "Google OAuth",
-    google_classroom: "Google Classroom",
-    google_forms: "Google Forms",
-  };
-  return (
-    <article className="status-card">
-      <div className="status-line">
-        <span
-          className={`status-dot ${available ? "available" : "unavailable"}`}
-        />
-        <span>
-          {!status
-            ? "Aguardando verificação"
-            : available
-              ? "Disponível"
-              : "Indisponível"}
-        </span>
-      </div>
-      <h3>{labels[service]}</h3>
-      <p>
-        {status
-          ? `Última verificação: ${new Date(status.checkedAt).toLocaleString("pt-BR")}`
-          : "O monitor ainda não registrou um ciclo para este serviço."}
-      </p>
-    </article>
-  );
-}
-
 function PrivacyPanel() {
+  const confirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const deleteAccount = async () => {
-    if (
-      !window.confirm(
-        "Excluir a conta remove sessões e credenciais e anonimiza sua identidade. O histórico pedagógico obrigatório será preservado. Continuar?",
-      )
-    )
-      return;
+    const confirmed = await confirm({
+      title: "Excluir sua conta?",
+      body: "Você perderá o acesso ao EDUC.AI. Notas e correções já entregues aos alunos são mantidas, sem o seu nome. Isso não pode ser desfeito.",
+      confirmLabel: "Excluir minha conta",
+      danger: true,
+    });
+    if (!confirmed) return;
     setDeleting(true);
+    setMessage(null);
     try {
       const response = await fetch(`${apiBaseUrl}/privacy/account`, {
         method: "DELETE",
@@ -1003,6 +1080,8 @@ function PrivacyPanel() {
       });
       if (!response.ok) throw new Error();
       window.location.reload();
+    } catch {
+      setMessage("Não foi possível excluir sua conta agora. Tente de novo.");
     } finally {
       setDeleting(false);
     }
@@ -1010,33 +1089,33 @@ function PrivacyPanel() {
 
   return (
     <section className="timeline-panel" aria-labelledby="privacy-title">
-      <div className="status-heading">
-        <div>
-          <span className="section-label">Privacidade e LGPD</span>
-          <h2 id="privacy-title">Seus dados</h2>
-        </div>
-      </div>
+      <h2 id="privacy-title">Seus dados</h2>
       <p>
-        Tokens nunca aparecem na exportação. A exclusão revoga o acesso e
-        anonimiza a identidade, preservando somente históricos pedagógicos e de
-        auditoria exigidos pela integridade do sistema.
+        Você pode baixar uma cópia dos seus dados a qualquer momento. Ao excluir
+        a conta, seu acesso é removido; notas e correções já entregues aos
+        alunos continuam guardadas, sem o seu nome.
       </p>
       <div className="inline-actions">
         <a
           className="secondary-action compact-action"
           href={`${apiBaseUrl}/privacy/export`}
         >
-          Exportar meus dados
+          Baixar uma cópia dos meus dados
         </a>
         <button
           type="button"
-          className="secondary-action compact-action"
+          className="danger-action compact-action"
           disabled={deleting}
           onClick={() => void deleteAccount()}
         >
           {deleting ? "Excluindo…" : "Excluir minha conta"}
         </button>
       </div>
+      {message && (
+        <p className="notice error" role="alert">
+          {message}
+        </p>
+      )}
     </section>
   );
 }
@@ -1046,6 +1125,6 @@ function readAuthError(): string | null {
   if (!code) return null;
   if (code === "access_denied") return "A autorização foi cancelada no Google.";
   if (code === "invalid_state")
-    return "A tentativa expirou. Inicie o login novamente.";
-  return "O Google não concluiu a autenticação. Tente novamente.";
+    return "A tentativa expirou. Toque em Entrar com Google de novo.";
+  return "O Google não concluiu a entrada. Tente de novo.";
 }

@@ -5,6 +5,10 @@ import type {
 } from "@educai/contracts";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { materialCategoryLabel } from "./labels.js";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+
 export function MaterialsPanel({
   materials,
   classes,
@@ -51,7 +55,7 @@ export function MaterialsPanel({
         formData.append("file", file);
       }
       const response = await fetch(
-        source === "link" ? "/api/materials/links" : "/api/materials/files",
+        `${apiBaseUrl}/materials/${source === "link" ? "links" : "files"}`,
         {
           method: "POST",
           credentials: "include",
@@ -71,7 +75,7 @@ export function MaterialsPanel({
       setMessage(
         source === "link"
           ? "Material adicionado à turma."
-          : "Arquivo privado enviado para a turma.",
+          : "Arquivo enviado para a turma.",
       );
       await reload();
     } catch {
@@ -100,7 +104,7 @@ export function MaterialsPanel({
             }}
           >
             <option value="link">Link externo</option>
-            <option value="file">Arquivo privado</option>
+            <option value="file">Arquivo do computador</option>
           </select>
         </label>
         <label>
@@ -124,7 +128,7 @@ export function MaterialsPanel({
           </label>
         ) : (
           <label>
-            Arquivo privado
+            Arquivo do computador
             <input
               key={fileInputKey}
               ref={fileInput}
@@ -185,19 +189,23 @@ export function MaterialsPanel({
         {message && <p role="status">{message}</p>}
       </form>
       {materials.length === 0 ? (
-        <p className="empty-state">Nenhum material cadastrado.</p>
+        <p className="empty-state">
+          Nenhum material ainda. Adicione um link ou arquivo acima.
+        </p>
       ) : (
         <ul className="resource-list">
-          {materials.slice(0, 5).map((material) => (
+          {materials.map((material) => (
             <li key={material.id}>
               <a
-                href={material.url ?? `/api/materials/${material.id}/file`}
+                href={
+                  material.url ?? `${apiBaseUrl}/materials/${material.id}/file`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <strong>{material.title}</strong>
               </a>
-              <span>{material.category}</span>
+              <span>{materialCategoryLabel(material.category)}</span>
               <small>{material.classNames.join(", ")}</small>
             </li>
           ))}

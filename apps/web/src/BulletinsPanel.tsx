@@ -6,10 +6,14 @@ import type {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
+import { useConfirm } from "./ConfirmDialog.js";
+import { bulletinStatusLabel, errorMessage, formatDate } from "./labels.js";
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 type DataEnvelope<T> = { data: T };
 
 export function BulletinsPanel() {
+  const confirm = useConfirm();
   const [bulletins, setBulletins] = useState<Bulletin[]>([]);
   const [students, setStudents] = useState<EligibleBulletinStudent[]>([]);
   const [classId, setClassId] = useState("");
@@ -46,7 +50,7 @@ export function BulletinsPanel() {
 
   useEffect(() => {
     void load().catch(() =>
-      setMessage("Não foi possível carregar os boletins."),
+      setMessage("Não foi possível carregar os boletins. Tente de novo."),
     );
   }, [load]);
 
@@ -99,19 +103,30 @@ export function BulletinsPanel() {
       if (!response.ok) throw new Error();
       const body = (await response.json()) as DataEnvelope<{ ids: string[] }>;
       setMessage(
-        `${body.data.ids.length} boletim(ns) gerado(s) com PDF histórico.`,
+        body.data.ids.length === 1
+          ? "1 boletim gerado."
+          : `${body.data.ids.length} boletins gerados.`,
       );
       await load();
     } catch {
       setMessage(
-        "Não foi possível gerar: verifique período, notas aprovadas e filtro de média.",
+        "Não foi possível gerar. Confira o período e se há notas devolvidas nele.",
       );
     } finally {
       setBusyId(null);
     }
   };
 
-  const send = async (bulletinId: string) => {
+  const send = async (bulletin: Bulletin) => {
+    if (
+      !(await confirm({
+        title: "Enviar boletim por e-mail?",
+        body: `O boletim de ${bulletin.studentName} será enviado para o e-mail do aluno cadastrado no Google Sala de Aula.`,
+        confirmLabel: "Enviar boletim",
+      }))
+    )
+      return;
+    const bulletinId = bulletin.id;
     setBusyId(bulletinId);
     setMessage(null);
     try {
@@ -123,9 +138,11 @@ export function BulletinsPanel() {
         },
       );
       if (!response.ok) throw new Error();
-      setMessage("Boletim enviado; a tentativa foi preservada.");
+      setMessage("Boletim enviado.");
     } catch {
-      setMessage("O PDF foi preservado. O envio pode ser repetido.");
+      setMessage(
+        "O e-mail não foi enviado. O boletim está salvo; tente de novo.",
+      );
     } finally {
       await load().catch(() => undefined);
       setBusyId(null);
@@ -135,11 +152,10 @@ export function BulletinsPanel() {
   return (
     <section className="timeline-panel" aria-labelledby="bulletins-title">
       <div className="status-heading">
-        <div>
-          <span className="section-label">Dia 13 · RF014</span>
-          <h2 id="bulletins-title">Boletins e envio</h2>
-        </div>
-        <span className="timeline-count">{bulletins.length} boletins</span>
+        <h2 id="bulletins-title">Seus boletins</h2>
+        <span className="timeline-count">
+          {bulletins.length} {bulletins.length === 1 ? "boletim" : "boletins"}
+        </span>
       </div>
       <div className="activities-layout">
         <form
@@ -242,11 +258,11 @@ export function BulletinsPanel() {
               checked={onlyBelowAverage}
               onChange={(event) => setOnlyBelowAverage(event.target.checked)}
             />
-            Somente desempenho abaixo do limiar
+            Só alunos com média abaixo de um valor
           </label>
           {onlyBelowAverage && (
             <label>
-              Limiar
+              Média mínima (0 a 10)
               <input
                 type="number"
                 min="0"
@@ -273,9 +289,11 @@ export function BulletinsPanel() {
           </button>
         </form>
         <div>
-          <h3>Boletins históricos</h3>
+          <h3>Boletins gerados</h3>
           {bulletins.length === 0 ? (
-            <p className="empty-state">Nenhum boletim gerado.</p>
+            <p className="empty-state">
+              Nenhum boletim ainda. Escolha a turma e o período ao lado.
+            </p>
           ) : (
             <ul className="resource-list">
               {bulletins.map((bulletin) => (
@@ -289,13 +307,14 @@ export function BulletinsPanel() {
                     {bulletinStatusLabel(bulletin.status)}
                   </span>
                   <small>
-                    {bulletin.periodStart} a {bulletin.periodEnd} ·{" "}
+                    {formatDate(bulletin.periodStart)} a{" "}
+                    {formatDate(bulletin.periodEnd)} ·{" "}
                     {bulletin.activities.length} atividades ·{" "}
-                    {bulletin.feedbacks.length} feedbacks
+                    {bulletin.feedbacks.length} recados
                   </small>
                   {bulletin.lastErrorCode && (
                     <small className="status-error">
-                      {bulletin.lastErrorCode}
+                      {errorMessage(bulletin.lastErrorCode)}
                     </small>
                   )}
                   <div className="inline-actions">
@@ -313,14 +332,11 @@ export function BulletinsPanel() {
                       disabled={
                         busyId === bulletin.id || bulletin.status === "pending"
                       }
-                      onClick={() => void send(bulletin.id)}
+                      onClick={() => void send(bulletin)}
                     >
                       {bulletin.status === "sent" ? "Reenviar" : "Enviar"}
                     </button>
                   </div>
-                  <small>
-                    {bulletin.deliveries.length} tentativa(s) de envio
-                  </small>
                 </li>
               ))}
             </ul>
@@ -334,13 +350,4 @@ export function BulletinsPanel() {
       )}
     </section>
   );
-}
-
-function bulletinStatusLabel(status: Bulletin["status"]): string {
-  return {
-    generated: "PDF gerado",
-    pending: "Envio pendente",
-    sent: "Enviado",
-    failed: "Falha recuperável",
-  }[status];
 }
