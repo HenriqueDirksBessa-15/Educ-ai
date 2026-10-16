@@ -311,6 +311,7 @@ describe("teacher shell", () => {
       ["#/inicio", "Olá, Professora Teste"],
       ["#/criar", "O que você quer criar?"],
       ["#/turmas", "Turmas"],
+      ["#/nova-turma", "Nova turma"],
       ["#/aulas", "Aulas"],
       ["#/atividades", "Atividades"],
       ["#/correcoes", "Correções"],

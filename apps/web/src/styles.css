@@ -1036,3 +1036,174 @@ input[type="radio"] {
     width: 100%;
   }
 }
+
+/* Class pages and shared form pieces */
+
+.page-actions {
+  margin-bottom: 1rem;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.card-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.card-title {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.muted-line {
+  display: block;
+  color: var(--muted);
+}
+
+.tag {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.1rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--bg);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.tag.warn {
+  border-color: transparent;
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.stacked-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stacked-form > button[type="submit"] {
+  justify-self: start;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+.field > span:first-child,
+.choice-group legend {
+  font-weight: 700;
+}
+
+.field input:not([type="radio"]):not([type="checkbox"]),
+.field select {
+  width: 100%;
+  min-height: 3rem;
+  border: 2px solid var(--field);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+  background: var(--surface);
+}
+
+.field [aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.field-error {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.choice-group {
+  border: 0;
+  padding: 0;
+}
+
+.choice-group legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.6rem;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0.6rem 0.9rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.student-list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-list li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.student-list li:last-child {
+  border-bottom: 0;
+}
+
+/* Long option texts (e.g. BNCC stages) must never widen the page. */
+select {
+  max-width: 100%;
+}
+
+.field,
+.stacked-form > *,
+.choice-group {
+  min-width: 0;
+}

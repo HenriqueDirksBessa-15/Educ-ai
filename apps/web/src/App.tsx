@@ -21,7 +21,7 @@ import {
 } from "react";
 import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { AppShell, Page } from "./AppShell";
-import { ClassesPanel } from "./ClassesPanel";
+import { ClassDetailPage, ClassListPage, NewClassPage } from "./ClassesPages";
 import { ConfirmProvider, useConfirm } from "./ConfirmDialog";
 import {
   formatDate,
@@ -31,7 +31,7 @@ import {
 import { MaterialsPanel } from "./MaterialsPanel";
 import { loadOverview } from "./overview";
 import { computePendencies, menuCounts, type Overview } from "./pendencies";
-import { pageTitle, routeHref, useRoute, type RouteId } from "./router";
+import { pageTitle, routeHref, useLocation, type RouteId } from "./router";
 
 const ActivitiesPanel = lazy(() =>
   import("./ActivitiesPanel").then((module) => ({
@@ -143,7 +143,7 @@ export function App() {
   };
 
   const authError = readAuthError();
-  const route = useRoute();
+  const { route, param } = useLocation();
 
   useEffect(() => {
     document.title =
@@ -168,6 +168,7 @@ export function App() {
         {skipLink}
         <ProfessorShell
           route={route}
+          param={param}
           identity={state.identity}
           integrations={state.integrations}
           loggingOut={loggingOut}
@@ -250,12 +251,14 @@ type LoadState = "loading" | "ready" | "failed";
 
 function ProfessorShell({
   route,
+  param,
   identity,
   integrations,
   loggingOut,
   onLogout,
 }: {
   route: RouteId;
+  param: string | null;
   identity: Identity;
   integrations: IntegrationStatus[];
   loggingOut: boolean;
@@ -384,7 +387,7 @@ function ProfessorShell({
               "Tema, habilidades da BNCC e roteiro da aula, com ou sem ajuda da IA.",
             ],
             [
-              "turmas",
+              "nova-turma",
               "Nova turma",
               "Para turmas que ainda não estão no Google Sala de Aula.",
             ],
@@ -392,13 +395,24 @@ function ProfessorShell({
         />
       </Page>
     ),
-    turmas: () => (
+    turmas: () =>
+      param ? (
+        <ClassDetailPage key={param} classId={param} reload={loadClasses} />
+      ) : (
+        <Page
+          title="Turmas"
+          subtitle="Turmas do Google Sala de Aula e turmas criadas aqui."
+        >
+          {loadFailure}
+          <ClassListPage classes={classes} reload={loadClasses} />
+        </Page>
+      ),
+    "nova-turma": () => (
       <Page
-        title="Turmas"
-        subtitle="Turmas do Google Sala de Aula e turmas criadas aqui."
+        title="Nova turma"
+        subtitle="Para turmas que ainda não estão no Google Sala de Aula."
       >
-        {loadFailure}
-        <ClassesPanel classes={classes} reload={loadClasses} />
+        <NewClassPage reload={loadClasses} />
       </Page>
     ),
     aulas: () => (

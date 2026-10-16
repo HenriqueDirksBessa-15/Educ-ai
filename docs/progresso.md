@@ -2,6 +2,24 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 04: Turmas
+
+Concluída em 16/10/2026 ([etapa](./telas/04-turmas.md)):
+
+- lista de turmas com matéria e ano, ou aviso "Matéria não definida", e botão
+  para trazer as turmas do Google Sala de Aula;
+- página da turma com alunos, atualização da lista e criação no Google Sala de
+  Aula com confirmação;
+- etapa, ano e **uma** matéria escolhidos em listas montadas do catálogo
+  BNCC, gravando exatamente os valores que a busca de habilidades usa (antes o
+  professor precisaria digitar `ef-ano-08`);
+- página de nova turma com código gerado.
+
+Verificações: 66 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados. Pendências para o backend registradas na
+etapa (habilidades de vários anos ligadas só ao primeiro ano na projeção da
+BNCC).
+
 ## Interface — etapa 03: entrada e Início
 
 Concluída em 16/10/2026 ([etapa](./telas/03-entrada-inicio.md)):

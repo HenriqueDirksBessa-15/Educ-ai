@@ -14,6 +14,7 @@ import {
 const ICONS: Record<RouteId | "mais", string> = {
   inicio: "M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z",
   criar: "M12 5v14M5 12h14",
+  "nova-turma": "M12 5v14M5 12h14",
   turmas:
     "M9 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17.5 11.5a2.5 2.5 0 1 0 0-5M16 14.2c3 .2 5.5 2.4 5.5 5.8",
   aulas: "M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM8 9h6M8 13h6",
@@ -112,7 +113,9 @@ export function AppShell({
         <a
           className="primary-action side-create"
           href={routeHref("criar")}
-          {...current("criar")}
+          {...(route === "criar" || route === "nova-turma"
+            ? ({ "aria-current": "page" } as const)
+            : {})}
         >
           + Criar
         </a>

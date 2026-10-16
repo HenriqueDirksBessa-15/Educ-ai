@@ -1,6 +1,7 @@
 import type {
   Bulletin,
   ClassSummary,
+  StudentSummary,
   Feedback,
   LessonPlan,
   MaterialCategory,
@@ -23,6 +24,16 @@ export function classSourceLabel(source: ClassSummary["source"]): string {
   return { google: "Do Google Sala de Aula", local: "Criada no EDUC.AI" }[
     source
   ];
+}
+
+export function enrollmentStatusLabel(
+  status: StudentSummary["status"],
+): string {
+  return {
+    active: "Ativo",
+    restricted: "Restrito",
+    pending: "Aguardando confirmação",
+  }[status];
 }
 
 export function materialCategoryLabel(category: MaterialCategory): string {
@@ -91,6 +102,8 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Muitos e-mails enviados de uma vez. Tente de novo em alguns minutos.",
   EMAIL_MESSAGE_INVALID:
     "O e-mail não foi aceito. Confira o endereço do aluno no Google Sala de Aula.",
+  INTEGRATION_UNAVAILABLE:
+    "Não conseguimos falar com o Google agora. Tente de novo; se continuar, saia e entre com Google de novo para renovar a permissão.",
   VALIDATION_ERROR: "Confira os dados preenchidos e tente de novo.",
   FORBIDDEN: "Você não tem acesso a este item.",
   NOT_FOUND: "Este item não existe mais. Atualize a página.",

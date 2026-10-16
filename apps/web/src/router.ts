@@ -4,6 +4,7 @@ export type RouteId =
   | "inicio"
   | "criar"
   | "turmas"
+  | "nova-turma"
   | "aulas"
   | "atividades"
   | "correcoes"
@@ -17,6 +18,7 @@ export const routes: Record<RouteId, RouteInfo> = {
   inicio: { title: "Início", hint: "O que fazer hoje" },
   criar: { title: "Criar" },
   turmas: { title: "Turmas", hint: "Alunos e matéria" },
+  "nova-turma": { title: "Nova turma" },
   aulas: { title: "Aulas", hint: "Planos e materiais" },
   atividades: { title: "Atividades", hint: "Criar e enviar" },
   correcoes: { title: "Correções", hint: "Notas para dar" },
@@ -44,26 +46,42 @@ export const primaryRoutes: RouteId[] = [
   "correcoes",
 ];
 
-export function parseRoute(hash: string): RouteId {
-  const match = /^#\/([a-z-]*)$/.exec(hash);
+// Only these routes take an id after the slash, e.g. "#/turmas/{id}".
+const routesWithParam = new Set<RouteId>(["turmas"]);
+
+export type Location = { route: RouteId; param: string | null };
+
+export function parseLocation(hash: string): Location {
+  const match = /^#\/([a-z-]*)(?:\/([A-Za-z0-9-]+))?$/.exec(hash);
   const id = match?.[1];
-  return id && id in routes ? (id as RouteId) : "inicio";
+  if (!id || !(id in routes)) return { route: "inicio", param: null };
+  const route = id as RouteId;
+  return {
+    route,
+    param: routesWithParam.has(route) ? (match?.[2] ?? null) : null,
+  };
 }
 
-export function routeHref(route: RouteId): string {
-  return `#/${route}`;
+export function parseRoute(hash: string): RouteId {
+  return parseLocation(hash).route;
+}
+
+export function routeHref(route: RouteId, param?: string): string {
+  return param ? `#/${route}/${param}` : `#/${route}`;
 }
 
 export function pageTitle(route: RouteId): string {
   return `${routes[route].title} · EDUC.AI`;
 }
 
-export function useRoute(): RouteId {
-  const [route, setRoute] = useState(() => parseRoute(window.location.hash));
+export function useLocation(): Location {
+  const [location, setLocation] = useState(() =>
+    parseLocation(window.location.hash),
+  );
   useEffect(() => {
-    const update = () => setRoute(parseRoute(window.location.hash));
+    const update = () => setLocation(parseLocation(window.location.hash));
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, []);
-  return route;
+  return location;
 }

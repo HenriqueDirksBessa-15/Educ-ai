@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   bulletinStatusLabel,
   classSourceLabel,
+  enrollmentStatusLabel,
   errorMessage,
   formatDate,
   lessonPlanStatusLabel,
@@ -75,6 +76,15 @@ describe("teacher-facing labels", () => {
       expect(message).not.toMatch(/[A-Z]{3,}_[A-Z_]+/);
       expect(message.length).toBeGreaterThan(10);
     }
+  });
+
+  it("explains Google integration failures and enrollment states", () => {
+    expect(errorMessage("INTEGRATION_UNAVAILABLE")).toMatch(
+      /saia e entre com Google/,
+    );
+    expect(enrollmentStatusLabel("active")).toBe("Ativo");
+    expect(enrollmentStatusLabel("pending")).toBe("Aguardando confirmação");
+    expect(enrollmentStatusLabel("restricted")).toBe("Restrito");
   });
 
   it("formats dates in Brazilian Portuguese", () => {
