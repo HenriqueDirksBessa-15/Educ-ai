@@ -23,6 +23,8 @@ const config: AppConfig = {
   sessionTtlSeconds: 28_800,
   integrationMonitorIntervalMs: 300_000,
   feedbackEditWindowMinutes: 1_440,
+  materialStorageDirectory: "storage/materials-test",
+  materialUploadMaxBytes: 104_857_600,
   enableDevAuth: false,
   rateLimitMax: 300,
   dataRetentionDays: 365,

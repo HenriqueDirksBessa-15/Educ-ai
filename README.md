@@ -143,6 +143,8 @@ npm run check
 | `RATE_LIMIT_MAX`                  | Requisições máximas por minuto/IP         |
 | `DATA_RETENTION_DAYS`             | Retenção de dados técnicos revogados      |
 | `FEEDBACK_EDIT_WINDOW_MINUTES`    | Janela de edição/exclusão de feedback     |
+| `MATERIAL_STORAGE_DIRECTORY`      | Diretório privado dos arquivos locais     |
+| `MATERIAL_UPLOAD_MAX_BYTES`       | Limite por arquivo, até 100 MB            |
 
 Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
 
@@ -177,6 +179,18 @@ Endpoints do Dia 4:
 - `GET/POST /api/classes` e `GET/PATCH /api/classes/:classId`;
 - `POST /api/classes/:classId/students` para matrícula idempotente;
 - `POST /api/classes/sync` para adapter Classroom de fixture.
+
+Endpoints de materiais:
+
+- `POST /api/materials/links` para cadastrar recurso HTTP(S);
+- `POST /api/materials/files` para upload multipart privado em streaming;
+- `GET /api/materials/:materialId/file` para download autenticado;
+- `POST /api/materials/:materialId/archive` e `DELETE /api/materials/:materialId`
+  para ciclo de vida protegido.
+
+Arquivos aceitos: PDF, DOCX, PPT/PPTX, MP4, JPEG, PNG, GIF e WebP. O limite
+padrão é 100 MB. Os bytes ficam no diretório privado local configurado e a
+chave física nunca é devolvida ao navegador. O backend GCS permanece pendente.
 
 Endpoints do Dia 9:
 

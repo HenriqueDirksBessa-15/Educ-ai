@@ -1,6 +1,26 @@
 # Progresso
 
-Atualizado em 15/10/2026.
+Atualizado em 16/10/2026.
+
+## Ciclo vertical — CV-B1.1: upload privado local
+
+Concluído em 16/10/2026 o upload privado de materiais:
+
+- multipart em streaming com limite decidido de 100 MB;
+- PDF, DOCX, PPT/PPTX, MP4 e imagens validados por extensão, MIME e assinatura;
+- armazenamento local por adaptador, chave opaca interna e rollback de objeto
+  em falha de limite ou persistência;
+- metadados e vínculos gravados atomicamente, com isolamento por professor;
+- download autenticado como anexo privado, sem expor a chave física;
+- interface única para link externo ou arquivo privado.
+
+Verificações: `npm run check` aprovado (17 contratos, 100 API e 10 web); 8
+testes PostgreSQL aprovados em banco temporário, com smoke OpenAI ignorado por
+ser opt-in; `npm audit --omit=dev` sem vulnerabilidades. O banco temporário foi
+removido e nenhum arquivo foi enviado a serviço externo.
+
+Nenhum arquivo foi enviado ao GCS. Decisões, segurança e roteiro estão em
+[`ciclo-vertical/09-cv-b1-upload-privado.md`](./ciclo-vertical/09-cv-b1-upload-privado.md).
 
 ## Ciclo vertical — CV-HML: OpenAI real e ambiente determinístico
 

@@ -56,6 +56,40 @@ describe("material repository boundaries", () => {
     ).rejects.toThrow("MATERIAL_RELATION_NOT_FOUND");
   });
 
+  it("persists file metadata and relations atomically", async () => {
+    const database = {
+      query: vi.fn().mockResolvedValue({ rows: [{ id: "material-file-id" }] }),
+    };
+    const repository = new TimelineRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(
+      repository.createMaterialFile(professorId, {
+        title: "Guia privado",
+        category: "reading",
+        classIds: [classId],
+        bnccSkillIds: [],
+        fileName: "guia.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 4,
+        storageKey: `${professorId}/11111111-1111-4111-8111-111111111111`,
+      }),
+    ).resolves.toBe("material-file-id");
+
+    const [sql, values] = database.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("file_name, mime_type");
+    expect(sql).toContain("INSERT INTO material_class");
+    expect(values).toEqual(
+      expect.arrayContaining([
+        "guia.pdf",
+        "application/pdf",
+        4,
+        `${professorId}/11111111-1111-4111-8111-111111111111`,
+      ]),
+    );
+  });
+
   it("lists only the requested archive state and returns relation ids", async () => {
     const database = { query: vi.fn().mockResolvedValue({ rows: [] }) };
     await new TimelineRepository(
@@ -69,5 +103,27 @@ describe("material repository boundaries", () => {
     expect(sql).toContain("class_ids");
     expect(sql).toContain("bncc_skill_ids");
     expect(values).toEqual([professorId, null, false]);
+  });
+
+  it("deletes material relations and the owned record atomically", async () => {
+    const database = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [{ id: "material-id", linked: false, storage_key: null }],
+        })
+        .mockResolvedValueOnce({ rows: [] }),
+    };
+    const repository = new TimelineRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(
+      repository.deleteMaterial(professorId, "material-id"),
+    ).resolves.toEqual({ status: "deleted", storageKey: null });
+    const [sql] = database.query.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain("DELETE FROM material_class");
+    expect(sql).toContain("DELETE FROM material_bncc_skill");
+    expect(sql).toContain("DELETE FROM material WHERE");
   });
 });

@@ -285,13 +285,39 @@ export const materialLinkInputSchema = z
       });
   });
 
-export const materialSchema = materialInputSchema.extend({
-  id: z.uuid(),
-  classNames: z.array(z.string().min(1)),
-  isArchived: z.boolean(),
-  hasPublishedContent: z.boolean(),
-  createdAt: z.iso.datetime(),
-});
+export const materialFileMetadataSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160),
+    description: z.string().trim().max(2_000).nullable().optional(),
+    category: materialCategorySchema.exclude(["link"]),
+    classIds: z.array(z.uuid()).min(1),
+    bnccSkillIds: z.array(z.uuid()).default([]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (new Set(value.classIds).size !== value.classIds.length)
+      context.addIssue({
+        code: "custom",
+        path: ["classIds"],
+        message: "Cada turma deve aparecer uma única vez.",
+      });
+    if (new Set(value.bnccSkillIds).size !== value.bnccSkillIds.length)
+      context.addIssue({
+        code: "custom",
+        path: ["bnccSkillIds"],
+        message: "Cada habilidade deve aparecer uma única vez.",
+      });
+  });
+
+export const materialSchema = materialInputSchema
+  .omit({ storageKey: true })
+  .extend({
+    id: z.uuid(),
+    classNames: z.array(z.string().min(1)),
+    isArchived: z.boolean(),
+    hasPublishedContent: z.boolean(),
+    createdAt: z.iso.datetime(),
+  });
 
 export const materialListQuerySchema = z.object({
   category: materialCategorySchema.optional(),
@@ -1017,6 +1043,7 @@ export type MaterialCategory = z.infer<typeof materialCategorySchema>;
 export type Material = z.infer<typeof materialSchema>;
 export type MaterialInput = z.infer<typeof materialInputSchema>;
 export type MaterialLinkInput = z.infer<typeof materialLinkInputSchema>;
+export type MaterialFileMetadata = z.infer<typeof materialFileMetadataSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type LessonPlanInput = z.infer<typeof lessonPlanInputSchema>;
 export type LessonPlanUpdate = z.infer<typeof lessonPlanUpdateSchema>;

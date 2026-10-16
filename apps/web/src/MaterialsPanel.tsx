@@ -3,7 +3,7 @@ import type {
   Material,
   MaterialCategory,
 } from "@educai/contracts";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 export function MaterialsPanel({
   materials,
@@ -17,6 +17,9 @@ export function MaterialsPanel({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [source, setSource] = useState<"link" | "file">("link");
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [category, setCategory] = useState<MaterialCategory>("reading");
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
@@ -29,32 +32,53 @@ export function MaterialsPanel({
 
   const create = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!classId || !title.trim() || !url.trim()) return;
+    const file = fileInput.current?.files?.[0] ?? null;
+    if (!classId || !title.trim() || (source === "link" ? !url.trim() : !file))
+      return;
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/materials/links", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description: description.trim() || null,
-          category,
-          classIds: [classId],
-          bnccSkillIds: [],
-          url,
-        }),
-      });
+      const metadata = {
+        title,
+        description: description.trim() || null,
+        category,
+        classIds: [classId],
+        bnccSkillIds: [],
+      };
+      const formData = new FormData();
+      if (file) {
+        formData.append("metadata", JSON.stringify(metadata));
+        formData.append("file", file);
+      }
+      const response = await fetch(
+        source === "link" ? "/api/materials/links" : "/api/materials/files",
+        {
+          method: "POST",
+          credentials: "include",
+          ...(source === "link"
+            ? {
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ ...metadata, url }),
+              }
+            : { body: formData }),
+        },
+      );
       if (!response.ok) throw new Error();
       setTitle("");
       setDescription("");
       setUrl("");
-      setMessage("Material adicionado à turma.");
+      setFileInputKey((current) => current + 1);
+      setMessage(
+        source === "link"
+          ? "Material adicionado à turma."
+          : "Arquivo privado enviado para a turma.",
+      );
       await reload();
     } catch {
       setMessage(
-        "Não foi possível adicionar o material. Revise o link e a turma.",
+        source === "link"
+          ? "Não foi possível adicionar o material. Revise o link e a turma."
+          : "Não foi possível enviar o arquivo. Revise o tipo, o limite de 100 MB e a turma.",
       );
     } finally {
       setSaving(false);
@@ -63,8 +87,22 @@ export function MaterialsPanel({
 
   return (
     <div>
-      <h3>Materiais por link</h3>
+      <h3>Materiais</h3>
       <form className="plan-form material-form" onSubmit={create}>
+        <label>
+          Origem
+          <select
+            value={source}
+            onChange={(event) => {
+              const next = event.target.value as "link" | "file";
+              setSource(next);
+              if (next === "file" && category === "link") setCategory("other");
+            }}
+          >
+            <option value="link">Link externo</option>
+            <option value="file">Arquivo privado</option>
+          </select>
+        </label>
         <label>
           Título do material
           <input
@@ -73,16 +111,30 @@ export function MaterialsPanel({
             required
           />
         </label>
-        <label>
-          Endereço do material
-          <input
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://"
-            required
-          />
-        </label>
+        {source === "link" ? (
+          <label>
+            Endereço do material
+            <input
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://"
+              required
+            />
+          </label>
+        ) : (
+          <label>
+            Arquivo privado
+            <input
+              key={fileInputKey}
+              ref={fileInput}
+              type="file"
+              accept=".pdf,.docx,.ppt,.pptx,.mp4,.jpg,.jpeg,.png,.gif,.webp"
+              required
+            />
+            <small>PDF, DOCX, PPT/PPTX, MP4 ou imagem; máximo de 100 MB.</small>
+          </label>
+        )}
         <label>
           Turma
           <select
@@ -110,7 +162,7 @@ export function MaterialsPanel({
             <option value="presentation">Apresentação</option>
             <option value="video">Vídeo</option>
             <option value="image">Imagem</option>
-            <option value="link">Link</option>
+            {source === "link" && <option value="link">Link</option>}
             <option value="other">Outro</option>
           </select>
         </label>
@@ -122,7 +174,13 @@ export function MaterialsPanel({
           />
         </label>
         <button type="submit" disabled={saving || classes.length === 0}>
-          {saving ? "Adicionando…" : "Adicionar material"}
+          {saving
+            ? source === "link"
+              ? "Adicionando…"
+              : "Enviando…"
+            : source === "link"
+              ? "Adicionar material"
+              : "Enviar arquivo"}
         </button>
         {message && <p role="status">{message}</p>}
       </form>
@@ -133,7 +191,7 @@ export function MaterialsPanel({
           {materials.slice(0, 5).map((material) => (
             <li key={material.id}>
               <a
-                href={material.url ?? undefined}
+                href={material.url ?? `/api/materials/${material.id}/file`}
                 target="_blank"
                 rel="noopener noreferrer"
               >

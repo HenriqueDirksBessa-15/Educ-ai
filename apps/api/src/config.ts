@@ -62,6 +62,17 @@ const configSchema = z
       .min(1)
       .max(43_200)
       .default(1_440),
+    MATERIAL_STORAGE_DIRECTORY: z
+      .string()
+      .trim()
+      .min(1)
+      .default("storage/materials"),
+    MATERIAL_UPLOAD_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(104_857_600)
+      .default(104_857_600),
     ENABLE_DEV_AUTH: booleanString,
     RATE_LIMIT_MAX: z.coerce.number().int().min(10).max(10_000).default(300),
     DATA_RETENTION_DAYS: z.coerce
@@ -109,6 +120,8 @@ export type AppConfig = {
   sessionTtlSeconds: number;
   integrationMonitorIntervalMs: number;
   feedbackEditWindowMinutes: number;
+  materialStorageDirectory: string;
+  materialUploadMaxBytes: number;
   enableDevAuth: boolean;
   rateLimitMax: number;
   dataRetentionDays: number;
@@ -170,6 +183,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     sessionTtlSeconds: result.data.SESSION_TTL_SECONDS,
     integrationMonitorIntervalMs: result.data.INTEGRATION_MONITOR_INTERVAL_MS,
     feedbackEditWindowMinutes: result.data.FEEDBACK_EDIT_WINDOW_MINUTES,
+    materialStorageDirectory: result.data.MATERIAL_STORAGE_DIRECTORY,
+    materialUploadMaxBytes: result.data.MATERIAL_UPLOAD_MAX_BYTES,
     enableDevAuth: result.data.ENABLE_DEV_AUTH,
     rateLimitMax: result.data.RATE_LIMIT_MAX,
     dataRetentionDays: result.data.DATA_RETENTION_DAYS,

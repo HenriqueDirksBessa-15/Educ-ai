@@ -125,6 +125,14 @@
 | DT-59 | 10/10/2026 | Reter automaticamente apenas dados técnicos com prazo configurável       | Históricos pedagógicos/auditoria aguardam política institucional               |
 | DT-60 | 10/10/2026 | Executar E2E sequencial nos navegadores instalados                       | Chrome/Edge ficam comprovados; Firefox e versões ausentes são lacuna explícita |
 
+## Decisões técnicas do ciclo vertical
+
+| ID    | Data       | Decisão                                                        | Impacto                                                                            |
+| ----- | ---------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| DT-61 | 16/10/2026 | Limitar cada arquivo privado a 100 MB, configurável para menos | Viabiliza vídeos curtos e mantém um teto explícito no streaming                    |
+| DT-62 | 16/10/2026 | Implementar armazenamento local privado atrás de adaptador     | Conclui o fluxo local sem usar GCS; backend de nuvem permanece substituível        |
+| DT-63 | 16/10/2026 | Validar extensão, MIME e assinatura e sempre baixar como anexo | Reduz spoofing de tipo e impede execução inline de conteúdo fornecido pelo usuário |
+
 ## Pendências do DERS
 
 | ID   | Prazo do plano | Pendência                                                                    | Estado                                                                                     |
@@ -134,7 +142,7 @@
 | D-03 | Dia 3          | Definir fonte e arquivo oficial da carga BNCC                                | Aberta; seed do Dia 1 é explicitamente não oficial                                         |
 | D-04 | Dia 4          | Fornecer o modelo padrão da planilha de alunos                               | Resolvida por DT-27: colunas nome e e-mail; entrada pendente até validação                 |
 | D-05 | Dia 5          | Resolver exclusão de marco vinculado                                         | Resolvida por DT-26: confirmação arquiva o marco e preserva o histórico publicado          |
-| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida por DT-28: formatos já aprovados; quota configurável sem limite fixo nesta etapa |
+| D-06 | Dia 5          | Fixar formatos e quota de materiais                                          | Resolvida por DT-28 e DT-61: formatos aprovados e limite de 100 MB configurável para menos |
 | D-07 | Dia 8          | Fixar opções de atraso e pesos                                               | Implementação adotada em DT-29; pesos são a pontuação explícita de cada questão            |
 | D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Resolvida tecnicamente por DT-48: configurável, padrão provisório de 24 horas              |
 | D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Resolvida por DT-53: campos omitidos; envio usa e-mail institucional do aluno              |

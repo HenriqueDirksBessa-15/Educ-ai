@@ -1,15 +1,21 @@
 import {
+  materialFileMetadataSchema,
   materialLinkInputSchema,
   materialListQuerySchema,
   milestoneCreateSchema,
   milestoneUpdateSchema,
 } from "@educai/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { Readable } from "node:stream";
+import { finished } from "node:stream/promises";
+import { z } from "zod";
 
 import type { AppConfig } from "../config.js";
 import { requireIdentity, sessionCookieName } from "../auth/routes.js";
 import type { AuthRepository } from "../auth/repository.js";
 import type { TimelineRepository } from "./repository.js";
+import { MaterialUploadError } from "./service.js";
+import type { MaterialService } from "./service.js";
 
 export function registerTimelineRoutes(
   app: FastifyInstance,
@@ -17,6 +23,7 @@ export function registerTimelineRoutes(
     config: AppConfig;
     authRepository: AuthRepository;
     timelineRepository: TimelineRepository;
+    materialService: MaterialService;
   },
 ): void {
   const cookieName = sessionCookieName(dependencies.config.nodeEnv);
@@ -146,6 +153,94 @@ export function registerTimelineRoutes(
   app.post("/api/materials/links", createMaterialLink);
   app.post("/api/materials", createMaterialLink);
 
+  app.post("/api/materials/files", async (request, reply) => {
+    const user = await identity(request, reply);
+    if (!user) return;
+    try {
+      const upload = await request.file({
+        limits: {
+          fields: 1,
+          files: 1,
+          parts: 2,
+          fileSize: dependencies.config.materialUploadMaxBytes,
+        },
+        throwFileSizeLimit: false,
+      });
+      if (!upload) return validationError(reply);
+      const metadataPart = upload.fields.metadata;
+      if (
+        !metadataPart ||
+        Array.isArray(metadataPart) ||
+        metadataPart.type !== "field" ||
+        typeof metadataPart.value !== "string"
+      ) {
+        await discard(upload.file);
+        return validationError(reply);
+      }
+      let rawMetadata: unknown;
+      try {
+        rawMetadata = JSON.parse(metadataPart.value);
+      } catch {
+        await discard(upload.file);
+        return validationError(reply);
+      }
+      const metadata = materialFileMetadataSchema.safeParse(rawMetadata);
+      if (!metadata.success) {
+        await discard(upload.file);
+        return validationError(reply);
+      }
+      const id = await dependencies.materialService.upload({
+        professorId: user.professorId,
+        metadata: metadata.data,
+        fileName: upload.filename,
+        mimeType: upload.mimetype,
+        stream: upload.file,
+        wasTruncated: () => upload.file.truncated,
+      });
+      return reply.code(201).send({ data: { id } });
+    } catch (error) {
+      if (error instanceof MaterialUploadError) {
+        if (error.code === "MATERIAL_FILE_TOO_LARGE")
+          return reply.code(413).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `O arquivo excede o limite configurado de ${formatMegabytes(dependencies.config.materialUploadMaxBytes)} MB.`,
+            },
+          });
+        if (error.code === "MATERIAL_FILE_INVALID")
+          return reply.code(415).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Tipo ou nome de arquivo não permitido.",
+            },
+          });
+        return notFound(reply, "Uma turma ou habilidade não foi encontrada.");
+      }
+      throw error;
+    }
+  });
+
+  app.get<{ Params: { materialId: string } }>(
+    "/api/materials/:materialId/file",
+    async (request, reply) => {
+      const user = await identity(request, reply);
+      if (!user) return;
+      if (!z.uuid().safeParse(request.params.materialId).success)
+        return validationError(reply);
+      const file = await dependencies.materialService.download(
+        user.professorId,
+        request.params.materialId,
+      );
+      if (!file) return notFound(reply, "Arquivo não encontrado.");
+      return reply
+        .header("content-type", file.mimeType)
+        .header("content-length", file.sizeBytes)
+        .header("content-disposition", attachmentHeader(file.fileName))
+        .header("cache-control", "private, no-store")
+        .send(file.stream);
+    },
+  );
+
   app.post<{ Params: { materialId: string } }>(
     "/api/materials/:materialId/archive",
     async (request, reply) => {
@@ -165,7 +260,7 @@ export function registerTimelineRoutes(
     async (request, reply) => {
       const user = await identity(request, reply);
       if (!user) return;
-      const result = await dependencies.timelineRepository.deleteMaterial(
+      const result = await dependencies.materialService.delete(
         user.professorId,
         request.params.materialId,
       );
@@ -182,6 +277,25 @@ export function registerTimelineRoutes(
       return reply.code(204).send();
     },
   );
+}
+
+function attachmentHeader(fileName: string): string {
+  const fallback = fileName
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7e]/g, "_")
+    .replace(/["\\]/g, "_");
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
+
+async function discard(stream: Readable): Promise<void> {
+  stream.resume();
+  await finished(stream);
+}
+
+function formatMegabytes(bytes: number): string {
+  return (bytes / 1_048_576).toLocaleString("pt-BR", {
+    maximumFractionDigits: 1,
+  });
 }
 
 function validationError(reply: {

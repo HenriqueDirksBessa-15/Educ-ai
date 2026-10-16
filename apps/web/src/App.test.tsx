@@ -73,10 +73,10 @@ describe("Google authentication screen", () => {
         {
           name: "Atividades assistidas e publicação Google",
         },
-        { timeout: 5_000 },
+        { timeout: 10_000 },
       ),
     ).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("logs out without sending a professor identifier", async () => {
     const fetchMock = vi

@@ -114,6 +114,14 @@ Consultas curriculares e perfil exigem sessão autenticada. O perfil permite alt
 
 Planos vinculam turma, ementa, BNCC e materiais e preservam revisões, gerações e aprovação docente. Atividades vinculam plano, dificuldade, questões e prazo, preservam gerações/revisões e mantêm uma máquina de publicação por Form e por turma Classroom. A conclusão agenda a coleta no prazo; submissões reconciliam o aluno dentro das turmas distribuídas e preservam o detalhamento por questão. Correções, feedbacks, notificações e boletins mantêm históricos ou snapshots imutáveis próprios.
 
+Arquivos de materiais entram por multipart em streaming e são gravados por um
+adaptador de armazenamento privado. O adapter local usa chaves opacas por
+professor fora da árvore versionada; a API persiste somente metadados e vínculos
+atômicos. O contrato público nunca expõe a chave física. Download passa por
+sessão, propriedade e estado ativo, e sempre responde como anexo sem cache. O
+limite padrão e máximo desta etapa é 100 MB; extensão, MIME e assinatura do
+conteúdo precisam concordar. Um adapter GCS ainda não foi configurado.
+
 ## Publicação externa de atividades
 
 A publicação não mantém transação aberta durante chamadas Google. A preparação adquire lock da atividade, fixa a geração aprovada quando aplicável e bloqueia edições estruturais a partir desse ponto. Cada passo é persistido antes e depois da operação externa. Um marcador derivado do UUID local permite reconciliar Forms pelo Drive e trabalhos pela descrição do Classroom. Repetições ignoram IDs já confirmados; respostas ambíguas entram em `reconciliation_required` e nunca disparam recriação cega.

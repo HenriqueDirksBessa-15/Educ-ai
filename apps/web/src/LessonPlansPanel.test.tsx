@@ -81,7 +81,6 @@ describe("complete lesson plan flow", () => {
             fileName: null,
             mimeType: null,
             sizeBytes: null,
-            storageKey: null,
             classNames: [group.name],
             isArchived: false,
             hasPublishedContent: false,

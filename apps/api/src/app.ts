@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
 import type { ApiError, LiveResponse, ReadyResponse } from "@educai/contracts";
 import Fastify, { type FastifyInstance } from "fastify";
 
@@ -31,6 +32,11 @@ import { registerProfileRoutes } from "./profile/routes.js";
 import { ProfileRepository } from "./profile/repository.js";
 import { registerTimelineRoutes } from "./timeline/routes.js";
 import { TimelineRepository } from "./timeline/repository.js";
+import { MaterialService } from "./timeline/service.js";
+import {
+  LocalMaterialStorage,
+  type MaterialStorage,
+} from "./timeline/storage.js";
 import { registerPlansRoutes } from "./plans/routes.js";
 import { PlansRepository } from "./plans/repository.js";
 import { registerActivitiesRoutes } from "./activities/routes.js";
@@ -81,6 +87,7 @@ type AppDependencies = {
   googleResponseCollector?: GoogleResponseCollector;
   classroomGradeReturner?: ClassroomGradeReturner;
   bulletinEmailSender?: BulletinEmailSender;
+  materialStorage?: MaterialStorage;
   startMonitor?: boolean;
 };
 
@@ -94,6 +101,7 @@ export async function createApp({
   googleResponseCollector,
   classroomGradeReturner,
   bulletinEmailSender,
+  materialStorage,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -131,6 +139,15 @@ export async function createApp({
     credentials: true,
   });
   await app.register(cookie);
+  await app.register(multipart, {
+    limits: {
+      fields: 1,
+      files: 1,
+      parts: 2,
+      fileSize: config.materialUploadMaxBytes,
+    },
+    throwFileSizeLimit: false,
+  });
 
   const repository = new AuthRepository(
     database,
@@ -142,6 +159,10 @@ export async function createApp({
   const curriculumRepository = new CurriculumRepository(database);
   const classesRepository = new ClassesRepository(database);
   const timelineRepository = new TimelineRepository(database);
+  const fileStorage =
+    materialStorage ??
+    new LocalMaterialStorage(config.materialStorageDirectory);
+  const materialService = new MaterialService(timelineRepository, fileStorage);
   const plansRepository = new PlansRepository(database);
   const activitiesRepository = new ActivitiesRepository(database);
   const correctionsRepository = new CorrectionsRepository(database);
@@ -267,6 +288,7 @@ export async function createApp({
     config,
     authRepository: repository,
     timelineRepository,
+    materialService,
   });
   registerPlansRoutes(app, {
     config,

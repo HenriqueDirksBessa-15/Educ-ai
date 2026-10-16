@@ -13,7 +13,9 @@ import {
   identitySchema,
   integrationStatusSchema,
   lessonPlanInputSchema,
+  materialFileMetadataSchema,
   materialLinkInputSchema,
+  materialSchema,
   professorProfileUpdateSchema,
   readyResponseSchema,
 } from "./index.js";
@@ -68,6 +70,45 @@ describe("shared contracts", () => {
     expect(() =>
       materialLinkInputSchema.parse({ ...valid, storageKey: "private/key" }),
     ).toThrow();
+  });
+
+  it("validates private file metadata without accepting storage identifiers", () => {
+    const metadata = {
+      title: "Guia privado",
+      category: "reading" as const,
+      classIds: ["11111111-1111-4111-8111-111111111111"],
+      bnccSkillIds: [],
+    };
+
+    expect(materialFileMetadataSchema.parse(metadata)).toEqual(metadata);
+    expect(() =>
+      materialFileMetadataSchema.parse({
+        ...metadata,
+        category: "link",
+      }),
+    ).toThrow();
+    expect(() =>
+      materialFileMetadataSchema.parse({
+        ...metadata,
+        storageKey: "private/key",
+      }),
+    ).toThrow();
+    expect(
+      materialSchema.parse({
+        ...metadata,
+        id: "21111111-1111-4111-8111-111111111111",
+        description: null,
+        url: null,
+        fileName: "guia.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 4,
+        classNames: ["8º A"],
+        isArchived: false,
+        hasPublishedContent: false,
+        createdAt: "2026-10-16T00:00:00.000Z",
+        storageKey: "private/key",
+      }),
+    ).not.toHaveProperty("storageKey");
   });
 
   it("requires Google as the identity provider", () => {

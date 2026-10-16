@@ -25,6 +25,12 @@ describe("loadConfig", () => {
   it("loads a valid environment", () => {
     expect(loadConfig(validEnvironment).apiPort).toBe(3000);
     expect(loadConfig(validEnvironment).feedbackEditWindowMinutes).toBe(1_440);
+    expect(loadConfig(validEnvironment).materialStorageDirectory).toBe(
+      "storage/materials",
+    );
+    expect(loadConfig(validEnvironment).materialUploadMaxBytes).toBe(
+      104_857_600,
+    );
     expect(loadConfig(validEnvironment).enableDevAuth).toBe(false);
     expect(loadConfig(validEnvironment).rateLimitMax).toBe(300);
     expect(loadConfig(validEnvironment).dataRetentionDays).toBe(365);

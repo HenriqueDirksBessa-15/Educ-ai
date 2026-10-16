@@ -49,6 +49,53 @@ describe("material links", () => {
     expect(fetchMock.mock.calls[0]![0]).toBe("/api/materials/links");
   });
 
+  it("uploads a private file with its validated metadata", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ data: { id: "file-id" } }, { status: 201 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const reload = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MaterialsPanel
+        materials={[]}
+        classes={[
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            name: "8º A",
+            description: null,
+            schoolYear: "8º ano EF",
+            source: "local",
+          },
+        ]}
+        reload={reload}
+      />,
+    );
+
+    const sourceSelect = screen.getByLabelText("Origem") as HTMLSelectElement;
+    sourceSelect.value = "file";
+    fireEvent.change(sourceSelect);
+    fireEvent.change(screen.getByLabelText("Título do material"), {
+      target: { value: "Guia privado" },
+    });
+    const file = new File(["%PDF"], "guia.pdf", {
+      type: "application/pdf",
+    });
+    const fileInput = screen.getByLabelText(/^Arquivo privado/);
+    Object.defineProperty(fileInput, "files", { value: [file] });
+    fireEvent.submit(fileInput.closest("form")!);
+
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/materials/files");
+    const body = fetchMock.mock.calls[0]![1].body as FormData;
+    expect(JSON.parse(String(body.get("metadata")))).toMatchObject({
+      title: "Guia privado",
+      classIds: ["11111111-1111-4111-8111-111111111111"],
+    });
+    expect(body.get("file")).toBe(file);
+  });
+
   it("opens a persisted external link without exposing the parent window", () => {
     render(
       <MaterialsPanel
@@ -64,7 +111,6 @@ describe("material links", () => {
             fileName: null,
             mimeType: null,
             sizeBytes: null,
-            storageKey: null,
             classNames: ["8º A"],
             isArchived: false,
             hasPublishedContent: false,

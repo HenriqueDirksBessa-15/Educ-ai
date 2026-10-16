@@ -221,7 +221,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await repository.getDetail(professorB, classId)).toBeNull();
   }, 60_000);
 
-  it("creates material links atomically and isolates them by professor", async () => {
+  it("creates materials atomically and isolates links and files by professor", async () => {
     const professors = await testPool.query<{ id: string }>(
       `INSERT INTO professor (google_subject, email, display_name)
        VALUES ($1, $2, 'Professor Material A'), ($3, $4, 'Professor Material B')
@@ -289,6 +289,35 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await repository.listMaterials(professorA)).toEqual([]);
     expect(await repository.listMaterials(professorA, undefined, true)).toEqual(
       [expect.objectContaining({ id: materialId, isArchived: true })],
+    );
+
+    const storageKey = `${professorA}/${randomUUID()}`;
+    const fileMaterialId = await repository.createMaterialFile(professorA, {
+      title: "Guia privado de frações",
+      category: "reading",
+      classIds: [classA],
+      bnccSkillIds: [],
+      fileName: "guia.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+      storageKey,
+    });
+    expect(
+      await repository.getMaterialFile(professorB, fileMaterialId),
+    ).toBeNull();
+    expect(
+      await repository.getMaterialFile(professorA, fileMaterialId),
+    ).toEqual({
+      storageKey,
+      fileName: "guia.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+    });
+    expect(await repository.listMaterials(professorA)).toEqual([
+      expect.not.objectContaining({ storageKey }),
+    ]);
+    expect(await repository.deleteMaterial(professorA, fileMaterialId)).toEqual(
+      { status: "deleted", storageKey },
     );
   }, 60_000);
 
@@ -1082,6 +1111,8 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       sessionTtlSeconds: 28_800,
       integrationMonitorIntervalMs: 300_000,
       feedbackEditWindowMinutes: 1_440,
+      materialStorageDirectory: "storage/materials-test",
+      materialUploadMaxBytes: 104_857_600,
       enableDevAuth: false,
       rateLimitMax: 300,
       dataRetentionDays: 365,

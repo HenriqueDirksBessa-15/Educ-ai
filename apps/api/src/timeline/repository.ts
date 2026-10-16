@@ -1,5 +1,6 @@
 import type {
   Material,
+  MaterialFileMetadata,
   MaterialLinkInput,
   Milestone,
   MilestoneCreate,
@@ -28,7 +29,6 @@ type MaterialRow = {
   file_name: string | null;
   mime_type: string | null;
   size_bytes: number | null;
-  storage_key: string | null;
   archived_at: Date | null;
   created_at: Date;
   class_names: string[];
@@ -133,8 +133,8 @@ export class TimelineRepository {
   ): Promise<Material[]> {
     const result = (await this.database.query(
       `SELECT material.id, material.title, material.description, material.category,
-              material.url, material.file_name, material.mime_type, material.size_bytes,
-              material.storage_key, material.archived_at, material.created_at,
+              material.url, material.file_name, material.mime_type, material.size_bytes::int,
+              material.archived_at, material.created_at,
               COALESCE(array_agg(DISTINCT class_group.id) FILTER (WHERE class_group.id IS NOT NULL), '{}') AS class_ids,
               COALESCE(array_agg(DISTINCT class_group.name) FILTER (WHERE class_group.name IS NOT NULL), '{}') AS class_names,
               COALESCE(array_agg(DISTINCT material_bncc_skill.bncc_skill_id) FILTER (WHERE material_bncc_skill.bncc_skill_id IS NOT NULL), '{}') AS bncc_skill_ids,
@@ -200,6 +200,96 @@ export class TimelineRepository {
     return materialId;
   }
 
+  async createMaterialFile(
+    professorId: string,
+    input: MaterialFileMetadata & {
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      storageKey: string;
+    },
+  ): Promise<string> {
+    const result = (await this.database.query(
+      `WITH requested_classes AS (
+         SELECT unnest($2::uuid[]) AS id
+       ), owned_classes AS (
+         SELECT class_group.id FROM class_group
+         JOIN requested_classes ON requested_classes.id = class_group.id
+         WHERE class_group.professor_id = $1
+       ), requested_skills AS (
+         SELECT unnest($3::uuid[]) AS id
+       ), valid_skills AS (
+         SELECT bncc_skill.id FROM bncc_skill
+         JOIN requested_skills ON requested_skills.id = bncc_skill.id
+       ), inserted_material AS (
+         INSERT INTO material
+           (professor_id, title, description, category, file_name, mime_type,
+            size_bytes, storage_key)
+         SELECT $1, $4, $5, $6, $7, $8, $9, $10
+         WHERE (SELECT count(*) FROM owned_classes) = cardinality($2::uuid[])
+           AND (SELECT count(*) FROM valid_skills) = cardinality($3::uuid[])
+         RETURNING id
+       ), linked_classes AS (
+         INSERT INTO material_class (material_id, class_group_id)
+         SELECT inserted_material.id, owned_classes.id
+         FROM inserted_material CROSS JOIN owned_classes
+       ), linked_skills AS (
+         INSERT INTO material_bncc_skill (material_id, bncc_skill_id)
+         SELECT inserted_material.id, valid_skills.id
+         FROM inserted_material CROSS JOIN valid_skills
+       )
+       SELECT id FROM inserted_material`,
+      [
+        professorId,
+        input.classIds,
+        input.bnccSkillIds,
+        input.title,
+        input.description ?? null,
+        input.category,
+        input.fileName,
+        input.mimeType,
+        input.sizeBytes,
+        input.storageKey,
+      ],
+    )) as QueryResult<{ id: string }>;
+    const materialId = result.rows[0]?.id;
+    if (!materialId) throw new Error("MATERIAL_RELATION_NOT_FOUND");
+    return materialId;
+  }
+
+  async getMaterialFile(
+    professorId: string,
+    materialId: string,
+  ): Promise<{
+    storageKey: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null> {
+    const result = (await this.database.query(
+      `SELECT storage_key, file_name, mime_type, size_bytes::int
+       FROM material
+       WHERE id = $1 AND professor_id = $2 AND archived_at IS NULL
+         AND storage_key IS NOT NULL AND file_name IS NOT NULL
+         AND mime_type IS NOT NULL AND size_bytes IS NOT NULL`,
+      [materialId, professorId],
+    )) as QueryResult<{
+      storage_key: string;
+      file_name: string;
+      mime_type: string;
+      size_bytes: number;
+    }>;
+    const row = result.rows[0];
+    return row
+      ? {
+          storageKey: row.storage_key,
+          fileName: row.file_name,
+          mimeType: row.mime_type,
+          sizeBytes: row.size_bytes,
+        }
+      : null;
+  }
+
   async archiveMaterial(
     professorId: string,
     materialId: string,
@@ -215,22 +305,34 @@ export class TimelineRepository {
   async deleteMaterial(
     professorId: string,
     materialId: string,
-  ): Promise<"deleted" | "not_found" | "linked"> {
+  ): Promise<{
+    status: "deleted" | "not_found" | "linked";
+    storageKey: string | null;
+  }> {
     const result = (await this.database.query(
-      `SELECT material.id,
+      `SELECT material.id, material.storage_key,
               EXISTS (SELECT 1 FROM published_material_link link
                       WHERE link.material_id = material.id) AS linked
        FROM material WHERE material.id = $1 AND material.professor_id = $2`,
       [materialId, professorId],
-    )) as QueryResult<{ id: string; linked: boolean }>;
+    )) as QueryResult<{
+      id: string;
+      linked: boolean;
+      storage_key: string | null;
+    }>;
     const row = result.rows[0];
-    if (!row) return "not_found";
-    if (row.linked) return "linked";
+    if (!row) return { status: "not_found", storageKey: null };
+    if (row.linked) return { status: "linked", storageKey: row.storage_key };
     await this.database.query(
-      "DELETE FROM material WHERE id = $1 AND professor_id = $2",
+      `WITH deleted_classes AS (
+         DELETE FROM material_class WHERE material_id = $1
+       ), deleted_skills AS (
+         DELETE FROM material_bncc_skill WHERE material_id = $1
+       )
+       DELETE FROM material WHERE id = $1 AND professor_id = $2`,
       [materialId, professorId],
     );
-    return "deleted";
+    return { status: "deleted", storageKey: row.storage_key };
   }
 
   private toMilestone(row: MilestoneRow): Milestone {
@@ -259,7 +361,6 @@ export class TimelineRepository {
       fileName: row.file_name,
       mimeType: row.mime_type,
       sizeBytes: row.size_bytes,
-      storageKey: row.storage_key,
       classNames: row.class_names,
       isArchived: row.archived_at !== null,
       hasPublishedContent: row.has_published_content,
