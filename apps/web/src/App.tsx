@@ -11,14 +11,7 @@ import type {
   Material,
   Milestone,
 } from "@educai/contracts";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, MouseEvent, ReactNode } from "react";
 import {
   ActivityListPage,
@@ -26,6 +19,7 @@ import {
   ActivityWizard,
 } from "./ActivitiesPages";
 import { AppShell, Page } from "./AppShell";
+import { BulletinsPage } from "./BulletinsPage";
 import { ClassDetailPage, ClassListPage, NewClassPage } from "./ClassesPages";
 import { ConfirmProvider, useConfirm } from "./ConfirmDialog";
 import { CorrectionListPage, CorrectionQueuePage } from "./CorrectionsPages";
@@ -39,12 +33,6 @@ import { MessagesPage } from "./MessagesPage";
 import { loadOverview } from "./overview";
 import { computePendencies, menuCounts, type Overview } from "./pendencies";
 import { pageTitle, routeHref, useLocation, type RouteId } from "./router";
-
-const BulletinsPanel = lazy(() =>
-  import("./BulletinsPanel").then((module) => ({
-    default: module.BulletinsPanel,
-  })),
-);
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 const devAuthEnabled =
@@ -473,9 +461,9 @@ function ProfessorShell({
     boletins: () => (
       <Page
         title="Boletins"
-        subtitle="Gere boletins em PDF com as notas já devolvidas."
+        subtitle="Gere boletins em PDF com as notas aprovadas e envie por e-mail."
       >
-        <BulletinsPanel />
+        <BulletinsPage />
       </Page>
     ),
     conta: () => (
@@ -504,9 +492,7 @@ function ProfessorShell({
       integrations={integrations}
       counts={overview ? menuCounts(overview) : {}}
     >
-      <Suspense fallback={<p className="empty-state">Carregando…</p>}>
-        {pages[route]()}
-      </Suspense>
+      {pages[route]()}
     </AppShell>
   );
 }

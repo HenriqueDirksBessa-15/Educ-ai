@@ -2,6 +2,21 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 09: Boletins
+
+Concluída em 16/10/2026 ([etapa](./telas/09-boletins.md)):
+
+- período preenchido pelo tipo (mês, bimestre, trimestre ou ano atuais) ou
+  datas escolhidas;
+- alunos em caixas de seleção com "Selecionar todos", no lugar da seleção
+  múltipla com Ctrl;
+- envio de um boletim mostrando o e-mail do aluno, e envio em lote dos
+  pendentes com relato de falhas;
+- datas, médias e situações em português.
+
+Verificações: 128 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados.
+
 ## Interface — etapa 08: Recados
 
 Concluída em 16/10/2026 ([etapa](./telas/08-recados.md)):
