@@ -1,0 +1,1468 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Início · EDUC.AI</title>
+    <style>
+      :root {
+        --bg: #f4f7f6;
+        --surface: #ffffff;
+        --text: #15332f;
+        --muted: #4a605b;
+        --primary: #0a6b5a;
+        --primary-hover: #08584a;
+        --primary-soft: #e3f1ed;
+        --border: #d5dfdc;
+        --field: #7d918c;
+        --focus: #0b3d35;
+        --ok: #1d6b3a;
+        --ok-soft: #e4f4e9;
+        --warn: #7a5200;
+        --warn-soft: #fff6e0;
+        --bad: #a12b2b;
+        --bad-soft: #fdecec;
+        --radius: 12px;
+        --nav-h: 68px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        font-size: 17px;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          1rem/1.55 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      a {
+        color: var(--primary);
+      }
+      :focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+      h1 {
+        font-size: 1.6rem;
+        line-height: 1.25;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 1.2rem;
+        margin: 28px 0 10px;
+      }
+      h3 {
+        font-size: 1.05rem;
+        margin: 0 0 4px;
+      }
+      p {
+        margin: 0 0 12px;
+        max-width: 65ch;
+      }
+      .muted {
+        color: var(--muted);
+      }
+
+      .proto-bar {
+        background: #1f2d2a;
+        color: #fff;
+        font-size: 0.82rem;
+        padding: 6px 16px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .proto-bar label {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        cursor: pointer;
+      }
+      .proto-bar input {
+        width: 18px;
+        height: 18px;
+      }
+
+      .skip {
+        position: absolute;
+        left: 12px;
+        top: -60px;
+        background: var(--focus);
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 8px;
+        z-index: 50;
+      }
+      .skip:focus {
+        top: 44px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 264px 1fr;
+        min-height: calc(100vh - 30px);
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        padding: 20px 14px 16px;
+        overflow-y: auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 1.2rem;
+        color: var(--text);
+        padding: 0 10px 8px;
+      }
+      .brand-mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--primary);
+        color: #fff;
+        font-size: 0.95rem;
+      }
+      .side-create {
+        width: 100%;
+        margin: 8px 0 4px;
+      }
+      .side-group {
+        margin-top: 12px;
+      }
+      .side-group h2 {
+        margin: 0 0 4px;
+        padding: 0 12px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .sidebar ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .sidebar a {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 48px;
+        padding: 0 12px;
+        border-radius: 10px;
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .sidebar a:hover {
+        background: var(--bg);
+      }
+      .sidebar a[aria-current="page"] {
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-weight: 800;
+      }
+      .sidebar a[aria-current="page"]::before {
+        content: "";
+        position: absolute;
+        left: -14px;
+        top: 8px;
+        bottom: 8px;
+        width: 4px;
+        border-radius: 0 4px 4px 0;
+        background: var(--primary);
+      }
+      .sidebar .hint {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--muted);
+        line-height: 1.2;
+      }
+      .sidebar .badge {
+        margin-left: auto;
+      }
+      .badge.soft {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .side-footer {
+        margin-top: auto;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+      }
+      .sidebar a.side-user {
+        gap: 10px;
+        min-height: 64px;
+        padding: 8px 12px;
+        font-weight: 700;
+      }
+      .sidebar a.side-create[aria-current="page"]::before {
+        display: none;
+      }
+      .sidebar a.side-create,
+      .sidebar a.side-create[aria-current="page"] {
+        color: #fff;
+        background: var(--primary);
+        justify-content: center;
+      }
+      .sidebar a.side-create:hover {
+        background: var(--primary-hover);
+      }
+      .avatar {
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .side-user small {
+        display: block;
+        color: var(--muted);
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 150px;
+      }
+      .icon {
+        width: 22px;
+        height: 22px;
+        flex: none;
+      }
+
+      main {
+        padding: 24px 32px 48px;
+        max-width: 980px;
+        width: 100%;
+      }
+      .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+
+      .bottom-nav {
+        display: none;
+      }
+      .more-sheet {
+        display: none;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px;
+        margin-bottom: 12px;
+      }
+      .card-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .list > li {
+        margin-bottom: 10px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 48px;
+        padding: 0 20px;
+        border-radius: 10px;
+        border: 2px solid var(--primary);
+        background: var(--primary);
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .btn:hover {
+        background: var(--primary-hover);
+        border-color: var(--primary-hover);
+      }
+      .btn.secondary {
+        background: var(--surface);
+        color: var(--primary);
+      }
+      .btn.secondary:hover {
+        background: var(--primary-soft);
+      }
+      .btn.danger {
+        background: var(--surface);
+        color: var(--bad);
+        border-color: var(--bad);
+      }
+      .btn.link {
+        background: none;
+        border-color: transparent;
+        color: var(--primary);
+        padding: 0 8px;
+      }
+      .btn[aria-disabled="true"] {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+
+      .tag {
+        display: inline-block;
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--bg);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      .tag.ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+        border-color: transparent;
+      }
+      .tag.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+        border-color: transparent;
+      }
+      .tag.bad {
+        background: var(--bad-soft);
+        color: var(--bad);
+        border-color: transparent;
+      }
+      .badge {
+        background: var(--bad);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 800;
+        border-radius: 999px;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .banner {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 14px 16px;
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        border: 1px solid transparent;
+      }
+      .banner.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .banner.ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .banner.bad {
+        background: var(--bad-soft);
+        color: var(--bad);
+      }
+      .banner p {
+        margin: 0;
+        color: var(--text);
+      }
+
+      .field {
+        display: block;
+        margin-bottom: 16px;
+      }
+      .field > span {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      .field small {
+        display: block;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .req {
+        color: var(--bad);
+        font-weight: 700;
+      }
+      input[type="text"],
+      input[type="url"],
+      input[type="number"],
+      input[type="date"],
+      input[type="datetime-local"],
+      input[type="search"],
+      select,
+      textarea {
+        width: 100%;
+        min-height: 48px;
+        padding: 10px 12px;
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 2px solid var(--field);
+        border-radius: 10px;
+      }
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+      .field-error {
+        color: var(--bad);
+        font-weight: 600;
+        margin-top: 6px;
+      }
+      [aria-invalid="true"] {
+        border-color: var(--bad);
+      }
+
+      .choice {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        min-height: 48px;
+        padding: 12px 14px;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        cursor: pointer;
+        margin-bottom: 8px;
+      }
+      .choice:has(input:checked) {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+      }
+      .choice input {
+        width: 24px;
+        height: 24px;
+        margin: 0;
+        flex: none;
+        accent-color: var(--primary);
+      }
+      .choice-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+      .big-choice {
+        display: block;
+        text-align: left;
+        padding: 18px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        font: inherit;
+        color: var(--text);
+        cursor: pointer;
+        min-height: 96px;
+        width: 100%;
+        text-decoration: none;
+      }
+      .big-choice:hover {
+        border-color: var(--primary);
+      }
+      .big-choice strong {
+        display: block;
+        font-size: 1.05rem;
+        margin-bottom: 4px;
+      }
+      .big-choice .icon {
+        display: block;
+        width: 32px;
+        height: 32px;
+        margin-bottom: 10px;
+        color: var(--primary);
+      }
+
+      .stepper {
+        display: flex;
+        gap: 6px;
+        list-style: none;
+        padding: 0;
+        margin: 0 0 20px;
+        flex-wrap: wrap;
+      }
+      .stepper li {
+        flex: 1 1 120px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .stepper li b {
+        display: block;
+        font-size: 0.8rem;
+      }
+      .stepper li[aria-current="step"] {
+        border: 2px solid var(--primary);
+        color: var(--primary);
+        font-weight: 700;
+      }
+      .stepper li.done {
+        background: var(--ok-soft);
+        color: var(--ok);
+        border-color: transparent;
+      }
+
+      .preview {
+        background: var(--bg);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .preview ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      .preview li {
+        margin-bottom: 10px;
+      }
+      .correct {
+        color: var(--ok);
+        font-weight: 700;
+      }
+
+      .progress {
+        height: 10px;
+        background: var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 8px 0;
+      }
+      .progress span {
+        display: block;
+        height: 100%;
+        background: var(--primary);
+      }
+
+      dialog {
+        border: 0;
+        border-radius: var(--radius);
+        padding: 24px;
+        max-width: 460px;
+        width: calc(100% - 32px);
+        color: var(--text);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+      }
+      dialog::backdrop {
+        background: rgba(15, 30, 27, 0.55);
+      }
+      dialog .actions {
+        justify-content: flex-end;
+      }
+
+      .toast {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 24px;
+        background: var(--text);
+        color: #fff;
+        padding: 14px 20px;
+        border-radius: 10px;
+        max-width: calc(100% - 32px);
+        z-index: 60;
+        display: none;
+      }
+
+      .login {
+        max-width: 520px;
+        margin: 8vh auto;
+        padding: 0 16px;
+      }
+      .login .card {
+        padding: 28px;
+      }
+
+      @media (max-width: 800px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          display: none;
+        }
+        main {
+          padding: 16px 16px calc(var(--nav-h) + 24px);
+        }
+        h1 {
+          font-size: 1.4rem;
+        }
+        .bottom-nav {
+          display: flex;
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: var(--nav-h);
+          background: var(--surface);
+          border-top: 1px solid var(--border);
+          z-index: 40;
+        }
+        .bottom-nav a,
+        .bottom-nav button {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          font: inherit;
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--muted);
+          text-decoration: none;
+          background: none;
+          border: 0;
+          cursor: pointer;
+          position: relative;
+        }
+        .bottom-nav [aria-current="page"] {
+          color: var(--primary);
+        }
+        .bottom-nav .badge {
+          position: absolute;
+          top: 6px;
+          right: calc(50% - 22px);
+          height: 18px;
+          min-width: 18px;
+          font-size: 0.7rem;
+        }
+        .more-sheet.open {
+          display: block;
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: var(--nav-h);
+          background: var(--surface);
+          border-top: 1px solid var(--border);
+          padding: 8px;
+          z-index: 39;
+          box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+        }
+        .more-sheet a {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          min-height: 52px;
+          padding: 0 12px;
+          color: var(--text);
+          text-decoration: none;
+          font-weight: 600;
+          border-radius: 10px;
+        }
+        .page-head .btn {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="proto-bar" role="note">
+      <span><b>Protótipo</b> · dados fictícios · nada é salvo</span>
+      <label
+        ><input type="checkbox" id="toggle-google" /> Simular Google fora do
+        ar</label
+      >
+      <a href="#/entrar" style="color: #fff">Ver tela de entrada</a>
+    </div>
+    <a class="skip" href="#conteudo">Ir para o conteúdo</a>
+
+    <div id="app"></div>
+
+    <dialog
+      id="confirm"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-body"
+    >
+      <h2 id="confirm-title" style="margin-top: 0"></h2>
+      <p id="confirm-body"></p>
+      <div class="actions">
+        <button
+          class="btn secondary"
+          type="button"
+          value="cancel"
+          id="confirm-cancel"
+        >
+          Cancelar
+        </button>
+        <button class="btn" type="button" id="confirm-ok"></button>
+      </div>
+    </dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      // Ícones simples em SVG inline (traço herda a cor do texto).
+      const ICONS = {
+        inicio:
+          '<path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+        turmas:
+          '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2c3 .2 5.5 2.4 5.5 5.8"/>',
+        aulas:
+          '<path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 9h6M8 13h6"/>',
+        atividades:
+          '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+        correcoes: '<path d="M4 13l5 5L20 7"/>',
+        recados: '<path d="M4 5h16v11H8l-4 4z"/>',
+        boletins:
+          '<path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6M14 3v5h5"/>',
+        conta:
+          '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>',
+        mais: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+      };
+      const icon = (name) =>
+        `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+      // `hint` explica o item no menu lateral; `badge` conta o que espera o professor.
+      const NAV = [
+        {
+          id: "inicio",
+          label: "Início",
+          hint: "O que fazer hoje",
+          primary: true,
+        },
+        {
+          id: "turmas",
+          label: "Turmas",
+          hint: "Alunos e matéria",
+          primary: true,
+          group: "Sala de aula",
+        },
+        {
+          id: "aulas",
+          label: "Aulas",
+          hint: "Planos e materiais",
+          primary: true,
+          group: "Sala de aula",
+          badge: 1,
+          badgeLabel: "1 plano para aprovar",
+          soft: true,
+        },
+        {
+          id: "atividades",
+          label: "Atividades",
+          hint: "Criar e enviar",
+          primary: true,
+          group: "Sala de aula",
+        },
+        {
+          id: "correcoes",
+          label: "Correções",
+          hint: "Notas para dar",
+          primary: true,
+          group: "Sala de aula",
+          badge: 3,
+          badgeLabel: "3 respostas para corrigir",
+        },
+        {
+          id: "recados",
+          label: "Recados",
+          hint: "Para alunos e turmas",
+          group: "Comunicação",
+        },
+        {
+          id: "boletins",
+          label: "Boletins",
+          hint: "PDF por aluno",
+          group: "Comunicação",
+        },
+        { id: "conta", label: "Minha conta", account: true },
+      ];
+
+      // Dados fictícios.
+      const DATA = {
+        teacher: "Professora Ana",
+        classes: [
+          {
+            id: "7b",
+            name: "7º ano B",
+            year: "7º ano",
+            source: "Do Google Sala de Aula",
+            students: 28,
+            subjects: ["Matemática"],
+          },
+          {
+            id: "8a",
+            name: "8º ano A",
+            year: "8º ano",
+            source: "Do Google Sala de Aula",
+            students: 31,
+            subjects: [],
+          },
+          {
+            id: "rf",
+            name: "Reforço de leitura",
+            year: "6º ano",
+            source: "Criada no EDUC.AI",
+            students: 9,
+            subjects: ["Língua Portuguesa"],
+          },
+        ],
+        plans: [
+          {
+            title: "Frações na pizza",
+            cls: "7º ano B",
+            status: ["Aprovado", "ok"],
+          },
+          {
+            title: "Sistema solar em escala",
+            cls: "8º ano A",
+            status: ["Sugestão para revisar", "warn"],
+          },
+          {
+            title: "Leitura de fábulas",
+            cls: "Reforço de leitura",
+            status: ["Rascunho", ""],
+          },
+        ],
+        activities: [
+          {
+            title: "Frações – exercício 1",
+            cls: "7º ano B",
+            status: ["Enviada para a turma", "ok"],
+            due: "18 de out., 23:59",
+            answers: "25 de 28 responderam",
+          },
+          {
+            title: "Quiz de leitura",
+            cls: "Reforço de leitura",
+            status: ["Rascunho", ""],
+            due: "sem prazo",
+            answers: "",
+          },
+        ],
+        students: [
+          "Ana Beatriz Lima",
+          "Bruno Costa",
+          "Carla Mendes",
+          "Davi Rocha",
+          "Eduarda Nunes",
+          "Felipe Souza",
+        ],
+      };
+
+      // Alunos com atividade corrigida, por turma (recado individual).
+      const RECADO_ALUNOS = {
+        "7º ano B": [
+          "Carla Mendes · Frações – exercício 1 · nota 7",
+          "Bruno Costa · Frações – exercício 1 · nota 9",
+        ],
+        "8º ano A": ["Eduarda Nunes · Sistema solar – quiz · nota 8"],
+        "Reforço de leitura": ["Davi Rocha · Quiz de leitura · nota 6"],
+      };
+
+      const state = {
+        googleDown: false,
+        step: 1,
+        planStep: 1,
+        correctionIndex: 0,
+        recado: "aluno",
+        recadoTurma: "7º ano B",
+      };
+
+      function shell(active, content) {
+        const link = (n) =>
+          `<li><a href="#/${n.id}" ${n.id === active ? 'aria-current="page"' : ""}>${icon(n.id)}<span>${n.label}<span class="hint">${n.hint}</span></span>${n.badge ? `<span class="badge${n.soft ? " soft" : ""}" aria-label="${n.badgeLabel}">${n.badge}</span>` : ""}</a></li>`;
+        const groups = [
+          ...new Set(NAV.filter((n) => n.group).map((n) => n.group)),
+        ];
+        const side = `
+      <ul>${NAV.filter((n) => !n.group && !n.account)
+        .map(link)
+        .join("")}</ul>
+      ${groups
+        .map(
+          (g) =>
+            `<div class="side-group"><h2>${g}</h2><ul>${NAV.filter(
+              (n) => n.group === g,
+            )
+              .map(link)
+              .join("")}</ul></div>`,
+        )
+        .join("")}`;
+        const isMore = !NAV.find((n) => n.id === active)?.primary;
+        const bottom = NAV.filter((n) => n.primary)
+          .map(
+            (n) =>
+              `<a href="#/${n.id}" ${n.id === active ? 'aria-current="page"' : ""}>${icon(n.id)}${n.label}${n.badge ? `<span class="badge" aria-hidden="true">${n.badge}</span>` : ""}</a>`,
+          )
+          .join("");
+        const more =
+          `<a href="#/criar" style="color:var(--primary)"><b>+ Criar</b></a>` +
+          NAV.filter((n) => !n.primary)
+            .map((n) => `<a href="#/${n.id}">${icon(n.id)}${n.label}</a>`)
+            .join("");
+        return `
+  <div class="layout">
+    <nav class="sidebar" aria-label="Menu principal">
+      <span class="brand"><span class="brand-mark" aria-hidden="true">E</span>EDUC.AI</span>
+      <a class="btn side-create" href="#/criar" ${["criar", "nova-atividade", "planejar", "nova-turma"].includes(active) ? 'aria-current="page"' : ""}>+ Criar</a>
+      ${side}
+      <div class="side-footer">
+        <a class="side-user" href="#/conta" ${active === "conta" ? 'aria-current="page"' : ""}>
+          <span class="avatar" aria-hidden="true">PA</span>
+          <span><b>${DATA.teacher}</b><small>professora.ana@example.invalid</small><span class="hint">Minha conta</span></span>
+        </a>
+      </div>
+    </nav>
+    <main id="conteudo" tabindex="-1">
+      ${state.googleDown ? `<div class="banner warn" role="alert"><strong>Atenção</strong><p>O Google Sala de Aula está fora do ar agora. Você pode continuar planejando; envios para a turma ficam para quando ele voltar.</p></div>` : ""}
+      ${content}
+    </main>
+  </div>
+  <div class="more-sheet" id="more-sheet">${more}</div>
+  <nav class="bottom-nav" aria-label="Menu principal">${bottom}
+    <button type="button" id="more-btn" aria-expanded="false" aria-controls="more-sheet" ${isMore ? 'aria-current="page"' : ""}>${icon("mais")}Mais</button>
+  </nav>`;
+      }
+
+      function head(title, subtitle, action = "") {
+        return `<div class="page-head"><div><h1>${title}</h1>${subtitle ? `<p class="muted">${subtitle}</p>` : ""}</div>${action}</div>`;
+      }
+
+      const PAGES = {
+        entrar: () => `
+    <div class="login" id="conteudo" tabindex="-1">
+      <span class="brand" style="padding:0 0 12px">EDUC.AI</span>
+      <div class="card">
+        <h1>Planeje, envie e corrija suas atividades em um só lugar.</h1>
+        <p class="muted">Entre com a mesma conta do Google que você usa no Google Sala de Aula.</p>
+        <a class="btn" href="#/inicio" style="width:100%;margin:12px 0">Entrar com Google</a>
+        <p class="muted" style="font-size:.95rem">Não vemos sua senha do Google. Nada é enviado aos alunos sem a sua aprovação.</p>
+      </div>
+    </div>`,
+
+        inicio: () =>
+          shell(
+            "inicio",
+            `
+    ${head(`Olá, ${DATA.teacher}`, "Isto é o que precisa da sua atenção hoje.")}
+    <ul class="list">
+      <li class="card card-row"><div><h3>3 respostas esperando sua correção</h3><p class="muted" style="margin:0">Frações – exercício 1 · 7º ano B</p></div><a class="btn" href="#/correcoes">Corrigir</a></li>
+      <li class="card card-row"><div><h3>Plano aguardando sua aprovação</h3><p class="muted" style="margin:0">Sistema solar em escala · 8º ano A</p></div><a class="btn secondary" href="#/aulas">Revisar</a></li>
+      <li class="card card-row"><div><h3>O 8º ano A ainda não tem matéria definida</h3><p class="muted" style="margin:0">Sem isso, as habilidades da BNCC não aparecem ao planejar.</p></div><a class="btn secondary" href="#/turma">Definir</a></li>
+      <li class="card card-row"><div><h3>Frações – exercício 1 fecha amanhã às 23:59</h3><p class="muted" style="margin:0">25 de 28 alunos já responderam.</p></div></li>
+    </ul>
+    <h2>Atalhos</h2>
+    <div class="choice-grid">
+      <a class="big-choice" href="#/planejar"><strong>Planejar uma aula</strong><span class="muted">Com ou sem ajuda da IA</span></a>
+      <a class="big-choice" href="#/nova-atividade"><strong>Criar uma atividade</strong><span class="muted">A partir de um plano aprovado</span></a>
+      <a class="big-choice" href="#/recados"><strong>Mandar um recado</strong><span class="muted">Para um aluno ou para a turma</span></a>
+    </div>`,
+          ),
+
+        turmas: () =>
+          shell(
+            "turmas",
+            `
+    ${head("Suas turmas", "Turmas do Google Sala de Aula e turmas criadas aqui.", `<button class="btn" type="button" data-toast="3 turmas atualizadas a partir do Google Sala de Aula.">Trazer minhas turmas do Google</button>`)}
+    <ul class="list">${DATA.classes
+      .map(
+        (c) => `
+      <li class="card card-row"><div><h3>${c.name}</h3><p class="muted" style="margin:0">${c.students} alunos · ${c.source}</p>
+        ${c.subjects.length ? `<span class="tag">${c.subjects.join(", ")}</span>` : `<span class="tag warn">Matéria não definida</span>`}</div>
+        <a class="btn secondary" href="#/turma">Abrir ${c.name}</a></li>`,
+      )
+      .join("")}
+    </ul>
+    <div class="actions"><a class="btn link" href="#/nova-turma">+ Criar turma no EDUC.AI</a></div>`,
+          ),
+
+        turma: () =>
+          shell(
+            "turmas",
+            `
+    <a class="btn link" href="#/turmas" style="padding-left:0">← Voltar para turmas</a>
+    ${head("8º ano A", "31 alunos · Do Google Sala de Aula", `<button class="btn secondary" type="button" data-toast="Lista de alunos atualizada: 31 alunos.">Atualizar lista de alunos</button>`)}
+    <div class="card">
+      <h2 style="margin-top:0">O que esta turma estuda</h2>
+      <p class="muted">Usamos isso para mostrar as habilidades da BNCC certas quando você planejar.</p>
+      <label class="field"><span>Etapa <span class="req" aria-hidden="true">*</span></span>
+        <select required><option>Ensino fundamental – anos finais (6º ao 9º)</option><option>Ensino fundamental – anos iniciais (1º ao 5º)</option><option>Ensino médio</option><option>Educação infantil</option></select></label>
+      <label class="field"><span>Ano <span class="req" aria-hidden="true">*</span></span>
+        <select required><option>6º ano</option><option>7º ano</option><option selected>8º ano</option><option>9º ano</option></select></label>
+      <fieldset class="field" style="border:0;padding:0;margin:0 0 16px"><legend style="font-weight:700;margin-bottom:6px">Matéria desta turma <span class="req" aria-hidden="true">*</span></legend>
+        <div class="choice-grid">${["Matemática", "Ciências", "Língua Portuguesa", "Geografia", "História", "Arte"].map((m) => `<label class="choice"><input type="radio" name="materia-turma" ${m === "Ciências" ? "checked" : ""}> ${m}</label>`).join("")}</div>
+        <small class="muted">Cada turma tem uma matéria. Ela define as habilidades da BNCC que aparecem ao planejar.</small>
+      </fieldset>
+      <button class="btn" type="button" data-toast="Pronto! A matéria do 8º ano A foi salva.">Salvar</button>
+    </div>
+    <h2>Alunos</h2>
+    <ul class="card list" style="padding:8px 18px">${DATA.students.map((s) => `<li style="padding:8px 0;border-bottom:1px solid var(--border);margin:0">${s}</li>`).join("")}<li style="padding:8px 0;margin:0" class="muted">e mais 25 alunos</li></ul>`,
+          ),
+
+        aulas: () =>
+          shell(
+            "aulas",
+            `
+    ${head("Suas aulas", "Planos de aula e materiais de apoio.", `<a class="btn" href="#/planejar">Planejar uma aula</a>`)}
+    <label class="field"><span>Buscar plano</span><input type="search" placeholder="Digite o nome do plano ou da turma"></label>
+    <ul class="list">${DATA.plans
+      .map(
+        (p) => `
+      <li class="card card-row"><div><h3>${p.title}</h3><p class="muted" style="margin:0 0 6px">${p.cls}</p><span class="tag ${p.status[1]}">${p.status[0]}</span></div>
+      <a class="btn secondary" href="#/planejar">Abrir ${p.title}</a></li>`,
+      )
+      .join("")}</ul>
+    <h2>Materiais</h2>
+    <ul class="list">
+      <li class="card card-row"><div><h3>Vídeo: frações no dia a dia</h3><p class="muted" style="margin:0">Vídeo · 7º ano B</p></div><a class="btn secondary" href="#/aulas">Abrir</a></li>
+      <li class="card card-row"><div><h3>Fábulas de Esopo (PDF)</h3><p class="muted" style="margin:0">Leitura · Reforço de leitura</p></div><a class="btn secondary" href="#/aulas">Abrir</a></li>
+    </ul>
+    <div class="actions"><button class="btn link" type="button" data-toast="No produto, abre: link da internet ou arquivo do computador.">+ Adicionar material</button></div>`,
+          ),
+
+        planejar: () => {
+          const s = state.planStep;
+          const steps = [
+            "Turma e tema",
+            "Habilidades da BNCC",
+            "Materiais",
+            "Conteúdo da aula",
+          ];
+          const stepper = `<ol class="stepper">${steps.map((t, i) => `<li ${i + 1 === s ? 'aria-current="step"' : ""} class="${i + 1 < s ? "done" : ""}"><b>Passo ${i + 1} de 4</b>${t}</li>`).join("")}</ol>`;
+          const bodies = {
+            1: `<label class="field"><span>Turma <span class="req" aria-hidden="true">*</span></span><select><option>7º ano B</option><option>8º ano A</option></select></label>
+          <div class="banner ok" role="status" style="margin-top:-4px"><p><b>Matemática · 7º ano</b><br>A matéria, o ano e as habilidades da BNCC desta aula já vêm da turma.</p></div>
+          <label class="field"><span>Tema da aula <span class="req" aria-hidden="true">*</span></span><input type="text" value="Frações na pizza" aria-describedby="tema-dica"><small id="tema-dica">Ex.: Frações no dia a dia</small></label>
+          <label class="field"><span>Duração</span><select><option>1 aula (50 min)</option><option>2 aulas (100 min)</option></select></label>`,
+            2: `<p style="margin-bottom:4px"><b>Habilidades da BNCC de Matemática · 7º ano</b></p>
+          <p class="muted">Mostramos só as habilidades da matéria e do ano da turma 7º ano B. Escolha uma ou mais; elas guiam a sugestão da IA e as atividades. <a href="#/turma">Mudar na turma</a></p>
+          <label class="field"><span>Buscar habilidade</span><input type="search" placeholder="Ex.: fração, equivalência"></label>
+          <label class="choice"><input type="checkbox" checked><span><b>EF07MA08</b> — Comparar e ordenar frações associadas às ideias de partes de inteiros, resultado da divisão, razão e operador.</span></label>
+          <label class="choice"><input type="checkbox"><span><b>EF07MA09</b> — Utilizar, na resolução de problemas, a associação entre razão e fração.</span></label>
+          <label class="choice"><input type="checkbox"><span><b>EF07MA10</b> — Comparar e ordenar números racionais em diferentes contextos e associá-los a pontos da reta numérica.</span></label>`,
+            3: `<p class="muted">Opcional. Os materiais escolhidos aparecem no plano e ajudam a IA.</p>
+          <label class="choice"><input type="checkbox" checked><span>Vídeo: frações no dia a dia</span></label>
+          <div class="actions"><button class="btn secondary" type="button" data-toast="No produto, abre: link da internet ou arquivo do computador.">+ Adicionar material novo</button></div>`,
+            4: `<p class="muted">Como você quer preencher o conteúdo da aula?</p>
+          <div class="choice-grid" style="margin-bottom:16px">
+            <button class="big-choice" type="button" data-toast="A IA preencheu os campos abaixo. Revise e ajuste o que quiser."><strong>Pedir sugestão à IA</strong><span class="muted">A IA preenche, você revisa e ajusta.</span></button>
+            <button class="big-choice" type="button" data-focus="obj"><strong>Escrever eu mesmo</strong><span class="muted">Preencha os campos abaixo.</span></button>
+          </div>
+          <label class="field"><span>Objetivos <span class="req" aria-hidden="true">*</span></span><textarea id="obj">Reconhecer frações como partes de um inteiro usando exemplos do cotidiano.</textarea></label>
+          <label class="field"><span>Como a aula vai acontecer <span class="req" aria-hidden="true">*</span></span><textarea>1. Conversa inicial com uma pizza de papel. 2. Grupos dividem e comparam pedaços. 3. Registro no caderno.</textarea></label>
+          <label class="field"><span>Como você vai avaliar <span class="req" aria-hidden="true">*</span></span><textarea aria-invalid="true" aria-describedby="av-erro"></textarea><p class="field-error" id="av-erro">Escreva como você vai avaliar a aula.</p></label>`,
+          };
+          const nav = `<div class="actions" style="justify-content:space-between">
+      ${s > 1 ? `<button class="btn secondary" type="button" data-plan-step="${s - 1}">Voltar</button>` : `<a class="btn secondary" href="#/aulas">Cancelar</a>`}
+      ${s < 4 ? `<button class="btn" type="button" data-plan-step="${s + 1}">Continuar</button>` : `<span class="actions" style="margin:0"><button class="btn secondary" type="button" data-toast="Rascunho salvo. Você pode voltar quando quiser.">Salvar rascunho</button><button class="btn" type="button" data-confirm="plan">Aprovar plano</button></span>`}</div>`;
+          return shell(
+            "aulas",
+            `${head("Planejar uma aula")}${stepper}<div class="card">${bodies[s]}</div>${nav}`,
+          );
+        },
+
+        atividades: () =>
+          shell(
+            "atividades",
+            `
+    ${head("Atividades", "Crie, envie e acompanhe as atividades das suas turmas.", `<a class="btn" href="#/nova-atividade">Criar atividade</a>`)}
+    <ul class="list">${DATA.activities
+      .map(
+        (a) => `
+      <li class="card"><div class="card-row"><div><h3>${a.title}</h3><p class="muted" style="margin:0 0 6px">${a.cls} · prazo ${a.due}</p><span class="tag ${a.status[1]}">${a.status[0]}</span> ${a.answers ? `<span class="muted">· ${a.answers}</span>` : ""}</div>
+      ${a.status[1] === "ok" ? `<a class="btn secondary" href="#/correcoes">Ver respostas</a>` : `<a class="btn secondary" href="#/nova-atividade">Continuar ${a.title}</a>`}</div></li>`,
+      )
+      .join("")}</ul>`,
+          ),
+
+        "nova-atividade": () => {
+          const s = state.step;
+          const steps = ["Plano", "Questões", "Revisar", "Prazo e envio"];
+          const stepper = `<ol class="stepper">${steps.map((t, i) => `<li ${i + 1 === s ? 'aria-current="step"' : ""} class="${i + 1 < s ? "done" : ""}"><b>Passo ${i + 1} de 4</b>${t}</li>`).join("")}</ol>`;
+          const bodies = {
+            1: `<p class="muted">A atividade parte de um plano de aula aprovado.</p>
+          <label class="choice"><input type="radio" name="plano" checked><span><b>Frações na pizza</b><br><span class="muted">7º ano B · Matemática</span></span></label>
+          <p class="muted">Não achou o plano? <a href="#/planejar">Planejar uma aula</a></p>
+          <label class="field"><span>Título da atividade <span class="req" aria-hidden="true">*</span></span><input type="text" value="Frações – exercício 1"></label>`,
+            2: `<div class="choice-grid" style="margin-bottom:16px">
+            <button class="big-choice" type="button" data-step="3" data-toast="A IA criou 4 questões. Revise cada uma antes de aprovar."><strong>Pedir questões à IA</strong><span class="muted">Baseadas no plano. Você revisa tudo antes de enviar.</span></button>
+            <button class="big-choice" type="button" data-step="3"><strong>Escrever as questões</strong><span class="muted">Comece do zero.</span></button>
+          </div>
+          <div class="choice-grid">
+            <label class="field"><span>Quantas questões?</span><select><option>3</option><option selected>4</option><option>5</option><option>10</option></select></label>
+            <label class="field"><span>Tipo de questão</span><select><option>Múltipla escolha</option><option>Resposta escrita</option><option selected>As duas</option></select></label>
+            <label class="field"><span>Dificuldade</span><select><option>Fácil</option><option selected>Média</option><option>Difícil</option></select></label>
+          </div>`,
+            3: `<div class="banner ok" role="status"><strong>Sugestão da IA</strong><p>Leia e ajuste cada questão. Nada vai para os alunos antes do passo 4.</p></div>
+          <div class="preview"><h3>Frações – exercício 1</h3><ol>
+            <li><b>Uma pizza foi dividida em 8 pedaços e Ana comeu 3. Que fração da pizza ela comeu?</b> (2 pontos)
+              <ul><li>3/5</li><li class="correct">3/8 ✓ resposta certa</li><li>5/8</li><li>8/3</li></ul>
+              <button class="btn link" type="button" data-toast="No produto, abre a questão para edição.">Editar questão 1</button></li>
+            <li><b>Explique com suas palavras por que 2/4 e 1/2 representam a mesma quantidade.</b> (3 pontos)
+              <p class="muted" style="margin:4px 0 0">Resposta esperada: as duas frações ocupam metade do inteiro.</p>
+              <button class="btn link" type="button" data-toast="No produto, abre a questão para edição.">Editar questão 2</button></li>
+          </ol></div>
+          <div class="actions"><button class="btn secondary" type="button" data-toast="Questão em branco adicionada.">+ Adicionar questão</button></div>`,
+            4: `<label class="field"><span>Prazo para responder <span class="req" aria-hidden="true">*</span></span><input type="datetime-local" value="2026-10-18T23:59"></label>
+          <fieldset class="field" style="border:0;padding:0;margin:0 0 16px"><legend style="font-weight:700;margin-bottom:6px">Depois do prazo</legend>
+            <label class="choice"><input type="radio" name="atraso" checked> Não aceitar mais respostas</label>
+            <label class="choice"><input type="radio" name="atraso"> Aceitar, tirando uma porcentagem da nota</label></fieldset>
+          <p class="muted">Turma que vai receber: <b>7º ano B</b> (28 alunos)</p>`,
+          };
+          const nav = `<div class="actions" style="justify-content:space-between">
+      ${s > 1 ? `<button class="btn secondary" type="button" data-step="${s - 1}">Voltar</button>` : `<a class="btn secondary" href="#/atividades">Cancelar</a>`}
+      ${s === 3 ? `<button class="btn" type="button" data-step="4" data-toast="Questões aprovadas.">Aprovar questões</button>` : s < 4 ? (s === 2 ? "" : `<button class="btn" type="button" data-step="${s + 1}">Continuar</button>`) : `<button class="btn" type="button" data-confirm="send">Enviar para a turma</button>`}</div>`;
+          return shell(
+            "atividades",
+            `${head("Criar atividade")}${stepper}<div class="card">${bodies[s]}</div>${nav}`,
+          );
+        },
+
+        correcoes: () =>
+          shell(
+            "correcoes",
+            `
+    ${head("Correções", "As questões de múltipla escolha já vêm corrigidas. Você corrige as respostas escritas.")}
+    <div class="card">
+      <div class="card-row"><div><h3>Frações – exercício 1</h3><p class="muted" style="margin:0">7º ano B · 25 respostas</p></div><a class="btn" href="#/corrigir">Corrigir respostas</a></div>
+      <div class="progress" role="progressbar" aria-label="Correções concluídas" aria-valuenow="22" aria-valuemin="0" aria-valuemax="25"><span style="width:88%"></span></div>
+      <p class="muted" style="margin:0">22 de 25 corrigidas · faltam 3</p>
+    </div>
+    <div class="card card-row"><div><h3>12 notas aprovadas ainda não devolvidas</h3><p class="muted" style="margin:0">Os alunos só veem a nota depois que você devolve.</p></div>
+      <button class="btn secondary" type="button" data-confirm="return">Devolver 12 notas</button></div>`,
+          ),
+
+        corrigir: () => {
+          const name = ["Bruno Costa", "Carla Mendes", "Davi Rocha"][
+            state.correctionIndex % 3
+          ];
+          return shell(
+            "correcoes",
+            `
+    <a class="btn link" href="#/correcoes" style="padding-left:0">← Voltar para correções</a>
+    ${head(`${name}`, `Frações – exercício 1 · resposta ${state.correctionIndex + 1} de 3 que faltam`)}
+    <div class="card"><h3>Questão 1 · múltipla escolha</h3><p style="margin:0"><span class="tag ok">Certa</span> 2 de 2 pontos</p></div>
+    <div class="card">
+      <h3>Questão 2 · resposta escrita (vale 3 pontos)</h3>
+      <p class="muted" style="margin:0 0 4px">Pergunta: Explique com suas palavras por que 2/4 e 1/2 representam a mesma quantidade.</p>
+      <div class="preview" style="margin:8px 0 12px"><b>Resposta do aluno:</b><p style="margin:4px 0 0">Porque se você corta a pizza em 4 e pega 2 fica com metade igual a cortar em 2 e pegar 1.</p></div>
+      <p class="muted"><b>Resposta esperada:</b> as duas frações ocupam metade do inteiro.</p>
+      <button class="btn secondary" type="button" data-toast="Sugestão da IA: 3 de 3 pontos. Confira antes de salvar.">Pedir sugestão à IA</button>
+      <div class="choice-grid" style="margin-top:16px">
+        <label class="field"><span>Pontos (de 0 a 3) <span class="req" aria-hidden="true">*</span></span><input type="number" min="0" max="3" step="0.5" value="3"></label>
+      </div>
+      <label class="field"><span>Comentário para o aluno</span><textarea placeholder="Opcional"></textarea><small>Pode ficar em branco.</small></label>
+    </div>
+    <p><b>Nota final: 10 de 10</b></p>
+    <div class="actions" style="justify-content:space-between">
+      <button class="btn secondary" type="button" data-next-correction>Pular por enquanto</button>
+      <button class="btn" type="button" data-next-correction data-toast="Nota de ${name} aprovada.">Aprovar nota e ir para o próximo</button>
+    </div>`,
+          );
+        },
+
+        recados: () =>
+          shell(
+            "recados",
+            `
+    ${head("Recados", "Mensagens para um aluno ou avisos para a turma toda.")}
+    <div class="card">
+      <h2 style="margin-top:0">Novo recado</h2>
+      <fieldset class="field" style="border:0;padding:0;margin:0 0 16px"><legend style="font-weight:700;margin-bottom:6px">Para quem? <span class="req" aria-hidden="true">*</span></legend>
+        <div class="choice-grid">
+          <label class="choice"><input type="radio" name="para" value="aluno" ${state.recado === "aluno" ? "checked" : ""}><span><b>Um aluno</b><br><span class="muted">Vai por e-mail, só para ele.</span></span></label>
+          <label class="choice"><input type="radio" name="para" value="turma" ${state.recado === "turma" ? "checked" : ""}><span><b>A turma toda</b><br><span class="muted">Vira um aviso no mural da turma no Google Sala de Aula.</span></span></label>
+        </div></fieldset>
+      ${
+        state.recado === "turma"
+          ? `<label class="field"><span>Turma <span class="req" aria-hidden="true">*</span></span><select><option>7º ano B (28 alunos)</option><option>8º ano A (31 alunos)</option><option>Reforço de leitura (9 alunos)</option></select></label>
+      <label class="field"><span>Título do aviso <span class="req" aria-hidden="true">*</span></span><input type="text" value="Prova na sexta-feira"></label>
+      <label class="field"><span>Mensagem <span class="req" aria-hidden="true">*</span></span><textarea>Turma, nossa prova de frações será na sexta-feira. Revisem os exercícios 1 a 5.</textarea><small>Todos os alunos da turma verão este aviso. Não cite notas nem dados de um aluno específico.</small></label>
+      <label class="field"><span>Link ou material (opcional)</span><select><option>Nenhum</option><option>Vídeo: frações no dia a dia</option></select></label>
+      <div class="actions"><button class="btn secondary" type="button" data-toast="A IA sugeriu um texto. Revise antes de enviar.">Pedir ajuda à IA</button><button class="btn" type="button" data-confirm="announcement">Enviar aviso para a turma</button></div>`
+          : `<label class="field"><span>Turma <span class="req" aria-hidden="true">*</span></span><select name="recado-turma">${Object.keys(
+              RECADO_ALUNOS,
+            )
+              .map(
+                (t) =>
+                  `<option ${t === state.recadoTurma ? "selected" : ""}>${t}</option>`,
+              )
+              .join("")}</select></label>
+      <label class="field"><span>Aluno <span class="req" aria-hidden="true">*</span></span><select>${RECADO_ALUNOS[state.recadoTurma].map((a) => `<option>${a}</option>`).join("")}</select><small>Aparecem os alunos desta turma com atividade já corrigida.</small></label>
+      <label class="field"><span>Mensagem <span class="req" aria-hidden="true">*</span></span><textarea>Carla, você foi muito bem nas questões de múltipla escolha!</textarea></label>
+      <div class="actions"><button class="btn secondary" type="button" data-toast="A IA sugeriu um texto. Revise antes de enviar.">Pedir ajuda à IA</button><button class="btn" type="button" data-confirm="message">Enviar recado</button></div>`
+      }
+    </div>
+    <h2>Enviados</h2>
+    <ul class="list">
+      <li class="card card-row"><div><h3>Prova na sexta-feira</h3><p class="muted" style="margin:0 0 6px">Turma toda · 7º ano B · 15 de out.</p><span class="tag ok">Enviado</span></div></li>
+      <li class="card card-row"><div><h3>Parabéns pela leitura</h3><p class="muted" style="margin:0 0 6px">Davi Rocha · 14 de out.</p><span class="tag bad">Não enviado</span></div><button class="btn secondary" type="button" data-toast="Recado enviado.">Tentar de novo</button></li>
+    </ul>`,
+          ),
+
+        boletins: () =>
+          shell(
+            "boletins",
+            `
+    ${head("Boletins", "Gere boletins em PDF com as notas já devolvidas.")}
+    <div class="card">
+      <label class="field"><span>Turma <span class="req" aria-hidden="true">*</span></span><select><option>7º ano B</option></select></label>
+      <label class="field"><span>Período <span class="req" aria-hidden="true">*</span></span><select><option>4º bimestre (01/10 a 15/12)</option><option>3º bimestre</option><option>Escolher datas</option></select></label>
+      <fieldset class="field" style="border:0;padding:0;margin:0 0 16px"><legend style="font-weight:700;margin-bottom:6px">Alunos <span class="req" aria-hidden="true">*</span></legend>
+        <label class="choice"><input type="checkbox" checked> <b>Selecionar todos (28)</b></label>
+        <div class="choice-grid">${DATA.students.map((s) => `<label class="choice"><input type="checkbox" checked> ${s}</label>`).join("")}</div></fieldset>
+      <button class="btn" type="button" data-toast="28 boletins gerados.">Gerar boletins</button>
+    </div>
+    <h2>Gerados</h2>
+    <ul class="list"><li class="card card-row"><div><h3>Ana Beatriz Lima · média 8,5</h3><p class="muted" style="margin:0 0 6px">4º bimestre · 7º ano B</p><span class="tag">Ainda não enviado</span></div>
+      <span class="actions" style="margin:0"><a class="btn secondary" href="#/boletins">Ver PDF</a><button class="btn" type="button" data-confirm="bulletin">Enviar por e-mail</button></span></li></ul>`,
+          ),
+
+        criar: () =>
+          shell(
+            "criar",
+            `
+    ${head("O que você quer criar?", "Escolha uma opção para começar.")}
+    <div class="choice-grid">
+      <a class="big-choice" href="#/nova-atividade">${icon("atividades")}<strong>Nova atividade</strong><span class="muted">Questões para a turma responder no Google Formulários, a partir de um plano aprovado.</span></a>
+      <a class="big-choice" href="#/planejar">${icon("aulas")}<strong>Novo plano de aula</strong><span class="muted">Tema, habilidades da BNCC e roteiro da aula, com ou sem ajuda da IA.</span></a>
+      <a class="big-choice" href="#/nova-turma">${icon("turmas")}<strong>Nova turma</strong><span class="muted">Para turmas que ainda não estão no Google Sala de Aula.</span></a>
+    </div>
+    <p class="muted" style="margin-top:16px">Sua turma já está no Google Sala de Aula? <a href="#/turmas">Traga suas turmas de lá</a>.</p>`,
+          ),
+
+        "nova-turma": () =>
+          shell(
+            "nova-turma",
+            `
+    <a class="btn link" href="#/criar" style="padding-left:0">← Voltar</a>
+    ${head("Nova turma")}
+    <div class="card">
+      <label class="field"><span>Nome da turma <span class="req" aria-hidden="true">*</span></span><input type="text" placeholder="Ex.: 7º ano B"></label>
+      <label class="field"><span>Ano <span class="req" aria-hidden="true">*</span></span><select><option>6º ano</option><option selected>7º ano</option><option>8º ano</option><option>9º ano</option></select></label>
+      <fieldset class="field" style="border:0;padding:0;margin:0 0 16px"><legend style="font-weight:700;margin-bottom:6px">Matéria desta turma <span class="req" aria-hidden="true">*</span></legend>
+        <div class="choice-grid">${["Matemática", "Ciências", "Língua Portuguesa", "Geografia", "História", "Arte"].map((m) => `<label class="choice"><input type="radio" name="materia-nova"> ${m}</label>`).join("")}</div>
+        <small class="muted">Cada turma tem uma matéria. Ela define as habilidades da BNCC que aparecem ao planejar.</small></fieldset>
+      <label class="field"><span>Código da turma</span><input type="text" value="MAT-7B-4821"><small>Criamos um código para você. Pode trocar se quiser.</small></label>
+      <div class="actions"><a class="btn secondary" href="#/criar">Cancelar</a><a class="btn" href="#/turmas" data-toast="Turma criada.">Criar turma</a></div>
+    </div>`,
+          ),
+
+        conta: () =>
+          shell(
+            "conta",
+            `
+    ${head("Minha conta")}
+    <div class="card"><h3>Professora Ana</h3><p class="muted">professora.ana@example.invalid</p>
+      <div class="actions"><button class="btn secondary" type="button" data-toast="Download iniciado.">Baixar uma cópia dos meus dados</button><a class="btn secondary" href="#/entrar">Sair</a></div></div>
+    <div class="card"><h3>Excluir minha conta</h3><p class="muted">Seu acesso é removido. Notas e correções já entregues aos alunos são mantidas, sem o seu nome.</p>
+      <button class="btn danger" type="button" data-confirm="delete">Excluir minha conta</button></div>`,
+          ),
+      };
+
+      const CONFIRMS = {
+        send: [
+          "Enviar para a turma?",
+          "A atividade será publicada no Google Formulários e aparecerá no Google Sala de Aula do 7º ano B (28 alunos). Depois de enviada, as questões não podem mais ser alteradas.",
+          "Enviar para a turma",
+          "Atividade enviada! Ela já aparece no Google Sala de Aula do 7º ano B.",
+          "#/atividades",
+        ],
+        plan: [
+          "Aprovar este plano?",
+          "Depois de aprovado, você pode criar atividades a partir dele. Para mudar algo, será preciso editar e aprovar de novo.",
+          "Aprovar plano",
+          "Plano aprovado. Que tal criar uma atividade?",
+          "#/aulas",
+        ],
+        return: [
+          "Devolver 12 notas?",
+          "Os 12 alunos vão ver a nota e seus comentários no Google Sala de Aula. Isso não pode ser desfeito.",
+          "Devolver notas",
+          "12 notas devolvidas ao Google Sala de Aula.",
+          null,
+        ],
+        announcement: [
+          "Enviar aviso para o 7º ano B?",
+          "O aviso será publicado no mural do Google Sala de Aula do 7º ano B e os 28 alunos poderão vê-lo. Se o Google falhar, enviamos por e-mail para cada aluno.",
+          "Enviar aviso",
+          "Aviso publicado no Google Sala de Aula do 7º ano B.",
+          null,
+        ],
+        message: [
+          "Enviar recado para Carla Mendes?",
+          "O recado será enviado por e-mail só para Carla Mendes.",
+          "Enviar recado",
+          "Recado enviado para Carla Mendes.",
+          null,
+        ],
+        bulletin: [
+          "Enviar boletim por e-mail?",
+          "O boletim de Ana Beatriz Lima será enviado para o e-mail dela cadastrado no Google Sala de Aula.",
+          "Enviar boletim",
+          "Boletim enviado.",
+          null,
+        ],
+        delete: [
+          "Excluir sua conta?",
+          "Você perderá o acesso ao EDUC.AI. Esta ação não pode ser desfeita.",
+          "Excluir minha conta",
+          "No produto, pede para digitar EXCLUIR antes de concluir.",
+          null,
+        ],
+      };
+
+      const TITLES = {
+        entrar: "Entrar",
+        inicio: "Início",
+        turmas: "Turmas",
+        turma: "8º ano A",
+        aulas: "Aulas",
+        planejar: "Planejar uma aula",
+        atividades: "Atividades",
+        "nova-atividade": "Criar atividade",
+        criar: "Criar",
+        "nova-turma": "Nova turma",
+        correcoes: "Correções",
+        corrigir: "Corrigir respostas",
+        recados: "Recados",
+        boletins: "Boletins",
+        conta: "Minha conta",
+      };
+
+      function toast(text) {
+        const el = document.getElementById("toast");
+        el.textContent = text;
+        el.style.display = "block";
+        clearTimeout(toast.t);
+        toast.t = setTimeout(() => (el.style.display = "none"), 3500);
+      }
+
+      function render(focus = true) {
+        const route = location.hash.replace("#/", "") || "inicio";
+        const page = PAGES[route] ? route : "inicio";
+        document.getElementById("app").innerHTML = PAGES[page]();
+        document.title = `${TITLES[page]} · EDUC.AI`;
+        if (focus) document.getElementById("conteudo")?.focus();
+      }
+
+      document.addEventListener("click", (event) => {
+        const t = event.target.closest("button, a");
+        if (!t) return;
+        if (t.id === "more-btn") {
+          const sheet = document.getElementById("more-sheet");
+          const open = sheet.classList.toggle("open");
+          t.setAttribute("aria-expanded", String(open));
+          return;
+        }
+        if (t.dataset.step) {
+          state.step = Number(t.dataset.step);
+          render();
+        }
+        if (t.dataset.planStep) {
+          state.planStep = Number(t.dataset.planStep);
+          render();
+        }
+        if (t.hasAttribute("data-next-correction")) {
+          state.correctionIndex = (state.correctionIndex + 1) % 3;
+          render();
+        }
+        if (t.dataset.focus) document.getElementById(t.dataset.focus)?.focus();
+        if (t.dataset.toast) toast(t.dataset.toast);
+        if (t.dataset.confirm) {
+          const [title, body, ok, done, next] = CONFIRMS[t.dataset.confirm];
+          const dialog = document.getElementById("confirm");
+          document.getElementById("confirm-title").textContent = title;
+          document.getElementById("confirm-body").textContent = body;
+          const okBtn = document.getElementById("confirm-ok");
+          okBtn.textContent = ok;
+          okBtn.className =
+            t.dataset.confirm === "delete" ? "btn danger" : "btn";
+          okBtn.onclick = () => {
+            dialog.close();
+            toast(done);
+            if (next) {
+              state.step = 1;
+              state.planStep = 1;
+              location.hash = next;
+            }
+          };
+          document.getElementById("confirm-cancel").onclick = () =>
+            dialog.close();
+          dialog.showModal();
+        }
+      });
+
+      document
+        .getElementById("toggle-google")
+        .addEventListener("change", (event) => {
+          state.googleDown = event.target.checked;
+          render(false);
+        });
+      document.addEventListener("change", (event) => {
+        if (event.target.name === "recado-turma") {
+          state.recadoTurma = event.target.value;
+          render(false);
+          document.querySelector('select[name="recado-turma"]')?.focus();
+          return;
+        }
+        if (event.target.name !== "para") return;
+        state.recado = event.target.value;
+        render(false);
+        document
+          .querySelector(`input[name="para"][value="${state.recado}"]`)
+          ?.focus();
+      });
+      window.addEventListener("hashchange", (event) => {
+        // Entrar num assistente vindo de outra tela recomeça do passo 1.
+        const from = new URL(event.oldURL).hash;
+        const to = location.hash;
+        if (to !== from) {
+          state.step = 1;
+          state.planStep = 1;
+        }
+        render();
+      });
+      render(false);
+    </script>
+  </body>
+</html>
