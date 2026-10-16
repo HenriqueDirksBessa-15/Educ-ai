@@ -6,39 +6,15 @@ import type {
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
+import { json, request } from "./api.js";
 import { useConfirm } from "./ConfirmDialog.js";
 import {
   loadCatalog,
   schoolYearLabel,
   type Catalog,
 } from "./curriculumCatalog.js";
-import {
-  classSourceLabel,
-  enrollmentStatusLabel,
-  errorMessage,
-} from "./labels.js";
+import { classSourceLabel, enrollmentStatusLabel } from "./labels.js";
 import { routeHref } from "./router.js";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
-
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    credentials: "include",
-    ...init,
-  });
-  const body = (await response.json().catch(() => null)) as {
-    data?: T;
-    error?: { code?: string };
-  } | null;
-  if (!response.ok) throw new Error(errorMessage(body?.error?.code));
-  return body?.data as T;
-}
-
-const json = (method: string, value: unknown): RequestInit => ({
-  method,
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(value),
-});
 
 type Feedback = { kind: "ok" | "error"; text: string } | null;
 
@@ -254,56 +230,60 @@ function CurriculumFields({
 
   return (
     <>
-      <label className="field">
-        <span>
-          Etapa <span aria-hidden="true">*</span>
-        </span>
-        <select
-          value={value.stage}
-          onChange={(event) =>
-            onChange({
-              stage: event.target.value as EducationStage,
-              year: "",
-              subject: "",
-            })
-          }
-          {...describe("stage")}
-        >
-          <option value="">Escolha a etapa</option>
-          {catalog.stages.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+      <div className="field">
+        <label>
+          <span>
+            Etapa <span aria-hidden="true">*</span>
+          </span>
+          <select
+            value={value.stage}
+            onChange={(event) =>
+              onChange({
+                stage: event.target.value as EducationStage,
+                year: "",
+                subject: "",
+              })
+            }
+            {...describe("stage")}
+          >
+            <option value="">Escolha a etapa</option>
+            {catalog.stages.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {error("stage")}
-      </label>
-      <label className="field">
-        <span>
-          Ano <span aria-hidden="true">*</span>
-        </span>
-        <select
-          value={value.year}
-          disabled={!stage}
-          onChange={(event) =>
-            onChange({ ...value, year: event.target.value, subject: "" })
-          }
-          {...describe("year")}
-        >
-          <option value="">Escolha o ano</option>
-          {!yearKnown && (
-            <option value={value.year}>
-              {schoolYearLabel(value.year)} (atual)
-            </option>
-          )}
-          {years.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+      </div>
+      <div className="field">
+        <label>
+          <span>
+            Ano <span aria-hidden="true">*</span>
+          </span>
+          <select
+            value={value.year}
+            disabled={!stage}
+            onChange={(event) =>
+              onChange({ ...value, year: event.target.value, subject: "" })
+            }
+            {...describe("year")}
+          >
+            <option value="">Escolha o ano</option>
+            {!yearKnown && (
+              <option value={value.year}>
+                {schoolYearLabel(value.year)} (atual)
+              </option>
+            )}
+            {years.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {error("year")}
-      </label>
+      </div>
       <fieldset
         className="field choice-group"
         {...(errors.subject ? { "aria-describedby": `${id}-subject` } : {})}
@@ -652,25 +632,27 @@ export function NewClassPage({ reload }: { reload: () => Promise<void> }) {
         onSubmit={(event) => void submit(event)}
         noValidate
       >
-        <label className="field">
-          <span>
-            Nome da turma <span aria-hidden="true">*</span>
-          </span>
-          <input
-            ref={nameRef}
-            value={name}
-            placeholder="Ex.: 7º ano B"
-            onChange={(event) => setName(event.target.value)}
-            {...(errors.name
-              ? { "aria-invalid": true, "aria-describedby": `${id}-name` }
-              : {})}
-          />
+        <div className="field">
+          <label>
+            <span>
+              Nome da turma <span aria-hidden="true">*</span>
+            </span>
+            <input
+              ref={nameRef}
+              value={name}
+              placeholder="Ex.: 7º ano B"
+              onChange={(event) => setName(event.target.value)}
+              {...(errors.name
+                ? { "aria-invalid": true, "aria-describedby": `${id}-name` }
+                : {})}
+            />
+          </label>
           {errors.name && (
             <span className="field-error" id={`${id}-name`}>
               {errors.name}
             </span>
           )}
-        </label>
+        </div>
         {catalogReady && (
           <CurriculumFields
             catalog={catalogState.catalog!}
@@ -679,19 +661,24 @@ export function NewClassPage({ reload }: { reload: () => Promise<void> }) {
             onChange={setProfile}
           />
         )}
-        <label className="field">
-          <span>Código da turma</span>
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            aria-describedby={`${id}-code-help`}
-            {...(errors.code ? { "aria-invalid": true } : {})}
-          />
-          <span className="muted-line" id={`${id}-code-help`}>
+        <div className="field">
+          <label>
+            <span>Código da turma</span>
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              aria-describedby={`${id}-code-help`}
+              {...(errors.code ? { "aria-invalid": true } : {})}
+            />
+          </label>
+          <span
+            className={errors.code ? "field-error" : "muted-line"}
+            id={`${id}-code-help`}
+          >
             {errors.code ??
               "Criamos um código para você. Pode trocar se quiser."}
           </span>
-        </label>
+        </div>
         <FeedbackMessage value={feedback} />
         {createdId && (
           <a className="secondary-action" href={routeHref("turmas", createdId)}>

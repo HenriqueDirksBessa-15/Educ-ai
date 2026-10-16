@@ -20,6 +20,11 @@ import {
   useState,
 } from "react";
 import type { FormEvent, MouseEvent, ReactNode } from "react";
+import {
+  ActivityListPage,
+  ActivityPage,
+  ActivityWizard,
+} from "./ActivitiesPages";
 import { AppShell, Page } from "./AppShell";
 import { ClassDetailPage, ClassListPage, NewClassPage } from "./ClassesPages";
 import { ConfirmProvider, useConfirm } from "./ConfirmDialog";
@@ -360,7 +365,7 @@ function ProfessorShell({
           items={[
             ["aulas", "Planejar uma aula", "Com ou sem ajuda da IA"],
             [
-              "atividades",
+              "nova-atividade",
               "Criar uma atividade",
               "A partir de um plano aprovado",
             ],
@@ -377,7 +382,7 @@ function ProfessorShell({
         <Shortcuts
           items={[
             [
-              "atividades",
+              "nova-atividade",
               "Nova atividade",
               "Questões para a turma responder no Google Formulários, a partir de um plano aprovado.",
             ],
@@ -435,12 +440,23 @@ function ProfessorShell({
         />
       </Page>
     ),
-    atividades: () => (
+    atividades: () =>
+      param ? (
+        <ActivityPage key={param} activityId={param} plans={plans} />
+      ) : (
+        <Page
+          title="Atividades"
+          subtitle="Crie, envie e acompanhe as atividades das suas turmas."
+        >
+          <ActivityListPage />
+        </Page>
+      ),
+    "nova-atividade": () => (
       <Page
-        title="Atividades"
-        subtitle="Crie, envie e acompanhe as atividades das suas turmas."
+        title="Nova atividade"
+        subtitle="Quatro passos: plano, questões, revisão e envio."
       >
-        <ActivitiesPanel plans={plans} />
+        <ActivityWizard plans={plans} />
       </Page>
     ),
     correcoes: () => (

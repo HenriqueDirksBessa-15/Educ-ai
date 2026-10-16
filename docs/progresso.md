@@ -2,6 +2,23 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 05: Atividades
+
+Concluída em 16/10/2026 ([etapa](./telas/05-atividades.md)):
+
+- lista com filtros (Todas, Rascunhos, Enviadas, Encerradas) e próximo passo
+  de cada atividade;
+- assistente em 4 passos — plano, questões (IA ou à mão), revisão e prazo e
+  envio — no lugar de cerca de 9 ações espalhadas;
+- tipo da atividade calculado das questões e pontuação inteira, evitando os
+  erros da API e do Google Formulários;
+- acompanhamento da atividade enviada com links, respostas, encerrar e
+  guardar com confirmação, e reenvio quando o Google falha.
+
+Verificações: 87 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados. Duas pendências de backend registradas na
+etapa.
+
 ## Interface — etapa 04: Turmas
 
 Concluída em 16/10/2026 ([etapa](./telas/04-turmas.md)):

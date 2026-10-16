@@ -7,6 +7,7 @@ export type RouteId =
   | "nova-turma"
   | "aulas"
   | "atividades"
+  | "nova-atividade"
   | "correcoes"
   | "recados"
   | "boletins"
@@ -21,6 +22,7 @@ export const routes: Record<RouteId, RouteInfo> = {
   "nova-turma": { title: "Nova turma" },
   aulas: { title: "Aulas", hint: "Planos e materiais" },
   atividades: { title: "Atividades", hint: "Criar e enviar" },
+  "nova-atividade": { title: "Nova atividade" },
   correcoes: { title: "Correções", hint: "Notas para dar" },
   recados: { title: "Recados", hint: "Para alunos e turmas" },
   boletins: { title: "Boletins", hint: "PDF por aluno" },
@@ -47,7 +49,7 @@ export const primaryRoutes: RouteId[] = [
 ];
 
 // Only these routes take an id after the slash, e.g. "#/turmas/{id}".
-const routesWithParam = new Set<RouteId>(["turmas"]);
+const routesWithParam = new Set<RouteId>(["turmas", "atividades"]);
 
 export type Location = { route: RouteId; param: string | null };
 

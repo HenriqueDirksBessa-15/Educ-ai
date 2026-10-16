@@ -314,6 +314,7 @@ describe("teacher shell", () => {
       ["#/nova-turma", "Nova turma"],
       ["#/aulas", "Aulas"],
       ["#/atividades", "Atividades"],
+      ["#/nova-atividade", "Nova atividade"],
       ["#/correcoes", "Correções"],
       ["#/recados", "Recados"],
       ["#/boletins", "Boletins"],
