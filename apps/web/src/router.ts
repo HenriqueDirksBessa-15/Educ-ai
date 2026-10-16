@@ -49,7 +49,7 @@ export const primaryRoutes: RouteId[] = [
 ];
 
 // Only these routes take an id after the slash, e.g. "#/turmas/{id}".
-const routesWithParam = new Set<RouteId>(["turmas", "atividades"]);
+const routesWithParam = new Set<RouteId>(["turmas", "atividades", "correcoes"]);
 
 export type Location = { route: RouteId; param: string | null };
 

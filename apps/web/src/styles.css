@@ -1314,3 +1314,76 @@ button.big-choice.secondary:hover:not(:disabled) {
   display: grid;
   gap: 0.4rem;
 }
+
+/* Corrections */
+
+.grow {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.progress {
+  height: 10px;
+  margin: 0.5rem 0 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+.queue-group {
+  margin-top: 1.5rem;
+}
+
+.queue-group h2 {
+  margin-bottom: 0.75rem;
+}
+
+.correction-form {
+  display: grid;
+  gap: 1rem;
+  border: 2px solid var(--primary);
+}
+
+.answer-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview {
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.preview p {
+  margin: 0.25rem 0 0;
+}
+
+.expected {
+  margin: 0;
+}
+
+.expected dt {
+  font-weight: 700;
+}
+
+.expected dd {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.grade-preview {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+}

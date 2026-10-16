@@ -28,6 +28,7 @@ import {
 import { AppShell, Page } from "./AppShell";
 import { ClassDetailPage, ClassListPage, NewClassPage } from "./ClassesPages";
 import { ConfirmProvider, useConfirm } from "./ConfirmDialog";
+import { CorrectionListPage, CorrectionQueuePage } from "./CorrectionsPages";
 import {
   formatDate,
   lessonPlanStatusLabel,
@@ -38,11 +39,6 @@ import { loadOverview } from "./overview";
 import { computePendencies, menuCounts, type Overview } from "./pendencies";
 import { pageTitle, routeHref, useLocation, type RouteId } from "./router";
 
-const ActivitiesPanel = lazy(() =>
-  import("./ActivitiesPanel").then((module) => ({
-    default: module.ActivitiesPanel,
-  })),
-);
 const FeedbackPanel = lazy(() =>
   import("./FeedbackPanel").then((module) => ({
     default: module.FeedbackPanel,
@@ -459,14 +455,17 @@ function ProfessorShell({
         <ActivityWizard plans={plans} />
       </Page>
     ),
-    correcoes: () => (
-      <Page
-        title="Correções"
-        subtitle="Abra uma atividade já enviada e toque em “Coletar respostas”. As questões de múltipla escolha vêm corrigidas; você corrige as respostas escritas."
-      >
-        <ActivitiesPanel plans={plans} initialFilter="published" />
-      </Page>
-    ),
+    correcoes: () =>
+      param ? (
+        <CorrectionQueuePage key={param} activityId={param} />
+      ) : (
+        <Page
+          title="Correções"
+          subtitle="As questões de múltipla escolha já vêm corrigidas. Você corrige as respostas escritas e devolve as notas."
+        >
+          <CorrectionListPage />
+        </Page>
+      ),
     recados: () => (
       <Page
         title="Recados"

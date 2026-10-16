@@ -387,7 +387,10 @@ function ActivityTracking({
           </button>
         )}
         {activity.status !== "draft" && (
-          <a className="primary-action" href={routeHref("correcoes")}>
+          <a
+            className="primary-action"
+            href={routeHref("correcoes", activity.id)}
+          >
             Ver respostas
           </a>
         )}

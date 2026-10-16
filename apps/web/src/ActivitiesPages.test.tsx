@@ -479,7 +479,7 @@ describe("existing activity", () => {
     ).toHaveAttribute("href", "https://classroom.google.com/c/c1/a/w1");
     expect(screen.getByRole("link", { name: "Ver respostas" })).toHaveAttribute(
       "href",
-      "#/correcoes",
+      `#/correcoes/${activityId}`,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Encerrar respostas" }));

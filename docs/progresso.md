@@ -2,6 +2,22 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 06: Correções
+
+Concluída em 16/10/2026 ([etapa](./telas/06-correcoes.md)):
+
+- lista de atividades enviadas com o progresso da correção;
+- fila por atividade (falta corrigir, aprovadas, devolvidas), buscar
+  respostas e devolver as notas aprovadas de uma vez, com confirmação e relato
+  de falhas;
+- correção de um aluno com resposta esperada à vista, sugestão da IA que só
+  preenche os campos, prévia da nota e aprovação que já passa ao próximo;
+- nada é gravado em nome do professor; enquanto a API exigir, o comentário é
+  obrigatório (pedido B-07 ao backend).
+
+Verificações: 99 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados.
+
 ## Interface — etapa 05: Atividades
 
 Concluída em 16/10/2026 ([etapa](./telas/05-atividades.md)):

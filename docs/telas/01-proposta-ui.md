@@ -260,6 +260,7 @@ Formato: **o que aconteceu** + **o que fazer** + botão quando houver ação.
 | B-04 | Devolver várias notas em uma chamada (opcional; a interface faz em sequência)                                                                      | 4.4                                           |
 | B-05 | Limitar o perfil curricular da turma a uma matéria (`curricularComponents` hoje é lista); a interface já envia só uma                              | 4.1 (opcional)                                |
 | B-06 | Incluir turma (`classId`, `className`) em `GET /api/feedbacks/eligible-submissions`, para filtrar alunos por turma no recado                       | 4.5                                           |
+| B-07 | Aceitar comentário vazio na revisão da correção (por resposta e geral), para cumprir DU-01                                                         | 4.4                                           |
 
 ## 8. Ordem de implementação (Fase 3)
 
