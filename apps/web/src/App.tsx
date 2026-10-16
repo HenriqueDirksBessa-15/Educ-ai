@@ -35,15 +35,11 @@ import {
   milestoneTypeLabel,
 } from "./labels";
 import { MaterialsPanel } from "./MaterialsPanel";
+import { MessagesPage } from "./MessagesPage";
 import { loadOverview } from "./overview";
 import { computePendencies, menuCounts, type Overview } from "./pendencies";
 import { pageTitle, routeHref, useLocation, type RouteId } from "./router";
 
-const FeedbackPanel = lazy(() =>
-  import("./FeedbackPanel").then((module) => ({
-    default: module.FeedbackPanel,
-  })),
-);
 const BulletinsPanel = lazy(() =>
   import("./BulletinsPanel").then((module) => ({
     default: module.BulletinsPanel,
@@ -471,7 +467,7 @@ function ProfessorShell({
         title="Recados"
         subtitle="Mensagens para um aluno ou avisos para a turma toda."
       >
-        <FeedbackPanel classes={classes} materials={materials} />
+        <MessagesPage classes={classes} materials={materials} />
       </Page>
     ),
     boletins: () => (

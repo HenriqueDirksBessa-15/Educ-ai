@@ -1387,3 +1387,7 @@ button.big-choice.secondary:hover:not(:disabled) {
   font-size: 1.1rem;
   font-weight: 800;
 }
+
+.field .muted-line {
+  font-weight: 500;
+}

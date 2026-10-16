@@ -2,6 +2,21 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 08: Recados
+
+Concluída em 16/10/2026 ([etapa](./telas/08-recados.md)):
+
+- novo recado para um aluno (lista agrupada por atividade corrigida) ou aviso
+  para a turma toda, com lembrete de que o aviso é visto por todos;
+- confirmação antes de enviar dizendo destinatário e canal; excluir também
+  pede confirmação;
+- a IA só preenche a mensagem; o texto enviado é sempre o que o professor vê;
+- histórico com a entrega em português e continuação de rascunhos.
+
+Verificações: 114 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados. A etapa 07 (Aulas) aguarda o B-01 do
+backend.
+
 ## Interface — etapa 06: Correções
 
 Concluída em 16/10/2026 ([etapa](./telas/06-correcoes.md)):
