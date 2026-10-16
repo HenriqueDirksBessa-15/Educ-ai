@@ -2,6 +2,25 @@
 
 Atualizado em 16/10/2026.
 
+## Ciclo vertical — CV-B1.2: backend GCS
+
+Concluída em 16/10/2026 a implementação do armazenamento GCS:
+
+- seleção explícita entre backend local e GCS, mantendo local como padrão;
+- autenticação por Application Default Credentials, sem chave versionada;
+- upload em streaming pela API JSON com precondição contra sobrescrita;
+- download privado e exclusão idempotente sob a mesma autorização docente;
+- bucket e prefixo obrigatórios/validados somente quando GCS é selecionado;
+- smoke real opt-in que cria, lê e remove um objeto fictício.
+
+Os testes usam transporte e token simulados. Nenhum objeto real foi criado; a
+homologação externa permanece pendente de autorização. Roteiro e operação estão
+em [`ciclo-vertical/10-cv-b1-gcs.md`](./ciclo-vertical/10-cv-b1-gcs.md).
+
+Verificações: `npm run check` aprovado (17 contratos, 103 API e 10 web);
+`npm audit --omit=dev` sem vulnerabilidades; smoke GCS coletado e ignorado sem
+a flag opt-in.
+
 ## Ciclo vertical — CV-B1.1: upload privado local
 
 Concluído em 16/10/2026 o upload privado de materiais:

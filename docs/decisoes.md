@@ -132,6 +132,8 @@
 | DT-61 | 16/10/2026 | Limitar cada arquivo privado a 100 MB, configurável para menos | Viabiliza vídeos curtos e mantém um teto explícito no streaming                    |
 | DT-62 | 16/10/2026 | Implementar armazenamento local privado atrás de adaptador     | Conclui o fluxo local sem usar GCS; backend de nuvem permanece substituível        |
 | DT-63 | 16/10/2026 | Validar extensão, MIME e assinatura e sempre baixar como anexo | Reduz spoofing de tipo e impede execução inline de conteúdo fornecido pelo usuário |
+| DT-64 | 16/10/2026 | Selecionar local ou GCS somente por configuração explícita     | Desenvolvimento não toca nuvem e produção não muda de backend implicitamente       |
+| DT-65 | 16/10/2026 | Autenticar o GCS por ADC e exigir criação sem sobrescrita      | Evita chave de serviço no app e colisões silenciosas de objetos                    |
 
 ## Pendências do DERS
 

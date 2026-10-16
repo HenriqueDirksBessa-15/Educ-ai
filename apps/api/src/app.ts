@@ -34,6 +34,7 @@ import { registerTimelineRoutes } from "./timeline/routes.js";
 import { TimelineRepository } from "./timeline/repository.js";
 import { MaterialService } from "./timeline/service.js";
 import {
+  GcsMaterialStorage,
   LocalMaterialStorage,
   type MaterialStorage,
 } from "./timeline/storage.js";
@@ -160,8 +161,7 @@ export async function createApp({
   const classesRepository = new ClassesRepository(database);
   const timelineRepository = new TimelineRepository(database);
   const fileStorage =
-    materialStorage ??
-    new LocalMaterialStorage(config.materialStorageDirectory);
+    materialStorage ?? createConfiguredMaterialStorage(config);
   const materialService = new MaterialService(timelineRepository, fileStorage);
   const plansRepository = new PlansRepository(database);
   const activitiesRepository = new ActivitiesRepository(database);
@@ -403,4 +403,15 @@ export async function createApp({
   });
 
   return app;
+}
+
+function createConfiguredMaterialStorage(config: AppConfig): MaterialStorage {
+  if (config.materialStorageBackend === "gcs") {
+    if (!config.materialStorageBucket) throw new Error("GCS_BUCKET_REQUIRED");
+    return new GcsMaterialStorage(
+      config.materialStorageBucket,
+      config.materialStoragePrefix,
+    );
+  }
+  return new LocalMaterialStorage(config.materialStorageDirectory);
 }

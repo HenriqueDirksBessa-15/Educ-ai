@@ -120,7 +120,10 @@ professor fora da árvore versionada; a API persiste somente metadados e víncul
 atômicos. O contrato público nunca expõe a chave física. Download passa por
 sessão, propriedade e estado ativo, e sempre responde como anexo sem cache. O
 limite padrão e máximo desta etapa é 100 MB; extensão, MIME e assinatura do
-conteúdo precisam concordar. Um adapter GCS ainda não foi configurado.
+conteúdo precisam concordar. O adapter GCS usa a API JSON com Application
+Default Credentials, prefixo privado e precondição de geração zero. A seleção
+`local`/`gcs` é explícita por ambiente; nenhuma operação real no bucket ocorreu
+durante a implementação.
 
 ## Publicação externa de atividades
 

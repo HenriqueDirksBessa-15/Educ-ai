@@ -1112,6 +1112,8 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       integrationMonitorIntervalMs: 300_000,
       feedbackEditWindowMinutes: 1_440,
       materialStorageDirectory: "storage/materials-test",
+      materialStorageBackend: "local",
+      materialStoragePrefix: "materials-test",
       materialUploadMaxBytes: 104_857_600,
       enableDevAuth: false,
       rateLimitMax: 300,

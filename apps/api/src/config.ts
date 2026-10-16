@@ -10,6 +10,17 @@ const optionalString = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const optionalBucket = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z
+    .string()
+    .trim()
+    .min(3)
+    .max(222)
+    .regex(/^[a-z0-9][a-z0-9._-]*[a-z0-9]$/)
+    .optional(),
+);
+
 const booleanString = z
   .enum(["true", "false"])
   .default("false")
@@ -67,6 +78,13 @@ const configSchema = z
       .trim()
       .min(1)
       .default("storage/materials"),
+    MATERIAL_STORAGE_BACKEND: z.enum(["local", "gcs"]).default("local"),
+    MATERIAL_STORAGE_BUCKET: optionalBucket,
+    MATERIAL_STORAGE_PREFIX: z
+      .string()
+      .trim()
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*(\/[a-zA-Z0-9][a-zA-Z0-9_-]*)*$/)
+      .default("materials"),
     MATERIAL_UPLOAD_MAX_BYTES: z.coerce
       .number()
       .int()
@@ -95,6 +113,15 @@ const configSchema = z
         });
       }
     }
+    if (
+      data.MATERIAL_STORAGE_BACKEND === "gcs" &&
+      !data.MATERIAL_STORAGE_BUCKET
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["MATERIAL_STORAGE_BUCKET"],
+        message: "bucket obrigatório para o backend gcs",
+      });
   });
 
 export type AppConfig = {
@@ -121,6 +148,11 @@ export type AppConfig = {
   integrationMonitorIntervalMs: number;
   feedbackEditWindowMinutes: number;
   materialStorageDirectory: string;
+  materialStorageBackend: z.infer<
+    typeof configSchema
+  >["MATERIAL_STORAGE_BACKEND"];
+  materialStorageBucket?: string;
+  materialStoragePrefix: string;
   materialUploadMaxBytes: number;
   enableDevAuth: boolean;
   rateLimitMax: number;
@@ -184,6 +216,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     integrationMonitorIntervalMs: result.data.INTEGRATION_MONITOR_INTERVAL_MS,
     feedbackEditWindowMinutes: result.data.FEEDBACK_EDIT_WINDOW_MINUTES,
     materialStorageDirectory: result.data.MATERIAL_STORAGE_DIRECTORY,
+    materialStorageBackend: result.data.MATERIAL_STORAGE_BACKEND,
+    materialStorageBucket: result.data.MATERIAL_STORAGE_BUCKET,
+    materialStoragePrefix: result.data.MATERIAL_STORAGE_PREFIX,
     materialUploadMaxBytes: result.data.MATERIAL_UPLOAD_MAX_BYTES,
     enableDevAuth: result.data.ENABLE_DEV_AUTH,
     rateLimitMax: result.data.RATE_LIMIT_MAX,

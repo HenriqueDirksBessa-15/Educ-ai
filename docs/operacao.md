@@ -57,6 +57,22 @@ Nunca aponte o ensaio para produção. Após restaurar, valide contagens, `/api/
 - Classroom: aprovação local permanece quando a devolução falha.
 - E-mail: PDF permanece imutável e cada reenvio cria outra tentativa.
 
+## Materiais no GCS
+
+O backend local é o padrão. Para ativar GCS, configure
+`MATERIAL_STORAGE_BACKEND=gcs`, `MATERIAL_STORAGE_BUCKET` e um prefixo exclusivo
+em `MATERIAL_STORAGE_PREFIX`. A carga usa Application Default Credentials; não
+grave chave JSON no `.env`, imagem ou repositório.
+
+Conceda somente criação, leitura e exclusão de objetos no bucket necessário
+(`roles/storage.objectUser`, preferencialmente limitado por condição IAM ao
+prefixo). Mantenha acesso uniforme, prevenção de acesso público, criptografia e
+uma regra de ciclo de vida para limpar objetos antigos do prefixo de integração.
+
+Antes de produção, execute o smoke opt-in em prefixo de homologação, confirme a
+remoção do objeto e registre bucket, prefixo, identidade ADC e resultado. O
+smoke nunca deve apontar para um prefixo com materiais reais.
+
 ## Produção/GCP
 
 Antes de publicar: configure HTTPS no balanceador, origem CORS exata, cookies `Secure`, segredos no Secret Manager, Cloud SQL privado/proxy, backups automáticos, retenção e provedor de e-mail. Execute migrações e smoke em homologação antes de produção.

@@ -31,6 +31,10 @@ describe("loadConfig", () => {
     expect(loadConfig(validEnvironment).materialUploadMaxBytes).toBe(
       104_857_600,
     );
+    expect(loadConfig(validEnvironment).materialStorageBackend).toBe("local");
+    expect(loadConfig(validEnvironment).materialStoragePrefix).toBe(
+      "materials",
+    );
     expect(loadConfig(validEnvironment).enableDevAuth).toBe(false);
     expect(loadConfig(validEnvironment).rateLimitMax).toBe(300);
     expect(loadConfig(validEnvironment).dataRetentionDays).toBe(365);
@@ -77,6 +81,26 @@ describe("loadConfig", () => {
 
   it("accepts absent OpenAI credentials without enabling external calls", () => {
     expect(loadConfig(validEnvironment).openai.apiKey).toBeUndefined();
+  });
+
+  it("requires a bucket only when the GCS material backend is selected", () => {
+    expect(() =>
+      loadConfig({ ...validEnvironment, MATERIAL_STORAGE_BACKEND: "gcs" }),
+    ).toThrow("MATERIAL_STORAGE_BUCKET");
+    expect(
+      loadConfig({
+        ...validEnvironment,
+        MATERIAL_STORAGE_BACKEND: "gcs",
+        MATERIAL_STORAGE_BUCKET: "educai-private-materials",
+      }).materialStorageBucket,
+    ).toBe("educai-private-materials");
+    expect(() =>
+      loadConfig({
+        ...validEnvironment,
+        MATERIAL_STORAGE_BACKEND: "gcs",
+        MATERIAL_STORAGE_BUCKET: "INVALID/BUCKET",
+      }),
+    ).toThrow("MATERIAL_STORAGE_BUCKET");
   });
 });
 

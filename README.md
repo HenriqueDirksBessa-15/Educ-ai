@@ -144,7 +144,11 @@ npm run check
 | `DATA_RETENTION_DAYS`             | Retenção de dados técnicos revogados      |
 | `FEEDBACK_EDIT_WINDOW_MINUTES`    | Janela de edição/exclusão de feedback     |
 | `MATERIAL_STORAGE_DIRECTORY`      | Diretório privado dos arquivos locais     |
+| `MATERIAL_STORAGE_BACKEND`        | Backend de arquivos: `local` ou `gcs`     |
+| `MATERIAL_STORAGE_BUCKET`         | Bucket obrigatório para o backend GCS     |
+| `MATERIAL_STORAGE_PREFIX`         | Prefixo privado dos objetos no bucket     |
 | `MATERIAL_UPLOAD_MAX_BYTES`       | Limite por arquivo, até 100 MB            |
+| `RUN_GCS_INTEGRATION`             | Smoke que cria e remove objeto no GCS     |
 
 Configuração ausente ou inválida encerra a API antes de abrir a porta e informa apenas os nomes das variáveis afetadas.
 
@@ -165,7 +169,9 @@ docs                   arquitetura, decisões, progresso e rastreabilidade
 - bucket privado de artefatos de teste: `gs://educai-511017-test-artifacts`;
 - região: `southamerica-east1`.
 
-O bucket armazena fixtures, relatórios e artefatos; ele não executa Docker. Nenhum deploy foi realizado.
+O bucket armazena fixtures, relatórios e artefatos; ele não executa Docker.
+O adapter de materiais pode usar GCS quando configurado explicitamente, mas
+nenhum smoke de arquivo ou deploy foi realizado automaticamente.
 
 Endpoints do Dia 3:
 
@@ -189,8 +195,16 @@ Endpoints de materiais:
   para ciclo de vida protegido.
 
 Arquivos aceitos: PDF, DOCX, PPT/PPTX, MP4, JPEG, PNG, GIF e WebP. O limite
-padrão é 100 MB. Os bytes ficam no diretório privado local configurado e a
-chave física nunca é devolvida ao navegador. O backend GCS permanece pendente.
+padrão é 100 MB. Os bytes ficam no diretório privado local ou no bucket GCS
+explicitamente configurado; a chave física nunca é devolvida ao navegador.
+
+Para o backend GCS, use Application Default Credentials com acesso mínimo de
+objeto e configure bucket/prefixo privados. O smoke externo é opt-in:
+
+```powershell
+$env:RUN_GCS_INTEGRATION="true"
+npm run test:integration:gcs
+```
 
 Endpoints do Dia 9:
 
