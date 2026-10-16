@@ -32,6 +32,9 @@ import { RetentionService } from "../../src/privacy/retention.js";
 import { ClassesRepository } from "../../src/classes/repository.js";
 import { TimelineRepository } from "../../src/timeline/repository.js";
 import { PlansRepository } from "../../src/plans/repository.js";
+import { NotificationRepository } from "../../src/notifications/repository.js";
+import { NotificationDeliveryWorker } from "../../src/notifications/worker.js";
+import { FixtureClassroomAnnouncementSender } from "../../src/notifications/classroom.js";
 
 loadRootEnvironment();
 const baseUrl = process.env.DATABASE_URL;
@@ -111,6 +114,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "023_class_curriculum_profile.sql",
       "024_lesson_plan_teacher_fields.sql",
       "025_activity_form_question_mapping.sql",
+      "026_notification_delivery.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -998,6 +1002,48 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       [[feedbackId, globalFeedbackId]],
     );
     expect(Number(notifications.rows[0]!.count)).toBe(2);
+    const notificationEmailSender = {
+      isFixture: false,
+      send: vi.fn().mockResolvedValue(undefined),
+    };
+    const notificationWorker = new NotificationDeliveryWorker(
+      new NotificationRepository(testPool),
+      collectionAuth as unknown as AuthRepository,
+      notificationEmailSender,
+      new FixtureClassroomAnnouncementSender(),
+      {
+        intervalMs: 30_000,
+        maxAttempts: 5,
+        leaseSeconds: 300,
+        retryBaseSeconds: 60,
+      },
+      { error: vi.fn(), warn: vi.fn() } as never,
+    );
+    await notificationWorker.runCycle();
+    expect(notificationEmailSender.send).toHaveBeenCalledTimes(2);
+    const completedNotifications = await testPool.query<{
+      status: string;
+      channel: string;
+    }>(
+      `SELECT notification.status, notification.channel
+       FROM notification_outbox notification
+       WHERE notification.feedback_id = ANY($1::uuid[])
+       ORDER BY notification.feedback_id`,
+      [[feedbackId, globalFeedbackId]],
+    );
+    expect(completedNotifications.rows).toEqual([
+      { status: "sent", channel: "email" },
+      { status: "sent", channel: "email" },
+    ]);
+    const notificationDeliveries = await testPool.query<{ count: string }>(
+      `SELECT count(*) FROM notification_delivery
+       WHERE notification_id IN (
+         SELECT id FROM notification_outbox
+         WHERE feedback_id = ANY($1::uuid[])
+       ) AND status = 'sent'`,
+      [[feedbackId, globalFeedbackId]],
+    );
+    expect(Number(notificationDeliveries.rows[0]!.count)).toBe(2);
     const bulletins = new BulletinsRepository(testPool);
     const bulletinService = new BulletinService(
       bulletins,
@@ -1107,10 +1153,15 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         baseUrl: "https://api.openai.com/v1",
         model: "gpt-5-mini",
       },
+      email: {},
       tokenEncryptionKey: encryptionKey,
       sessionTtlSeconds: 28_800,
       integrationMonitorIntervalMs: 300_000,
       feedbackEditWindowMinutes: 1_440,
+      notificationWorkerIntervalMs: 30_000,
+      notificationMaxAttempts: 5,
+      notificationLeaseSeconds: 300,
+      notificationRetryBaseSeconds: 60,
       materialStorageDirectory: "storage/materials-test",
       materialStorageBackend: "local",
       materialStoragePrefix: "materials-test",

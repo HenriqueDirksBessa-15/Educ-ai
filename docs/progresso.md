@@ -2,6 +2,21 @@
 
 Atualizado em 16/10/2026.
 
+## Ciclo vertical — CV-F: Resend e outbox operacional
+
+Concluída em 16/10/2026 a implementação da entrega híbrida:
+
+- Resend para feedback individual e boletim PDF, com chave idempotente;
+- anúncio Classroom apenas para aviso global;
+- fallback do Classroom para e-mail dos alunos ativos após falha terminal;
+- outbox por destinatário com lease, repetição exponencial e revisões;
+- novo escopo OAuth `classroom.announcements`.
+
+Testes direcionados e gate de tipagem/lint aprovados; nenhum envio externo foi
+realizado. A validação da migração 026 em PostgreSQL ficou pendente porque o
+Docker local não respondeu. Detalhes em
+[`ciclo-vertical/11-cv-notificacoes-resend.md`](./ciclo-vertical/11-cv-notificacoes-resend.md).
+
 ## Ciclo vertical — CV-B1.2: backend GCS
 
 Concluída em 16/10/2026 a implementação do armazenamento GCS:

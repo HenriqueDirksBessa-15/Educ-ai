@@ -42,4 +42,38 @@ describe("bulletin delivery", () => {
     );
     expect(repository.completeDelivery).not.toHaveBeenCalled();
   });
+
+  it("uses the delivery id as the provider idempotency key", async () => {
+    const repository = {
+      startDelivery: vi.fn().mockResolvedValue({
+        deliveryId: "delivery-1",
+        recipientEmail: "aluno@example.test",
+        studentName: "Aluno Teste",
+        title: "Boletim",
+        pdf: new Uint8Array([37, 80, 68, 70]),
+      }),
+      completeDelivery: vi.fn(),
+      failDelivery: vi.fn(),
+    };
+    const email = {
+      isFixture: false,
+      send: vi.fn().mockResolvedValue(undefined),
+    } satisfies BulletinEmailSender;
+    const service = new BulletinService(
+      repository as unknown as BulletinsRepository,
+      email,
+    );
+
+    await expect(service.send("professor-1", "bulletin-1")).resolves.toEqual({
+      status: "sent",
+    });
+    expect(email.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "bulletin/delivery-1",
+        attachments: [
+          expect.objectContaining({ contentType: "application/pdf" }),
+        ],
+      }),
+    );
+  });
 });

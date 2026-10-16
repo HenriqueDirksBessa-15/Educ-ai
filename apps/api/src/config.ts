@@ -53,6 +53,8 @@ const configSchema = z
     OPENAI_API_KEY: optionalString,
     OPENAI_BASE_URL: z.url().default("https://api.openai.com/v1"),
     OPENAI_MODEL: z.string().min(1).default("gpt-5-mini"),
+    RESEND_API_KEY: optionalString,
+    EMAIL_FROM: optionalString,
     TOKEN_ENCRYPTION_KEY: z
       .string()
       .regex(/^[a-fA-F0-9]{64}$/, "deve conter 32 bytes em hexadecimal"),
@@ -73,6 +75,30 @@ const configSchema = z
       .min(1)
       .max(43_200)
       .default(1_440),
+    NOTIFICATION_WORKER_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(300_000)
+      .default(30_000),
+    NOTIFICATION_MAX_ATTEMPTS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(5),
+    NOTIFICATION_LEASE_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(30)
+      .max(3_600)
+      .default(300),
+    NOTIFICATION_RETRY_BASE_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(3_600)
+      .default(60),
     MATERIAL_STORAGE_DIRECTORY: z
       .string()
       .trim()
@@ -122,6 +148,13 @@ const configSchema = z
         path: ["MATERIAL_STORAGE_BUCKET"],
         message: "bucket obrigatório para o backend gcs",
       });
+    if (Boolean(data.RESEND_API_KEY) !== Boolean(data.EMAIL_FROM))
+      for (const path of ["RESEND_API_KEY", "EMAIL_FROM"] as const)
+        context.addIssue({
+          code: "custom",
+          path: [path],
+          message: "chave Resend e remetente devem ser informados juntos",
+        });
   });
 
 export type AppConfig = {
@@ -143,10 +176,18 @@ export type AppConfig = {
     baseUrl: string;
     model: string;
   };
+  email: {
+    resendApiKey?: string;
+    from?: string;
+  };
   tokenEncryptionKey: string;
   sessionTtlSeconds: number;
   integrationMonitorIntervalMs: number;
   feedbackEditWindowMinutes: number;
+  notificationWorkerIntervalMs: number;
+  notificationMaxAttempts: number;
+  notificationLeaseSeconds: number;
+  notificationRetryBaseSeconds: number;
   materialStorageDirectory: string;
   materialStorageBackend: z.infer<
     typeof configSchema
@@ -211,10 +252,18 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
       baseUrl: result.data.OPENAI_BASE_URL,
       model: result.data.OPENAI_MODEL,
     },
+    email: {
+      resendApiKey: result.data.RESEND_API_KEY,
+      from: result.data.EMAIL_FROM,
+    },
     tokenEncryptionKey: result.data.TOKEN_ENCRYPTION_KEY,
     sessionTtlSeconds: result.data.SESSION_TTL_SECONDS,
     integrationMonitorIntervalMs: result.data.INTEGRATION_MONITOR_INTERVAL_MS,
     feedbackEditWindowMinutes: result.data.FEEDBACK_EDIT_WINDOW_MINUTES,
+    notificationWorkerIntervalMs: result.data.NOTIFICATION_WORKER_INTERVAL_MS,
+    notificationMaxAttempts: result.data.NOTIFICATION_MAX_ATTEMPTS,
+    notificationLeaseSeconds: result.data.NOTIFICATION_LEASE_SECONDS,
+    notificationRetryBaseSeconds: result.data.NOTIFICATION_RETRY_BASE_SECONDS,
     materialStorageDirectory: result.data.MATERIAL_STORAGE_DIRECTORY,
     materialStorageBackend: result.data.MATERIAL_STORAGE_BACKEND,
     materialStorageBucket: result.data.MATERIAL_STORAGE_BUCKET,

@@ -161,7 +161,7 @@ export class FeedbackRepository {
          WHERE $9::boolean
        ), notification AS (
          UPDATE notification_outbox notification SET status = 'pending',
-           error_code = NULL, sent_at = NULL
+           error_code = NULL, sent_at = NULL, revision = revision + 1
          FROM updated WHERE notification.feedback_id = updated.id
        ), next_version AS (
          SELECT coalesce(max(version), 0) + 1 AS value
@@ -416,7 +416,7 @@ export class FeedbackRepository {
                 CASE WHEN sent.scope = 'individual' THEN 'student'::notification_recipient_kind
                      ELSE 'class_group'::notification_recipient_kind END,
                 sent.student_id, sent.class_group_id,
-                CASE WHEN sent.google_classroom_id IS NOT NULL
+                CASE WHEN sent.scope = 'global' AND sent.google_classroom_id IS NOT NULL
                      THEN 'google_classroom'::notification_channel
                      ELSE 'email'::notification_channel END
          FROM sent ON CONFLICT (feedback_id) DO NOTHING

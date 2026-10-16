@@ -93,8 +93,14 @@ export class BulletinService {
         to: lease.recipientEmail,
         subject: lease.title,
         text: `Olá, ${lease.studentName}. Seu boletim está anexado.`,
-        fileName: `${safeFileName(lease.title)}.pdf`,
-        pdf: lease.pdf,
+        idempotencyKey: `bulletin/${lease.deliveryId}`,
+        attachments: [
+          {
+            fileName: `${safeFileName(lease.title)}.pdf`,
+            contentType: "application/pdf",
+            content: lease.pdf,
+          },
+        ],
       });
       await this.repository.completeDelivery(
         professorId,

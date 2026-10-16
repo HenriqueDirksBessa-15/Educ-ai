@@ -137,12 +137,18 @@ npm run check
 | `OPENAI_API_KEY`                  | Chave OpenAI usada somente no servidor    |
 | `OPENAI_BASE_URL`                 | Base URL da Responses API                 |
 | `OPENAI_MODEL`                    | Modelo usado para sugestões estruturadas  |
+| `RESEND_API_KEY`                  | Chave de envio transacional Resend        |
+| `EMAIL_FROM`                      | Remetente verificado dos e-mails          |
 | `RUN_OPENAI_INTEGRATION`          | Habilita o smoke test real, com custo     |
 | `ENABLE_DEV_AUTH`                 | Habilita sessão fixture só em development |
 | `VITE_ENABLE_DEV_AUTH`            | Exibe o botão local em desenvolvimento    |
 | `RATE_LIMIT_MAX`                  | Requisições máximas por minuto/IP         |
 | `DATA_RETENTION_DAYS`             | Retenção de dados técnicos revogados      |
 | `FEEDBACK_EDIT_WINDOW_MINUTES`    | Janela de edição/exclusão de feedback     |
+| `NOTIFICATION_WORKER_INTERVAL_MS` | Intervalo do worker de notificações       |
+| `NOTIFICATION_MAX_ATTEMPTS`       | Máximo de tentativas por destinatário     |
+| `NOTIFICATION_LEASE_SECONDS`      | Lease contra workers concorrentes         |
+| `NOTIFICATION_RETRY_BASE_SECONDS` | Base do backoff exponencial               |
 | `MATERIAL_STORAGE_DIRECTORY`      | Diretório privado dos arquivos locais     |
 | `MATERIAL_STORAGE_BACKEND`        | Backend de arquivos: `local` ou `gcs`     |
 | `MATERIAL_STORAGE_BUCKET`         | Bucket obrigatório para o backend GCS     |

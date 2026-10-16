@@ -35,6 +35,10 @@ describe("loadConfig", () => {
     expect(loadConfig(validEnvironment).materialStoragePrefix).toBe(
       "materials",
     );
+    expect(loadConfig(validEnvironment).notificationWorkerIntervalMs).toBe(
+      30_000,
+    );
+    expect(loadConfig(validEnvironment).notificationMaxAttempts).toBe(5);
     expect(loadConfig(validEnvironment).enableDevAuth).toBe(false);
     expect(loadConfig(validEnvironment).rateLimitMax).toBe(300);
     expect(loadConfig(validEnvironment).dataRetentionDays).toBe(365);
@@ -81,6 +85,22 @@ describe("loadConfig", () => {
 
   it("accepts absent OpenAI credentials without enabling external calls", () => {
     expect(loadConfig(validEnvironment).openai.apiKey).toBeUndefined();
+  });
+
+  it("requires the Resend key and sender together", () => {
+    expect(() =>
+      loadConfig({ ...validEnvironment, RESEND_API_KEY: "resend-secret" }),
+    ).toThrow(/RESEND_API_KEY, EMAIL_FROM/);
+    expect(
+      loadConfig({
+        ...validEnvironment,
+        RESEND_API_KEY: "resend-secret",
+        EMAIL_FROM: "EDUC.AI <boletins@example.test>",
+      }).email,
+    ).toEqual({
+      resendApiKey: "resend-secret",
+      from: "EDUC.AI <boletins@example.test>",
+    });
   });
 
   it("requires a bucket only when the GCS material backend is selected", () => {

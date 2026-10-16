@@ -57,6 +57,16 @@ Nunca aponte o ensaio para produção. Após restaurar, valide contagens, `/api/
 - Classroom: aprovação local permanece quando a devolução falha.
 - E-mail: PDF permanece imutável e cada reenvio cria outra tentativa.
 
+## Resend e notificações
+
+Configure `RESEND_API_KEY` com permissão somente de envio e `EMAIL_FROM` com um
+domínio verificado. O worker envia feedback individual por e-mail, aviso global
+por Classroom e usa e-mail como fallback. Professores existentes precisam
+conceder novamente o escopo `classroom.announcements`.
+
+Monitore `notification_outbox` e `notification_delivery`: falhas preservam o
+conteúdo, repetem com backoff e tornam-se terminais após o limite configurado.
+
 ## Materiais no GCS
 
 O backend local é o padrão. Para ativar GCS, configure

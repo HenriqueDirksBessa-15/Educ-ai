@@ -69,6 +69,7 @@ import { registerFeedbackRoutes } from "./feedback/routes.js";
 import { BulletinsRepository } from "./bulletins/repository.js";
 import {
   FixtureBulletinEmailSender,
+  ResendEmailSender,
   UnavailableBulletinEmailSender,
   type BulletinEmailSender,
 } from "./bulletins/email.js";
@@ -77,6 +78,13 @@ import { registerBulletinRoutes } from "./bulletins/routes.js";
 import { AuditRepository } from "./audit/repository.js";
 import { PrivacyRepository } from "./privacy/repository.js";
 import { registerPrivacyRoutes } from "./privacy/routes.js";
+import {
+  FixtureClassroomAnnouncementSender,
+  ProductionClassroomAnnouncementSender,
+  type ClassroomAnnouncementSender,
+} from "./notifications/classroom.js";
+import { NotificationRepository } from "./notifications/repository.js";
+import { NotificationDeliveryWorker } from "./notifications/worker.js";
 
 type AppDependencies = {
   config: AppConfig;
@@ -88,6 +96,7 @@ type AppDependencies = {
   googleResponseCollector?: GoogleResponseCollector;
   classroomGradeReturner?: ClassroomGradeReturner;
   bulletinEmailSender?: BulletinEmailSender;
+  classroomAnnouncementSender?: ClassroomAnnouncementSender;
   materialStorage?: MaterialStorage;
   startMonitor?: boolean;
 };
@@ -102,6 +111,7 @@ export async function createApp({
   googleResponseCollector,
   classroomGradeReturner,
   bulletinEmailSender,
+  classroomAnnouncementSender,
   materialStorage,
   startMonitor = config.nodeEnv !== "test",
 }: AppDependencies): Promise<FastifyInstance> {
@@ -217,10 +227,31 @@ export async function createApp({
   );
   const emailSender =
     bulletinEmailSender ??
-    (config.nodeEnv === "production"
-      ? new UnavailableBulletinEmailSender()
-      : new FixtureBulletinEmailSender());
+    (config.email.resendApiKey && config.email.from
+      ? new ResendEmailSender(config.email.resendApiKey, config.email.from)
+      : config.nodeEnv === "production"
+        ? new UnavailableBulletinEmailSender()
+        : new FixtureBulletinEmailSender());
   const bulletinService = new BulletinService(bulletinsRepository, emailSender);
+  const notificationRepository = new NotificationRepository(database);
+  const announcementSender =
+    classroomAnnouncementSender ??
+    (config.nodeEnv === "production"
+      ? new ProductionClassroomAnnouncementSender(config.google)
+      : new FixtureClassroomAnnouncementSender());
+  const notificationWorker = new NotificationDeliveryWorker(
+    notificationRepository,
+    repository,
+    emailSender,
+    announcementSender,
+    {
+      intervalMs: config.notificationWorkerIntervalMs,
+      maxAttempts: config.notificationMaxAttempts,
+      leaseSeconds: config.notificationLeaseSeconds,
+      retryBaseSeconds: config.notificationRetryBaseSeconds,
+    },
+    app.log,
+  );
   const monitor = new IntegrationMonitor(
     repository,
     gateway,
@@ -334,10 +365,12 @@ export async function createApp({
   if (startMonitor) {
     monitor.start();
     if (!responseCollector.isFixture) collectionWorker.start();
+    if (config.nodeEnv === "production") notificationWorker.start();
   }
   app.addHook("onClose", async () => {
     monitor.stop();
     collectionWorker.stop();
+    notificationWorker.stop();
   });
 
   app.get<{ Reply: LiveResponse }>("/api/health/live", async () => ({
