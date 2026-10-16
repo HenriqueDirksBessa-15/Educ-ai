@@ -123,8 +123,16 @@ export class ConfigurationError extends Error {
   }
 }
 
-export function loadRootEnvironment(): void {
-  loadDotenv({ path: join(findRepositoryRoot(), ".env"), quiet: true });
+export function loadRootEnvironment(
+  environment: NodeJS.ProcessEnv = process.env,
+  environmentPath = join(findRepositoryRoot(), ".env"),
+): void {
+  loadDotenv({
+    path: environmentPath,
+    quiet: true,
+    override: environment.NODE_ENV !== "production",
+    processEnv: environment as Record<string, string>,
+  });
 }
 
 export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {

@@ -93,13 +93,18 @@ OAuth discente ampliaria o produto e contraria a fronteira atual do DERS.
 - proxy encerrado após as verificações;
 - nenhum deploy público ou envio de e-mail real.
 
-## OpenAI real — bloqueado
+## OpenAI real
 
-O smoke opt-in foi executado uma vez. A validação respondeu
-`OPENAI_API_KEY_INVALID`; nenhuma geração estruturada ocorreu. É necessário
-substituir `OPENAI_API_KEY` por uma chave válida e repetir somente
-`RUN_OPENAI_INTEGRATION=true npm run test:integration:openai` para concluir
-essa parte da CV-HML.
+O primeiro smoke opt-in respondeu `OPENAI_API_KEY_INVALID` porque o processo
+herdou uma chave antiga e o carregamento padrão do dotenv preservou essa
+variável, embora o `.env` já contivesse a chave nova. Depois de forçar o valor
+atual do arquivo somente no processo do teste, a validação de disponibilidade e
+a geração estruturada real de um plano foram aprovadas.
+
+O carregador foi corrigido permanentemente: em desenvolvimento e teste, o
+`.env` do projeto substitui valores herdados; em produção, segredos injetados
+pela plataforma continuam prevalecendo. Testes de regressão cobrem ambos os
+comportamentos.
 
 ## Rollback
 

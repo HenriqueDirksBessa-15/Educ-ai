@@ -2,6 +2,19 @@
 
 Atualizado em 15/10/2026.
 
+## Ciclo vertical — CV-HML: OpenAI real e ambiente determinístico
+
+Concluída em 15/10/2026 a homologação OpenAI que faltava:
+
+- a causa do falso `OPENAI_API_KEY_INVALID` era uma chave antiga herdada pelo
+  processo, preservada pelo comportamento padrão do dotenv apesar da chave
+  correta no `.env`;
+- o smoke real validou a chave atual e gerou um plano estruturado com sucesso;
+- em desenvolvimento e teste, o `.env` do repositório agora substitui valores
+  herdados; em produção, variáveis injetadas pela plataforma continuam tendo
+  precedência;
+- testes de regressão protegem os dois comportamentos sem expor segredos.
+
 ## Ciclo vertical — CV-HML: homologação Google real
 
 Executada em 15/10/2026 a homologação externa autorizada do caminho Google:
@@ -20,8 +33,8 @@ Executada em 15/10/2026 a homologação externa autorizada do caminho Google:
 O Classroom só conclui automaticamente o envio para “Atividade com teste”
 criada pela interface; a API pública cria o Form como link, exigindo que o
 aluno marque o trabalho como entregue. O smoke OpenAI foi executado e bloqueado
-por `OPENAI_API_KEY_INVALID`; essa parte não está homologada. Evidências, IDs,
-limitações e rollback estão em
+inicialmente por uma variável herdada, depois corrigido e aprovado. Evidências,
+IDs, limitações e rollback estão em
 [`ciclo-vertical/08-cv-hml.md`](./ciclo-vertical/08-cv-hml.md).
 
 ## Ciclo vertical — CV-D/E: coleta, correção e boletim simulados

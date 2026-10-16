@@ -1,6 +1,14 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { ConfigurationError, loadConfig } from "./config.js";
+import {
+  ConfigurationError,
+  loadConfig,
+  loadRootEnvironment,
+} from "./config.js";
 
 const validEnvironment = {
   NODE_ENV: "test",
@@ -63,5 +71,41 @@ describe("loadConfig", () => {
 
   it("accepts absent OpenAI credentials without enabling external calls", () => {
     expect(loadConfig(validEnvironment).openai.apiKey).toBeUndefined();
+  });
+});
+
+describe("loadRootEnvironment", () => {
+  it("replaces inherited values with the project file outside production", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "educai-env-"));
+    const environmentPath = join(directory, ".env");
+    await writeFile(environmentPath, "OPENAI_API_KEY=current-key\n", "utf8");
+    const environment = {
+      NODE_ENV: "test",
+      OPENAI_API_KEY: "stale-inherited-key",
+    };
+
+    try {
+      loadRootEnvironment(environment, environmentPath);
+      expect(environment.OPENAI_API_KEY).toBe("current-key");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves platform-injected values in production", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "educai-env-"));
+    const environmentPath = join(directory, ".env");
+    await writeFile(environmentPath, "OPENAI_API_KEY=file-key\n", "utf8");
+    const environment = {
+      NODE_ENV: "production",
+      OPENAI_API_KEY: "platform-key",
+    };
+
+    try {
+      loadRootEnvironment(environment, environmentPath);
+      expect(environment.OPENAI_API_KEY).toBe("platform-key");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
