@@ -11,7 +11,14 @@ import type {
   Material,
   Milestone,
 } from "@educai/contracts";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { AppShell, Page } from "./AppShell";
 import { ClassesPanel } from "./ClassesPanel";
@@ -22,6 +29,8 @@ import {
   milestoneTypeLabel,
 } from "./labels";
 import { MaterialsPanel } from "./MaterialsPanel";
+import { loadOverview } from "./overview";
+import { computePendencies, menuCounts, type Overview } from "./pendencies";
 import { pageTitle, routeHref, useRoute, type RouteId } from "./router";
 
 const ActivitiesPanel = lazy(() =>
@@ -199,7 +208,7 @@ export function App() {
         {state.kind === "unauthenticated" && (
           <section className="login-layout">
             <div className="login-copy">
-              <h1>Seu planejamento começa com uma conta Google.</h1>
+              <h1>Planeje, envie e corrija suas atividades em um só lugar.</h1>
               <p>
                 Entre com a mesma conta do Google que você usa no Google Sala de
                 Aula.
@@ -299,6 +308,28 @@ function ProfessorShell({
     void loadAll();
   }, [loadAll]);
 
+  // Pendencies drive the home page and the menu counters; refreshed on every
+  // visit to the home page.
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [overviewState, setOverviewState] = useState<LoadState>("loading");
+  const refreshOverview = useCallback(async () => {
+    setOverviewState("loading");
+    try {
+      setOverview(await loadOverview());
+      setOverviewState("ready");
+    } catch {
+      setOverview(null);
+      setOverviewState("failed");
+    }
+  }, []);
+
+  const overviewRequested = useRef(false);
+  useEffect(() => {
+    if (route !== "inicio" && overviewRequested.current) return;
+    overviewRequested.current = true;
+    void refreshOverview();
+  }, [route, refreshOverview]);
+
   const loadFailure = loadState === "failed" && (
     <div className="notice error" role="alert">
       <strong>Não conseguimos carregar todos os seus dados.</strong>
@@ -313,9 +344,15 @@ function ProfessorShell({
     inicio: () => (
       <Page
         title={`Olá, ${identity.displayName}`}
-        subtitle="O que você quer fazer agora?"
+        subtitle="Isto é o que precisa da sua atenção hoje."
       >
         {loadFailure}
+        <Pendencies
+          state={overviewState}
+          overview={overview}
+          onRetry={() => void refreshOverview()}
+        />
+        <h2 className="section-title">Atalhos</h2>
         <Shortcuts
           items={[
             ["aulas", "Planejar uma aula", "Com ou sem ajuda da IA"],
@@ -436,11 +473,76 @@ function ProfessorShell({
   };
 
   return (
-    <AppShell route={route} identity={identity} integrations={integrations}>
+    <AppShell
+      route={route}
+      identity={identity}
+      integrations={integrations}
+      counts={overview ? menuCounts(overview) : {}}
+    >
       <Suspense fallback={<p className="empty-state">Carregando…</p>}>
         {pages[route]()}
       </Suspense>
     </AppShell>
+  );
+}
+
+function Pendencies({
+  state,
+  overview,
+  onRetry,
+}: {
+  state: LoadState;
+  overview: Overview | null;
+  onRetry: () => void;
+}) {
+  if (state === "failed")
+    return (
+      <div className="notice error" role="alert">
+        <strong>Não conseguimos verificar suas pendências agora.</strong>
+        <span>Verifique a internet e tente de novo.</span>
+        <button type="button" onClick={onRetry}>
+          Tentar de novo
+        </button>
+      </div>
+    );
+  if (state === "loading" || !overview)
+    return (
+      <p className="empty-state" aria-live="polite">
+        Verificando o que precisa da sua atenção…
+      </p>
+    );
+
+  const items = computePendencies(overview, new Date());
+  if (items.length === 0)
+    return (
+      <div className="all-clear">
+        <p>Tudo em dia. Que tal planejar a próxima aula?</p>
+        <a className="primary-action" href={routeHref("aulas")}>
+          Planejar uma aula
+        </a>
+      </div>
+    );
+
+  return (
+    <ul className="pendency-list" aria-label="Pendências">
+      {items.map((item) => (
+        <li key={item.id} className={`pendency ${item.tone}`}>
+          <div>
+            <strong id={`pendencia-${item.id}`}>{item.title}</strong>
+            {item.detail && <span>{item.detail}</span>}
+          </div>
+          <a
+            className={
+              item.tone === "warning" ? "secondary-action" : "primary-action"
+            }
+            href={routeHref(item.route)}
+            aria-describedby={`pendencia-${item.id}`}
+          >
+            {item.actionLabel}
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }
 

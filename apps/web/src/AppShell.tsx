@@ -2,6 +2,7 @@ import type { Identity, IntegrationStatus } from "@educai/contracts";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import type { MenuCounts } from "./pendencies.js";
 import {
   navigation,
   primaryRoutes,
@@ -60,11 +61,13 @@ export function AppShell({
   route,
   identity,
   integrations,
+  counts = {},
   children,
 }: {
   route: RouteId;
   identity: Identity;
   integrations: IntegrationStatus[];
+  counts?: MenuCounts;
   children: ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -86,6 +89,16 @@ export function AppShell({
   );
   const current = (id: RouteId) =>
     id === route ? ({ "aria-current": "page" } as const) : {};
+  const badge = (id: RouteId) => {
+    const item = counts[id];
+    return (
+      item && (
+        <span className="badge" role="img" aria-label={item.label}>
+          {item.count}
+        </span>
+      )
+    );
+  };
 
   return (
     <div className="app-layout">
@@ -119,6 +132,7 @@ export function AppShell({
                       {routes[id].title}
                       <span className="side-hint">{routes[id].hint}</span>
                     </span>
+                    {badge(id)}
                   </a>
                 </li>
               ))}
@@ -182,6 +196,7 @@ export function AppShell({
           >
             <Icon name={id} />
             {routes[id].title}
+            {badge(id)}
           </a>
         ))}
         <button

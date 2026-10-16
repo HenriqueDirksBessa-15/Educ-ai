@@ -16,7 +16,7 @@ test("shows the exclusive Google login with keyboard-visible controls", async ({
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(
     page.getByRole("heading", {
-      name: "Seu planejamento começa com uma conta Google.",
+      name: "Planeje, envie e corrija suas atividades em um só lugar.",
     }),
   ).toBeVisible();
   await expect(

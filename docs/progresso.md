@@ -2,6 +2,22 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 03: entrada e Início
+
+Concluída em 16/10/2026 ([etapa](./telas/03-entrada-inicio.md)):
+
+- tela de entrada simplificada, com a orientação de usar a mesma conta do
+  Google Sala de Aula;
+- Início com pendências e um botão para cada: respostas para corrigir, notas
+  aprovadas não devolvidas, devoluções com falha, planos para aprovar, turmas
+  sem matéria, atividades que fecham em 48 horas, recados e boletins não
+  enviados; "Tudo em dia" quando não há nada;
+- contadores no menu para Correções e Aulas, com rótulo acessível;
+- falha de verificação não mostra números parciais.
+
+Verificações: 51 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados. E2E atualizado, não executado.
+
 ## Interface — etapa 02: base
 
 Concluída em 16/10/2026 a base do redesenho da interface do professor
