@@ -83,7 +83,8 @@ Concluída em 16/10/2026.
   do prazo, devolução em lote com falha, resposta sem aluno identificado).
   Todos escritos antes do código. Os 2 testes do painel antigo saíram com
   ele.
-- Abrir a correção de um aluno leva o foco ao nome dele (testado).
+- Abrir a correção de um aluno leva o foco ao nome dele. Esse comportamento
+  surgiu na conferência no navegador; o teste foi escrito depois do código.
 - Typecheck e build do web, lint, formatação e 17 testes de contratos
   aprovados. O `npm run check` completo segue bloqueado pelas alterações em
   andamento da API, fora desta etapa.
