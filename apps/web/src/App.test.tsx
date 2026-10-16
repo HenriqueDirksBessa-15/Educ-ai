@@ -148,6 +148,45 @@ describe("Google authentication screen", () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("professorId");
   });
 
+  it("returns to the sign-in screen after the account is deleted", async () => {
+    window.location.hash = "#/conta";
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const path = url.replace(/^\/api/, "");
+      if (path === "/auth/session")
+        return response({ data: { authenticated: true, identity } });
+      if (path === "/profile")
+        return response({
+          data: {
+            id: identity.professorId,
+            displayName: identity.displayName,
+            email: identity.email,
+            profileImageUrl: null,
+            notificationPreference: "visual",
+            createdAt: "2026-10-07T12:00:00.000Z",
+          },
+        });
+      if (path === "/privacy/account" && init?.method === "DELETE")
+        return { ok: true, status: 204, json: async () => null } as Response;
+      return response({ data: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Excluir minha conta" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Para confirmar, digite EXCLUIR/), {
+      target: { value: "EXCLUIR" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Excluir minha conta para sempre" }),
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Entrar com Google" }),
+    ).toBeInTheDocument();
+  });
+
   it("shows a recoverable error when the server cannot be reached", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
 

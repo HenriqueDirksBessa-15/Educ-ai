@@ -1391,3 +1391,22 @@ button.big-choice.secondary:hover:not(:disabled) {
 .field .muted-line {
   font-weight: 500;
 }
+
+/* Account */
+
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.avatar.large {
+  width: 4rem;
+  height: 4rem;
+  font-size: 1.3rem;
+  object-fit: cover;
+}
+
+.danger-zone {
+  border-color: var(--bad);
+}

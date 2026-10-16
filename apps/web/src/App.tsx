@@ -18,10 +18,11 @@ import {
   ActivityPage,
   ActivityWizard,
 } from "./ActivitiesPages";
+import { AccountPage } from "./AccountPage";
 import { AppShell, Page } from "./AppShell";
 import { BulletinsPage } from "./BulletinsPage";
 import { ClassDetailPage, ClassListPage, NewClassPage } from "./ClassesPages";
-import { ConfirmProvider, useConfirm } from "./ConfirmDialog";
+import { ConfirmProvider } from "./ConfirmDialog";
 import { CorrectionListPage, CorrectionQueuePage } from "./CorrectionsPages";
 import {
   formatDate,
@@ -158,6 +159,17 @@ export function App() {
           integrations={state.integrations}
           loggingOut={loggingOut}
           onLogout={() => void logout()}
+          onNameChange={(displayName) =>
+            setState((current) =>
+              current.kind === "authenticated"
+                ? { ...current, identity: { ...current.identity, displayName } }
+                : current,
+            )
+          }
+          onAccountDeleted={() => {
+            window.history.replaceState({}, "", window.location.pathname);
+            setState({ kind: "unauthenticated" });
+          }}
         />
       </ConfirmProvider>
     );
@@ -241,6 +253,8 @@ function ProfessorShell({
   integrations,
   loggingOut,
   onLogout,
+  onNameChange,
+  onAccountDeleted,
 }: {
   route: RouteId;
   param: string | null;
@@ -248,6 +262,8 @@ function ProfessorShell({
   integrations: IntegrationStatus[];
   loggingOut: boolean;
   onLogout: () => void;
+  onNameChange: (displayName: string) => void;
+  onAccountDeleted: () => void;
 }) {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -468,19 +484,13 @@ function ProfessorShell({
     ),
     conta: () => (
       <Page title="Minha conta">
-        <section className="timeline-panel" aria-labelledby="account-title">
-          <h2 id="account-title">{identity.displayName}</h2>
-          <p className="identity-email">{identity.email}</p>
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={loggingOut}
-            onClick={onLogout}
-          >
-            {loggingOut ? "Saindo…" : "Sair"}
-          </button>
-        </section>
-        <PrivacyPanel />
+        <AccountPage
+          identity={identity}
+          loggingOut={loggingOut}
+          onLogout={onLogout}
+          onNameChange={onNameChange}
+          onDeleted={onAccountDeleted}
+        />
       </Page>
     ),
   };
@@ -1165,69 +1175,6 @@ export function LessonPlansPanel({
             </button>
           </form>
         </div>
-      )}
-    </section>
-  );
-}
-
-function PrivacyPanel() {
-  const confirm = useConfirm();
-  const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const deleteAccount = async () => {
-    const confirmed = await confirm({
-      title: "Excluir sua conta?",
-      body: "Você perderá o acesso ao EDUC.AI. Notas e correções já entregues aos alunos são mantidas, sem o seu nome. Isso não pode ser desfeito.",
-      confirmLabel: "Excluir minha conta",
-      danger: true,
-    });
-    if (!confirmed) return;
-    setDeleting(true);
-    setMessage(null);
-    try {
-      const response = await fetch(`${apiBaseUrl}/privacy/account`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ confirmation: "EXCLUIR" }),
-      });
-      if (!response.ok) throw new Error();
-      window.location.reload();
-    } catch {
-      setMessage("Não foi possível excluir sua conta agora. Tente de novo.");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <section className="timeline-panel" aria-labelledby="privacy-title">
-      <h2 id="privacy-title">Seus dados</h2>
-      <p>
-        Você pode baixar uma cópia dos seus dados a qualquer momento. Ao excluir
-        a conta, seu acesso é removido; notas e correções já entregues aos
-        alunos continuam guardadas, sem o seu nome.
-      </p>
-      <div className="inline-actions">
-        <a
-          className="secondary-action compact-action"
-          href={`${apiBaseUrl}/privacy/export`}
-        >
-          Baixar uma cópia dos meus dados
-        </a>
-        <button
-          type="button"
-          className="danger-action compact-action"
-          disabled={deleting}
-          onClick={() => void deleteAccount()}
-        >
-          {deleting ? "Excluindo…" : "Excluir minha conta"}
-        </button>
-      </div>
-      {message && (
-        <p className="notice error" role="alert">
-          {message}
-        </p>
       )}
     </section>
   );

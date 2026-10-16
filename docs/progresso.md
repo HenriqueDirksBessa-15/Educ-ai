@@ -2,6 +2,20 @@
 
 Atualizado em 16/10/2026.
 
+## Interface — etapa 10: Minha conta
+
+Concluída em 16/10/2026 ([etapa](./telas/10-minha-conta.md)):
+
+- nome editável que aparece na hora no menu; e-mail do Google somente
+  leitura;
+- sair sempre disponível, mesmo se o perfil não carregar;
+- cópia dos dados explicada antes do download;
+- exclusão da conta só depois de digitar EXCLUIR, voltando à tela de entrada.
+
+Verificações: 136 testes web e 17 de contratos aprovados; typecheck e build do
+web, lint e formatação aprovados. Com esta etapa, todas as telas do
+redesenho estão prontas, exceto Aulas (etapa 07), que aguarda o B-01.
+
 ## Interface — etapa 09: Boletins
 
 Concluída em 16/10/2026 ([etapa](./telas/09-boletins.md)):
