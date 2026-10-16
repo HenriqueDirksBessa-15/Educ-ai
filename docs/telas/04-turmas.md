@@ -53,8 +53,9 @@ mudanças de backend.
   opção "(atual)", para não ser apagado sem querer.
 - Catálogo vazio: aviso "A BNCC ainda não foi carregada neste ambiente. Avise
   o suporte." e o perfil não pode ser salvo.
-- Nova turma: se o perfil falhar depois de a turma ser criada, a turma abre
-  com o aviso para concluir a matéria; nada é criado em duplicidade.
+- Nova turma: se o perfil falhar depois de a turma ser criada, a página
+  avisa e mostra o link **Abrir a turma criada** para concluir a matéria; o
+  botão de criar fica bloqueado para não criar a turma em duplicidade.
 - Código gerado no formato `TURMA-1234`, editável, com no mínimo 4
   caracteres.
 
