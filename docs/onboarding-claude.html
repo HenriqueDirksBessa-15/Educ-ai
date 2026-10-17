@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Onboarding EDUC.AI</title>
+    <style>
+      :root {
+        --bg: #f7f6f2;
+        --surface: #ffffff;
+        --text: #1f1d1a;
+        --muted: #6b665e;
+        --border: #e3e0d8;
+        --accent: #2f5d50;
+        --accent-soft: #e4efe9;
+        --ok: #2e7d4f;
+        --ok-soft: #e3f3e8;
+        --warn: #9a6400;
+        --warn-soft: #fbf0d9;
+        --bad: #a83a32;
+        --bad-soft: #f8e3e0;
+        --code-bg: #f1efe9;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #161514;
+          --surface: #1f1e1c;
+          --text: #ece9e3;
+          --muted: #a39e95;
+          --border: #34322e;
+          --accent: #7fbfa9;
+          --accent-soft: #1f3a32;
+          --ok: #7cc79a;
+          --ok-soft: #1d3527;
+          --warn: #e4b45a;
+          --warn-soft: #3a2f17;
+          --bad: #ec8b82;
+          --bad-soft: #3d201d;
+          --code-bg: #262421;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #161514;
+        --surface: #1f1e1c;
+        --text: #ece9e3;
+        --muted: #a39e95;
+        --border: #34322e;
+        --accent: #7fbfa9;
+        --accent-soft: #1f3a32;
+        --ok: #7cc79a;
+        --ok-soft: #1d3527;
+        --warn: #e4b45a;
+        --warn-soft: #3a2f17;
+        --bad: #ec8b82;
+        --bad-soft: #3d201d;
+        --code-bg: #262421;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          16px/1.6 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 32px 16px 80px;
+      }
+      h1 {
+        font-size: 2rem;
+        line-height: 1.2;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: 1.35rem;
+        margin: 48px 0 12px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+      h3 {
+        font-size: 1.05rem;
+        margin: 24px 0 8px;
+      }
+      p,
+      li {
+        max-width: 72ch;
+      }
+      .lead {
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+      nav.toc {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin: 24px 0;
+      }
+      nav.toc ol {
+        margin: 0;
+        padding-left: 20px;
+        columns: 2;
+        column-gap: 32px;
+      }
+      @media (max-width: 640px) {
+        nav.toc ol {
+          columns: 1;
+        }
+      }
+      a {
+        color: var(--accent);
+      }
+      code {
+        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+        font-size: 0.88em;
+        background: var(--code-bg);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin: 12px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .stat {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .stat b {
+        display: block;
+        font-size: 1.6rem;
+        line-height: 1.2;
+      }
+      .stat span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.93rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        background: var(--code-bg);
+        font-weight: 600;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 1px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .bad {
+        background: var(--bad-soft);
+        color: var(--bad);
+      }
+      .info {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        margin: 12px 0;
+      }
+      .flow span.step {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 0.9rem;
+      }
+      .flow span.arrow {
+        color: var(--muted);
+      }
+      .callout {
+        border-left: 4px solid var(--warn);
+        background: var(--warn-soft);
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+        margin: 16px 0;
+      }
+      .callout.accent {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .prompt {
+        position: relative;
+      }
+      .prompt pre {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font:
+          0.86rem/1.55 ui-monospace,
+          "Cascadia Code",
+          Consolas,
+          monospace;
+        margin: 0;
+      }
+      .prompt button {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font: inherit;
+        font-size: 0.8rem;
+        cursor: pointer;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 10px;
+      }
+      .prompt button:hover {
+        border-color: var(--accent);
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      @media (max-width: 720px) {
+        .two {
+          grid-template-columns: 1fr;
+        }
+      }
+      .small {
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Onboarding do Claude no EDUC.AI</h1>
+      <p class="lead">
+        O que entendi do projeto em 16/10/2026, como proponho trabalhar junto
+        com o Codex e o seu prompt reescrito com boas práticas. Leitura feita
+        sem alterar código e sem abrir o <code>.env</code>.
+      </p>
+
+      <nav class="toc" aria-label="Sumário">
+        <ol>
+          <li><a href="#produto">O produto</a></li>
+          <li><a href="#arquitetura">Arquitetura e stack</a></li>
+          <li><a href="#ciclo">Ciclo pedagógico A → E</a></li>
+          <li><a href="#historia">Histórico de entregas</a></li>
+          <li><a href="#qualidade">Testes e gates</a></li>
+          <li><a href="#wip">Trabalho em andamento</a></li>
+          <li><a href="#regras">Regras de trabalho</a></li>
+          <li><a href="#riscos">Riscos e observações</a></li>
+          <li><a href="#colaboracao">Protocolo Claude ↔ Codex</a></li>
+          <li><a href="#prompt">Seu prompt reescrito</a></li>
+          <li><a href="#template">Template para próximas etapas</a></li>
+          <li><a href="#perguntas">Perguntas para você</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="produto">1. O produto</h2>
+      <p>
+        <b>EDUC.AI</b> é um sistema de apoio ao professor: planejamento
+        pedagógico alinhado à BNCC, geração assistida por IA de planos e
+        atividades, publicação no Google Forms/Classroom, coleta e correção de
+        respostas, feedbacks e boletins em PDF.
+      </p>
+      <ul>
+        <li>
+          <b>Usuário único: o professor.</b> O aluno interage só pelo Google
+          Classroom/Forms (DT-25). Login exclusivamente Google OAuth.
+        </li>
+        <li>
+          <b>A IA sugere, o professor decide.</b> Nada gerado pela OpenAI é
+          publicado ou vira nota sem revisão e aprovação explícitas.
+        </li>
+        <li>
+          <b>Autoridade funcional:</b>
+          <code>Desenvolvimento_DERS_HenriqueBessa_ClaytonAraujo.pdf</code> (96
+          páginas, RF001–RF014). Mudanças fora do DERS exigem decisão
+          registrada.
+        </li>
+        <li>
+          <b>Plano vigente:</b> <code>CICLO_VERTICAL_TDD_EDUCAI.md</code>, que
+          substituiu o plano de 14 dias por uma fatia vertical ponta a ponta com
+          integrações reais.
+        </li>
+      </ul>
+
+      <div class="grid">
+        <div class="stat"><b>44</b><span>commits em main</span></div>
+        <div class="stat">
+          <b>26</b><span>migrações SQL (026 ainda não commitada)</span>
+        </div>
+        <div class="stat">
+          <b>130</b
+          ><span>testes unitários (17 contratos, 103 API, 10 web)</span>
+        </div>
+        <div class="stat">
+          <b>~200</b><span>meta de testes unitários genuínos</span>
+        </div>
+      </div>
+
+      <h2 id="arquitetura">2. Arquitetura e stack</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Camada</th>
+            <th>Onde</th>
+            <th>Tecnologia</th>
+          </tr>
+          <tr>
+            <td>Web</td>
+            <td><code>apps/web</code></td>
+            <td>
+              React 19, Vite 6, TypeScript; painéis por domínio
+              (<code>App.tsx</code>, <code>ActivitiesPanel</code>,
+              <code>MaterialsPanel</code>…)
+            </td>
+          </tr>
+          <tr>
+            <td>API</td>
+            <td><code>apps/api</code></td>
+            <td>
+              Fastify 5, <code>pg</code>, Zod 4,
+              <code>google-auth-library</code>, <code>pdf-lib</code>; módulos
+              por domínio com <code>routes / repository / service</code>
+            </td>
+          </tr>
+          <tr>
+            <td>Contratos</td>
+            <td><code>packages/contracts</code></td>
+            <td>Schemas Zod compartilhados entre web e API</td>
+          </tr>
+          <tr>
+            <td>Banco</td>
+            <td><code>database/migrations</code></td>
+            <td>
+              PostgreSQL 16, SQL versionado com checksum; BNCC canônica com
+              1.721 habilidades
+            </td>
+          </tr>
+          <tr>
+            <td>Integrações</td>
+            <td>adaptadores</td>
+            <td>
+              Google OAuth/Classroom/Forms/Drive, OpenAI Responses API, GCS,
+              Resend (em andamento)
+            </td>
+          </tr>
+          <tr>
+            <td>Infra</td>
+            <td>GCP <code>educai-511017</code></td>
+            <td>
+              Cloud SQL <code>educai-dev</code> via Auth Proxy (porta 5433),
+              bucket privado, região <code>southamerica-east1</code>. Sem deploy
+              público.
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>Padrões que observei no código</h3>
+      <ul>
+        <li>
+          <b>Adaptadores com fixture.</b> Cada integração tem uma versão
+          <code>Fixture*</code> (dev/test) e uma de produção, escolhida em
+          <code>apps/api/src/app.ts</code> por <code>NODE_ENV</code> ou
+          configuração explícita. As fixtures nunca contam como evidência de
+          integração real.
+        </li>
+        <li>
+          <b>Identidade vem da sessão.</b> Nenhum <code>professorId</code> do
+          cliente é confiado; repositórios filtram por professor autenticado.
+        </li>
+        <li>
+          <b>Idempotência e histórico.</b> IDs externos como chave idempotente,
+          leases para workers, histórico imutável (triggers que impedem alterar
+          registros enviados ou liberados).
+        </li>
+        <li>
+          <b>Configuração validada.</b> <code>config.ts</code> usa Zod;
+          configuração inválida derruba a API antes de abrir a porta e mostra só
+          o nome das variáveis afetadas.
+        </li>
+        <li>
+          <b>Segurança.</b> Tokens com AES-256-GCM, cookie
+          <code>__Host-</code> em produção, CSP/Helmet, rate limit, auditoria de
+          mutações, export/anonimização LGPD.
+        </li>
+      </ul>
+
+      <h2 id="ciclo">3. Ciclo pedagógico A → E</h2>
+      <div class="flow">
+        <span class="step">Login Google</span><span class="arrow">→</span>
+        <span class="step">Turma Classroom</span><span class="arrow">→</span>
+        <span class="step">BNCC + materiais</span><span class="arrow">→</span>
+        <span class="step">Plano aprovado</span><span class="arrow">→</span>
+        <span class="step">Atividade IA aprovada</span
+        ><span class="arrow">→</span> <span class="step">Form + Classroom</span
+        ><span class="arrow">→</span> <span class="step">Coleta</span
+        ><span class="arrow">→</span> <span class="step">Correção revisada</span
+        ><span class="arrow">→</span>
+        <span class="step">Boletim PDF</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Etapa</th>
+            <th>Estado</th>
+            <th>Evidência</th>
+          </tr>
+          <tr>
+            <td>A — Google e turmas</td>
+            <td><span class="tag ok">Homologado</span></td>
+            <td>
+              Curso real criado, roster de aluno fictício sincronizado,
+              isolamento por professor (CV-A1, CV-A2, CV-HML)
+            </td>
+          </tr>
+          <tr>
+            <td>B — Materiais, BNCC e plano</td>
+            <td>
+              <span class="tag ok">Homologado</span>
+              <span class="tag warn">GCS pendente</span>
+            </td>
+            <td>
+              Plano real via OpenAI; link e upload privado local; backend GCS
+              implementado, smoke real não executado
+            </td>
+          </tr>
+          <tr>
+            <td>C — Atividade e publicação</td>
+            <td><span class="tag ok">Homologado</span></td>
+            <td>
+              Form real com <code>emailCollectionType: VERIFIED</code>, trabalho
+              Classroom publicado, IDs do Forms persistidos
+            </td>
+          </tr>
+          <tr>
+            <td>D — Respostas</td>
+            <td><span class="tag ok">Real + simulado</span></td>
+            <td>
+              Resposta real coletada; fixtures sintéticas de
+              <code>forms.responses.list</code> para regressão
+            </td>
+          </tr>
+          <tr>
+            <td>E — Correção e boletim</td>
+            <td>
+              <span class="tag ok">PDF homologado</span>
+              <span class="tag warn">E-mail pendente</span>
+            </td>
+            <td>
+              Nota 4/10 devolvida como <code>RETURNED</code> no Classroom; PDF
+              gerado; envio de e-mail sendo implementado agora
+            </td>
+          </tr>
+        </table>
+      </div>
+      <p class="small">
+        Limitação conhecida: a API do Classroom não cria “Atividade com teste”,
+        então o aluno envia o Form e marca a tarefa como entregue manualmente.
+        Resolver isso exigiria OAuth do aluno, fora do DERS.
+      </p>
+
+      <h2 id="historia">4. Histórico de entregas</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Fase</th>
+            <th>Período</th>
+            <th>Resumo</th>
+          </tr>
+          <tr>
+            <td>Plano de 14 dias</td>
+            <td>07–10/10</td>
+            <td>
+              Dias 1–14 implementados localmente: fundação, OAuth, BNCC, turmas,
+              materiais, planos, atividades, correção, feedback, boletim,
+              segurança/LGPD. Auditoria técnica no Dia 7.
+            </td>
+          </tr>
+          <tr>
+            <td>Diagnóstico vertical</td>
+            <td>10/10</td>
+            <td>
+              <code>docs/ciclo-vertical/00-diagnostico.md</code>: ciclo A→E não
+              demonstrável, com 5 bloqueios P0 (Classroom só fixture, UI
+              incompleta, sem homologação real) e 6 P1.
+            </td>
+          </tr>
+          <tr>
+            <td>CV-0 a CV-D/E</td>
+            <td>10–14/10</td>
+            <td>
+              Gates estabilizados, Classroom real, turmas/roster/currículo,
+              materiais por link, plano completo, publicação endurecida, ciclo
+              de correção simulado.
+            </td>
+          </tr>
+          <tr>
+            <td>CV-HML</td>
+            <td>15/10</td>
+            <td>
+              Homologação real Google + OpenAI com dados fictícios; 5
+              divergências da API real corrigidas; bug do dotenv com chave
+              antiga corrigido.
+            </td>
+          </tr>
+          <tr>
+            <td>CV-B1.1 / B1.2</td>
+            <td>16/10</td>
+            <td>
+              Upload privado local (100 MB, validação por assinatura) e backend
+              GCS por ADC.
+            </td>
+          </tr>
+          <tr>
+            <td><b>Em andamento</b></td>
+            <td>16/10</td>
+            <td>
+              Entrega de notificações (outbox → e-mail Resend e avisos no
+              Classroom). Veja a seção 6.
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2 id="qualidade">5. Testes e gates</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Comando</th>
+            <th>O que cobre</th>
+          </tr>
+          <tr>
+            <td><code>npm run check</code></td>
+            <td>
+              format:check + lint + typecheck + testes unitários + build (sem
+              banco)
+            </td>
+          </tr>
+          <tr>
+            <td><code>npm run test:integration</code></td>
+            <td>
+              Cria banco PostgreSQL temporário, aplica todas as migrações, roda
+              seed duas vezes e remove o banco
+            </td>
+          </tr>
+          <tr>
+            <td><code>npm run test:e2e</code></td>
+            <td>Playwright em Chrome e Edge instalados (Firefox pendente)</td>
+          </tr>
+          <tr>
+            <td><code>test:integration:openai</code> / <code>:gcs</code></td>
+            <td>
+              Smokes reais opt-in (<code>RUN_*_INTEGRATION=true</code>), com
+              custo ou efeito externo
+            </td>
+          </tr>
+        </table>
+      </div>
+      <p>
+        Fluxo obrigatório do ciclo: investigação → especificação MD → teste
+        vermelho → implementação mínima → refatoração → integração → smoke E2E →
+        revisão → commit. Cada etapa tem um doc em
+        <code>docs/ciclo-vertical/NN-*.md</code> e uma entrada em
+        <code>docs/progresso.md</code>.
+      </p>
+
+      <h2 id="wip">6. Trabalho em andamento (não commitado)</h2>
+      <div class="callout">
+        <b>Há uma etapa aberta na árvore de trabalho</b>, provavelmente do
+        Codex. Não mexi nela. Pelo <code>AGENTS.md</code>, ela ainda não está
+        concluída: faltam doc da etapa, atualização do progresso, verificação e
+        commit.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Arquivo</th>
+            <th>Mudança</th>
+          </tr>
+          <tr>
+            <td>
+              <code>database/migrations/026_notification_delivery.sql</code>
+            </td>
+            <td>
+              Coluna <code>revision</code> na outbox; nova tabela
+              <code>notification_delivery</code> com lease, tentativas e envio
+              imutável; feedback individual nunca vira aviso para a turma
+            </td>
+          </tr>
+          <tr>
+            <td><code>apps/api/src/notifications/*</code></td>
+            <td>
+              <code>NotificationDeliveryWorker</code> (lotes de até 100, retry
+              com backoff),
+              <code>ProductionClassroomAnnouncementSender</code> com marcador
+              idempotente, repositório e testes
+            </td>
+          </tr>
+          <tr>
+            <td><code>apps/api/src/bulletins/email.ts</code></td>
+            <td>
+              Abstração <code>TransactionalEmailSender</code> +
+              <code>ResendEmailSender</code> com <code>idempotency-key</code> e
+              erros normalizados
+            </td>
+          </tr>
+          <tr>
+            <td><code>config.ts</code>, <code>.env.example</code></td>
+            <td>
+              <code>RESEND_API_KEY</code> e
+              <code>EMAIL_FROM</code> (obrigatórios juntos), 4 variáveis
+              <code>NOTIFICATION_*</code>
+            </td>
+          </tr>
+          <tr>
+            <td><code>auth/google-gateway.ts</code></td>
+            <td>Novo escopo <code>classroom.announcements</code></td>
+          </tr>
+        </table>
+      </div>
+      <h3>Pontos que eu revisaria antes do commit dessa etapa</h3>
+      <ul>
+        <li>
+          <b>Novo escopo OAuth.</b> Professores já autorizados precisam
+          consentir de novo. Vale documentar isso no README, como já foi feito
+          para os escopos do Dia 9.
+        </li>
+        <li>
+          <b>Worker só roda em produção.</b> Em desenvolvimento a outbox não é
+          processada; convém documentar como exercitá-la localmente.
+        </li>
+        <li>
+          <b>README e matriz desatualizados.</b> A tabela de variáveis não traz
+          <code>RESEND_*</code>/<code>NOTIFICATION_*</code>, e RF013/RF014 ainda
+          constam como “entrega externa pendente”.
+        </li>
+        <li>
+          <b>Nomenclatura.</b> <code>BulletinEmailError</code> agora também
+          atende feedbacks; um nome genérico evitaria confusão.
+        </li>
+      </ul>
+
+      <h2 id="regras">7. Regras de trabalho que vou seguir</h2>
+      <ul>
+        <li>
+          Uma etapa = verificações + documentação de progresso + revisão do diff
+          + <b>um commit coerente</b>. Não misturar etapas.
+        </li>
+        <li>Sem push e sem deploy sem pedido explícito.</li>
+        <li>
+          Sem chamadas faturáveis ou externas (OpenAI, Google, GCS, Resend),
+          migração em banco compartilhado ou criação de recurso de nuvem sem
+          aprovação prévia.
+        </li>
+        <li>
+          Segredos nunca no Git, logs, navegador ou relatórios. Dados de teste
+          sempre fictícios (<code>example.invalid</code>, marcador
+          <code>EDUCAI HML</code>).
+        </li>
+        <li>
+          Não tratar fixture como integração real nem aprovação da IA como
+          decisão do professor; registrar o que foi real e o que foi simulado.
+        </li>
+        <li>
+          Não trocar stack nem reescrever módulos íntegros por gosto; mudanças
+          fora do DERS vão para <code>docs/decisoes.md</code>.
+        </li>
+      </ul>
+
+      <h2 id="riscos">8. Riscos e observações</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Item</th>
+            <th>Severidade</th>
+            <th>Observação</th>
+          </tr>
+          <tr>
+            <td>Dois agentes na mesma árvore</td>
+            <td><span class="tag bad">Alta</span></td>
+            <td>
+              Claude e Codex editando o mesmo checkout sem coordenação podem
+              sobrescrever ou misturar etapas num commit. Ver protocolo abaixo.
+            </td>
+          </tr>
+          <tr>
+            <td>Meta de 200 testes</td>
+            <td><span class="tag warn">Média</span></td>
+            <td>
+              Há 130 hoje. Faltam ~70 testes com comportamento real, sem inflar
+              a contagem.
+            </td>
+          </tr>
+          <tr>
+            <td>Componentes web grandes</td>
+            <td><span class="tag warn">Média</span></td>
+            <td>
+              <code>ActivitiesPanel.tsx</code> (1.386 linhas) e
+              <code>App.tsx</code> (1.051) concentram estado e UI; é o alvo
+              natural do “refatorar uma tela por vez”.
+            </td>
+          </tr>
+          <tr>
+            <td>Plano × stack real</td>
+            <td><span class="tag info">Baixa</span></td>
+            <td>
+              O plano de 14 dias cita React Router, TanStack Query e React Hook
+              Form, que não estão no <code>package.json</code> do web. Não é
+              defeito, mas a documentação deveria refletir a decisão.
+            </td>
+          </tr>
+          <tr>
+            <td>Fim de linha LF/CRLF</td>
+            <td><span class="tag info">Baixa</span></td>
+            <td>
+              O git avisa conversão em vários arquivos; já causou falha de
+              <code>format:check</code> (CV-011). Um
+              <code>.gitattributes</code> resolveria.
+            </td>
+          </tr>
+          <tr>
+            <td>Dependência sem versão fixa</td>
+            <td><span class="tag info">Baixa</span></td>
+            <td>
+              <code>@fastify/multipart</code> usa <code>^10.1.4</code>; as
+              demais dependências estão fixadas.
+            </td>
+          </tr>
+          <tr>
+            <td>Pendências operacionais</td>
+            <td><span class="tag warn">Média</span></td>
+            <td>
+              Smoke GCS, ensaio de backup/restore (faltam
+              <code>pg_dump</code>/<code>pg_restore</code>), Firefox, deploy de
+              homologação HTTPS, pentest.
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2 id="colaboracao">9. Protocolo de colaboração Claude ↔ Codex</h2>
+      <div class="two">
+        <div class="card">
+          <h3>Fonte de verdade comum</h3>
+          <ul>
+            <li><code>AGENTS.md</code>: regras (os dois agentes leem).</li>
+            <li><code>CICLO_VERTICAL_TDD_EDUCAI.md</code>: plano.</li>
+            <li>
+              <code>docs/progresso.md</code> e
+              <code>docs/ciclo-vertical/NN-*.md</code>: estado e passagem de
+              bastão.
+            </li>
+            <li><code>docs/decisoes.md</code>: decisões (DT-xx).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Regra de ouro: um escritor por árvore</h3>
+          <ul>
+            <li>Só um agente edita o checkout principal por vez.</li>
+            <li>
+              Trabalho paralelo vai para um <b>git worktree/branch</b> separado
+              e você faz o merge.
+            </li>
+            <li>
+              Antes de começar, o agente roda <code>git status</code>; se houver
+              alterações de outra etapa, para e pergunta.
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th>Papel sugerido</th>
+            <th>Codex</th>
+            <th>Claude</th>
+          </tr>
+          <tr>
+            <td>Implementação da etapa corrente</td>
+            <td>✔ dono</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Revisão do diff antes do commit</td>
+            <td>—</td>
+            <td>✔ revisão de correção, segurança e aderência ao DERS</td>
+          </tr>
+          <tr>
+            <td>Etapas independentes em paralelo</td>
+            <td colspan="2">
+              Uma por agente, cada uma em sua branch, sem tocar os mesmos
+              arquivos
+            </td>
+          </tr>
+          <tr>
+            <td>Documentação e testes faltantes</td>
+            <td colspan="2">
+              Quem tiver menos contexto acumulado; descrito em um brief
+              autocontido
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h2 id="prompt">10. Seu prompt reescrito</h2>
+      <div class="two">
+        <div class="card">
+          <h3>Original</h3>
+          <p>
+            <i
+              >“vc vai trabalhar em conjunto com o codex nesse projeto, faça seu
+              onbord; ao final de seu onbord gere um html falando tudo que vc
+              entendeu; minha espectativa é que vc pege meu prompt e refaça ele
+              seguindo as melhores praticas do mercado”</i
+            >
+          </p>
+        </div>
+        <div class="card">
+          <h3>O que faltava</h3>
+          <ul>
+            <li>
+              <b>Papel e contexto:</b> quem é o agente e quais documentos são
+              autoridade.
+            </li>
+            <li>
+              <b>Limites:</b> somente leitura, não tocar no trabalho do Codex,
+              não ler segredos.
+            </li>
+            <li><b>Passos explícitos</b> e ordem de leitura.</li>
+            <li><b>Formato do entregável</b> e onde salvar.</li>
+            <li><b>Critérios de aceite</b> verificáveis.</li>
+            <li><b>Como encerrar:</b> o que reportar e o que perguntar.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="prompt">
+        <button type="button" data-copy="p1">Copiar</button>
+        <pre id="p1">
+# Papel
+Você é um engenheiro de software sênior entrando no projeto EDUC.AI, que eu desenvolvo em conjunto com o agente Codex. Seu primeiro trabalho é um onboarding somente leitura.
+
+# Contexto
+- Repositório: C:\Users\henri\cloneeducai\Educ-ai (monorepo npm: apps/api Fastify, apps/web React/Vite, packages/contracts Zod, database/migrations PostgreSQL 16).
+- Autoridade funcional: Desenvolvimento_DERS_HenriqueBessa_ClaytonAraujo.pdf (RF001–RF014). Consulte-o só para resolver ambiguidades.
+- Plano vigente: CICLO_VERTICAL_TDD_EDUCAI.md.
+- Estado e decisões: docs/progresso.md, docs/ciclo-vertical/*.md, docs/decisoes.md, docs/matriz-rastreabilidade.md.
+- Regras obrigatórias: AGENTS.md.
+- O Codex pode ter alterações não commitadas na árvore de trabalho.
+
+# Objetivo
+Entender o produto, a arquitetura, o estado atual e o trabalho em andamento, e me entregar um relatório que me permita confirmar seu entendimento antes de você escrever código.
+
+# Restrições
+- Não edite, formate, commite, faça push ou deploy. A única escrita permitida é o arquivo HTML do entregável.
+- Não execute chamadas externas ou faturáveis (OpenAI, Google, GCS, e-mail) nem migrações em qualquer banco.
+- Não altere nem "conserte" alterações não commitadas; apenas descreva-as.
+- Não abra o .env; use .env.example e config.ts para conhecer as variáveis.
+- Separe o que verificou no código do que só leu na documentação e cite arquivo:linha quando afirmar algo sobre o código.
+
+# Passos
+1. Leia README.md, AGENTS.md, CICLO_VERTICAL_TDD_EDUCAI.md e as entradas mais recentes de docs/progresso.md.
+2. Mapeie a estrutura: módulos da API, painéis da web, contratos, migrações, adaptadores (fixture × produção) e workers.
+3. Para cada etapa A→E do ciclo vertical, registre o estado (homologado real, apenas simulado ou pendente) com a evidência.
+4. Rode `git status` e `git log --oneline -15` e descreva o trabalho não commitado: o que faz, o que falta para fechar a etapa segundo o AGENTS.md e riscos.
+5. Liste riscos técnicos e lacunas priorizados (alta/média/baixa).
+6. Proponha um protocolo de colaboração com o Codex que evite que dois agentes editem os mesmos arquivos.
+
+# Entregável
+Um único arquivo HTML autocontido em docs/onboarding-claude.html (sem dependências externas, legível em celular e com modo escuro) com as seções:
+produto; arquitetura e stack; ciclo A→E com estado; histórico de entregas; testes e gates; trabalho em andamento; regras de trabalho; riscos; protocolo de colaboração; perguntas abertas.
+
+# Critérios de aceite
+- Toda afirmação de estado aponta a evidência (doc, commit ou arquivo).
+- Nenhum segredo ou dado pessoal aparece no HTML.
+- `git status` mostra como novidade apenas o HTML.
+
+# Ao terminar
+Responda em no máximo 10 linhas: caminho do HTML, os 3 principais riscos e as perguntas que preciso responder antes da próxima etapa.</pre
+        >
+      </div>
+
+      <h2 id="template">11. Template para pedir as próximas etapas</h2>
+      <p>
+        Use este molde quando for delegar uma etapa ao Claude ou ao Codex. Ele
+        torna o pedido verificável e evita que os dois agentes se atropelem.
+      </p>
+      <div class="prompt">
+        <button type="button" data-copy="p2">Copiar</button>
+        <pre id="p2">
+# Etapa: &lt;ID e nome, ex.: CV-N1 entrega de notificações&gt;
+
+## Objetivo
+&lt;Resultado observável para o professor, em 1–2 frases.&gt;
+
+## Contexto mínimo
+- Requisito do DERS: &lt;RF/RN e página&gt;
+- Docs a ler: &lt;docs/ciclo-vertical/NN-*.md, decisões DT-xx&gt;
+- Arquivos prováveis: &lt;caminhos&gt;
+
+## Escopo
+- Inclui: &lt;lista&gt;
+- Não inclui: &lt;lista explícita&gt;
+
+## Restrições
+- Siga AGENTS.md: uma etapa, um commit; sem push e sem deploy.
+- Antes de editar, rode `git status`. Se houver alterações de outra etapa, pare e me avise.
+- Chamadas externas ou faturáveis: &lt;proibidas | autorizadas: quais, com qual limite&gt;.
+- Banco: &lt;somente temporário de teste | educai-dev autorizado&gt;.
+
+## Método (TDD)
+1. Escreva ou atualize a especificação em docs/ciclo-vertical/NN-*.md.
+2. Escreva os testes primeiro e mostre que falham.
+3. Implemente o mínimo para passar e refatore.
+4. Rode `npm run check` e, se tocar no banco, `npm run test:integration`.
+
+## Critérios de aceite
+- [ ] &lt;comportamento verificável 1&gt;
+- [ ] &lt;comportamento verificável 2&gt;
+- [ ] Isolamento entre professores testado na API.
+- [ ] Repetir a operação não duplica dados.
+- [ ] docs/progresso.md e a matriz de rastreabilidade atualizados.
+
+## Relatório final
+Critérios atendidos; testes (unitários / integração / E2E) com contagens; o que foi real e o que foi simulado; chamadas externas e custo; pendências; como reverter; hash do commit.</pre
+        >
+      </div>
+
+      <h2 id="perguntas">12. Perguntas para você</h2>
+      <ol>
+        <li>
+          O trabalho de notificações não commitado é do Codex e ele ainda está
+          trabalhando nele? Enquanto isso não fechar, eu não edito o checkout
+          principal.
+        </li>
+        <li>
+          Qual divisão você prefere: o Codex implementa e eu reviso, ou cada um
+          pega etapas independentes em branches separadas?
+        </li>
+        <li>
+          Qual é a próxima etapa depois das notificações: smoke GCS, deploy de
+          homologação HTTPS, meta de 200 testes ou refatoração por tela?
+        </li>
+        <li>
+          Este HTML deve ser versionado em <code>docs/</code> ou fica só local?
+        </li>
+      </ol>
+
+      <p class="small">
+        Gerado por Claude em 16/10/2026 a partir da leitura do repositório, sem
+        alterar código.
+      </p>
+    </main>
+    <script>
+      document.querySelectorAll("button[data-copy]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var text = document.getElementById(button.dataset.copy).innerText;
+          var done = function () {
+            button.textContent = "Copiado";
+            setTimeout(function () {
+              button.textContent = "Copiar";
+            }, 1500);
+          };
+          if (navigator.clipboard)
+            navigator.clipboard.writeText(text).then(done, function () {});
+        });
+      });
+    </script>
+  </body>
+</html>
