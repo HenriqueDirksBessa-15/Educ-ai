@@ -2,6 +2,16 @@
 
 Atualizado em 16/10/2026.
 
+## Ambiente de testes GCP
+
+Criado em 16/10/2026 um ambiente Cloud Run público protegido pelo login da
+aplicação, com container único para SPA/API, banco e usuário isolados no Cloud
+SQL existente, migrações/jobs, seed fictícia, Artifact Registry, Secret Manager
+e conta de serviço mínima. Root, assets, live, ready, CORS, CSP e dev-login
+foram validados. A URL ainda precisa ser cadastrada manualmente no cliente
+OAuth Google. Inventário e rollback estão em
+[`gcp-test-environment.md`](./gcp-test-environment.md).
+
 ## Interface — pendências de backend consolidadas
 
 As pendências de backend encontradas nas etapas 02 a 10 do redesenho estão

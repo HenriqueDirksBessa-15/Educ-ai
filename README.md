@@ -85,6 +85,14 @@ npm run dev:api
 npm run dev:web
 ```
 
+## Homologação GCP
+
+O ambiente reutilizável está em
+<https://educai-test-821892619668.southamerica-east1.run.app>. Publique novas
+revisões com `./scripts/deploy-gcp-test.ps1`. Consulte o
+[runbook do ambiente](./docs/gcp-test-environment.md) para OAuth, recursos,
+custos e rollback.
+
 ## Qualidade e testes
 
 ```powershell

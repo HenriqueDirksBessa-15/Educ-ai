@@ -4,7 +4,9 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import type { ApiError, LiveResponse, ReadyResponse } from "@educai/contracts";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import { readFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 
 import type { AppConfig } from "./config.js";
 import { TokenCipher } from "./auth/crypto.js";
@@ -78,6 +80,7 @@ import { registerBulletinRoutes } from "./bulletins/routes.js";
 import { AuditRepository } from "./audit/repository.js";
 import { PrivacyRepository } from "./privacy/repository.js";
 import { registerPrivacyRoutes } from "./privacy/routes.js";
+import { findRepositoryRoot } from "./db/paths.js";
 import {
   FixtureClassroomAnnouncementSender,
   ProductionClassroomAnnouncementSender,
@@ -136,7 +139,14 @@ export async function createApp({
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'none'"],
+        defaultSrc: config.nodeEnv === "production" ? ["'self'"] : ["'none'"],
+        scriptSrc: config.nodeEnv === "production" ? ["'self'"] : ["'none'"],
+        styleSrc: config.nodeEnv === "production" ? ["'self'"] : ["'none'"],
+        imgSrc:
+          config.nodeEnv === "production"
+            ? ["'self'", "data:", "https:"]
+            : ["'none'"],
+        connectSrc: config.nodeEnv === "production" ? ["'self'"] : ["'none'"],
         frameAncestors: ["'none'"],
       },
     },
@@ -394,7 +404,25 @@ export async function createApp({
     },
   );
 
+  if (config.nodeEnv === "production") {
+    app.get<{ Params: { file: string } }>(
+      "/assets/:file",
+      async (request, reply) => {
+        if (!/^[a-zA-Z0-9._-]+$/.test(request.params.file))
+          return reply.code(404).send();
+        return sendWebFile(reply, join("assets", request.params.file));
+      },
+    );
+    app.get("/", async (_request, reply) => sendWebFile(reply, "index.html"));
+  }
+
   app.setNotFoundHandler((request, reply) => {
+    if (
+      config.nodeEnv === "production" &&
+      request.method === "GET" &&
+      !request.url.startsWith("/api/")
+    )
+      return sendWebFile(reply, "index.html");
     const response: ApiError = {
       error: {
         code: "NOT_FOUND",
@@ -436,6 +464,29 @@ export async function createApp({
   });
 
   return app;
+}
+
+async function sendWebFile(reply: FastifyReply, relativePath: string) {
+  const root = join(findRepositoryRoot(), "apps", "web", "dist");
+  const data = await readFile(join(root, relativePath));
+  const contentTypes: Record<string, string> = {
+    ".css": "text/css; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+  };
+  return reply
+    .header(
+      "cache-control",
+      relativePath === "index.html"
+        ? "no-cache"
+        : "public, max-age=31536000, immutable",
+    )
+    .type(contentTypes[extname(relativePath)] ?? "application/octet-stream")
+    .send(data);
 }
 
 function createConfiguredMaterialStorage(config: AppConfig): MaterialStorage {

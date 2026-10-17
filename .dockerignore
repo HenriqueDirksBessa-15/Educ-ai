@@ -1,0 +1,16 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+**/dist
+coverage
+playwright-report
+test-results
+storage
+backups
+docs
+*.log
+*.pem
+client_secret*.json
