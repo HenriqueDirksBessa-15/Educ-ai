@@ -1,4 +1,4 @@
-FROM node:20.16.0-bookworm-slim AS build
+FROM node:22.20.0-bookworm-slim AS build
 
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
@@ -13,7 +13,7 @@ COPY database database
 RUN npm run build
 RUN npm prune --omit=dev
 
-FROM node:20.16.0-bookworm-slim AS runtime
+FROM node:22.20.0-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 WORKDIR /app

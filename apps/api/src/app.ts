@@ -116,10 +116,14 @@ export async function createApp({
   bulletinEmailSender,
   classroomAnnouncementSender,
   materialStorage,
-  startMonitor = config.nodeEnv !== "test",
+  startMonitor = config.nodeEnv !== "test" && config.backgroundWorkersEnabled,
 }: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: 1_048_576,
+    trustProxy:
+      config.nodeEnv === "production"
+        ? (_address: string, hop: number) => hop < 2
+        : false,
     logger:
       config.nodeEnv === "test"
         ? false
@@ -129,6 +133,7 @@ export async function createApp({
               paths: [
                 "req.headers.authorization",
                 "req.headers.cookie",
+                "req.url",
                 "res.headers.set-cookie",
               ],
               censor: "[REDACTED]",
@@ -195,7 +200,7 @@ export async function createApp({
   const privacyRepository = new PrivacyRepository(database);
   const openAIAdapter =
     planGenerationAdapter ??
-    (config.openai.apiKey
+    (config.nodeEnv === "production" || config.openai.apiKey
       ? new ConfiguredOpenAIAdapter(config.openai)
       : new FixtureOpenAIAdapter());
   const activityPublisher =

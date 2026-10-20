@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Fundação executável do EDUC.AI",
   "engines": {
-    "node": ">=20.16.0 <21",
+    "node": ">=22.20.0 <23",
     "npm": ">=10.8.0"
   },
   "workspaces": [
@@ -35,6 +35,7 @@
     "db:seed": "npm run db:seed -w @educai/api",
     "db:import-bncc": "npm run db:import-bncc -w @educai/api --",
     "db:retention": "npm run db:retention -w @educai/api",
+    "workers:run-once": "npm run workers:run-once -w @educai/api",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run build"
   },
   "devDependencies": {

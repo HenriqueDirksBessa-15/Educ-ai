@@ -40,6 +40,7 @@ describe("loadConfig", () => {
     );
     expect(loadConfig(validEnvironment).notificationMaxAttempts).toBe(5);
     expect(loadConfig(validEnvironment).enableDevAuth).toBe(false);
+    expect(loadConfig(validEnvironment).backgroundWorkersEnabled).toBe(true);
     expect(loadConfig(validEnvironment).rateLimitMax).toBe(300);
     expect(loadConfig(validEnvironment).dataRetentionDays).toBe(365);
   });
@@ -71,6 +72,22 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig({ ...validEnvironment, API_PORT: "99999" }),
     ).toThrow("API_PORT");
+  });
+
+  it("uses the Cloud Run PORT when API_PORT is absent", () => {
+    expect(
+      loadConfig({ ...validEnvironment, API_PORT: undefined, PORT: "8080" })
+        .apiPort,
+    ).toBe(8080);
+  });
+
+  it("can disable in-process workers for a scheduled production job", () => {
+    expect(
+      loadConfig({
+        ...validEnvironment,
+        BACKGROUND_WORKERS_ENABLED: "false",
+      }).backgroundWorkersEnabled,
+    ).toBe(false);
   });
 
   it("requires Google client id and secret together", () => {
@@ -121,6 +138,12 @@ describe("loadConfig", () => {
         MATERIAL_STORAGE_BUCKET: "INVALID/BUCKET",
       }),
     ).toThrow("MATERIAL_STORAGE_BUCKET");
+  });
+
+  it("rejects ephemeral material storage in production", () => {
+    expect(() =>
+      loadConfig({ ...validEnvironment, NODE_ENV: "production" }),
+    ).toThrow("MATERIAL_STORAGE_BACKEND");
   });
 });
 

@@ -1,6 +1,29 @@
 # Progresso
 
-Atualizado em 16/10/2026.
+Atualizado em 19/10/2026.
+
+## Preparação de produção GCP
+
+Concluída a etapa de hardening necessária para publicar o mesmo contêiner no
+Cloud Run sem depender do disco efêmero nem de uma instância mínima:
+
+- runtime atualizado para Node.js 22 LTS e porta compatível com `PORT` do
+  Cloud Run;
+- armazenamento GCS obrigatório quando `NODE_ENV=production`;
+- URL de requisição redigida nos logs para não registrar `code` e `state` do
+  callback OAuth;
+- cadeia de dois proxies confiáveis para recuperar o IP do cliente atrás do
+  balanceador global e do Cloud Run;
+- adapter OpenAI de produção nunca substituído por fixture quando a chave
+  estiver ausente;
+- workers periódicos podem ser desabilitados no serviço HTTP e executados uma
+  vez por Cloud Run Job, permitindo escala a zero com execução agendada.
+
+Verificações desta etapa: 24 testes focados e a suíte completa da API com 120
+testes aprovados; lint, typecheck, build de produção e audit de dependências de
+produção também aprovados. A validação final da imagem é executada sobre uma
+árvore limpa antes da publicação, porque mudanças locais independentes em
+planos de aula permanecem fora desta etapa.
 
 ## Ambiente de testes GCP
 

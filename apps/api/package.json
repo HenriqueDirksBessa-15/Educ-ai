@@ -15,7 +15,8 @@
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:seed": "tsx src/db/seed-cli.ts",
     "db:import-bncc": "tsx src/db/import-bncc-cli.ts",
-    "db:retention": "tsx src/db/retention-cli.ts"
+    "db:retention": "tsx src/db/retention-cli.ts",
+    "workers:run-once": "tsx src/workers-cli.ts"
   },
   "dependencies": {
     "@educai/contracts": "0.1.0",
