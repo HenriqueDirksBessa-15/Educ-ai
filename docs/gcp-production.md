@@ -6,8 +6,8 @@ serviço e origem.
 
 ## URLs
 
-- plataforma: `https://educai.dev.br` (infraestrutura pronta; depende do DNS e
-  da emissão final do certificado);
+- plataforma: `https://educai.dev.br` (registro A salvo no Registro.br; aguarda
+  a transição dos servidores DNS e a emissão final do certificado);
 - endereço técnico validado:
   `https://educai-821892619668.southamerica-east1.run.app`;
 - API: `/api` na mesma origem; não há subdomínio `api.educai.dev.br`.
@@ -97,8 +97,8 @@ root/live/ready. Seeds nunca são executadas em produção. Use
 
 ## Domínio e HTTPS
 
-Os nameservers atuais são `a.auto.dns.br` e `b.auto.dns.br`, portanto o registro
-deve ser criado no painel do Registro.br:
+Os nameservers são `a.auto.dns.br` e `b.auto.dns.br`. O registro abaixo foi
+salvo no painel do Registro.br em 20/10/2026:
 
 | Tipo | Nome                 | Valor           |
 | ---- | -------------------- | --------------- |
@@ -112,6 +112,11 @@ Resolve-DnsName educai.dev.br -Type A
 gcloud compute ssl-certificates describe educai-cert `
   --project educai-511017 --global
 ```
+
+No momento da entrega, o painel indicava servidores DNS em transição por cerca
+de 1h19, os autoritativos ainda não publicavam o A e o certificado aparecia como
+`PROVISIONING/FAILED_NOT_VISIBLE`. Esse estado é esperado até o fim da transição
+e não requer recriar o balanceador ou o certificado.
 
 Quando o certificado estiver `ACTIVE` e o domínio responder 200, restrinja o
 Cloud Run para impedir acesso direto fora do balanceador:

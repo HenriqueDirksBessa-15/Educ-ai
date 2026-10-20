@@ -99,7 +99,8 @@ A produção usa o projeto `educai-511017`, região `southamerica-east1`, com
 Cloud Run, Cloud SQL e GCS existentes atrás de um balanceador HTTPS global. O
 endereço técnico validado é
 <https://educai-821892619668.southamerica-east1.run.app>; a ativação de
-<https://educai.dev.br> depende do registro A e da emissão do certificado.
+<https://educai.dev.br> aguarda a transição do DNS no Registro.br e a emissão
+do certificado gerenciado.
 
 Consulte o [runbook de produção](./docs/gcp-production.md) para inventário,
 DNS/OAuth pendentes, variáveis, atualização, verificações e rollback. Atualize

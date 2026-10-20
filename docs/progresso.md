@@ -17,9 +17,11 @@ Classroom, Forms, OpenAI estruturada e GCS foram aprovados sem enviar mensagens
 nem alterar turmas. Logs não contêm code/state OAuth, cookies ou Authorization.
 
 O balanceador global usa `136.81.217.99`, certificado gerenciado e redirect
-HTTP para HTTPS. A ativação de `https://educai.dev.br` ainda depende do registro
-A no Registro.br e da configuração do callback no cliente OAuth Web. Inventário,
-procedimentos, validações e rollback estão em
+HTTP para HTTPS. O registro A foi salvo no Registro.br; a ativação de
+`https://educai.dev.br` aguarda a transição informada pelos servidores DNS e a
+emissão automática do certificado. A configuração OAuth foi entregue para o
+cliente Web e só pode ser validada pelo novo domínio após a propagação.
+Inventário, procedimentos, validações e rollback estão em
 [`gcp-production.md`](./gcp-production.md).
 
 ## Preparação de produção GCP
