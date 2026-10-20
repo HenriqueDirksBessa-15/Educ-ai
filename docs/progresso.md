@@ -16,6 +16,8 @@ Cloud Run sem depender do disco efêmero nem de uma instância mínima:
   balanceador global e do Cloud Run;
 - adapter OpenAI de produção nunca substituído por fixture quando a chave
   estiver ausente;
+- migrações SQL têm checkout obrigatório em LF para preservar os checksums
+  gravados no PostgreSQL em builds iniciados no Windows;
 - workers periódicos podem ser desabilitados no serviço HTTP e executados uma
   vez por Cloud Run Job, permitindo escala a zero com execução agendada.
 
