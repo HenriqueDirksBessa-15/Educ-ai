@@ -1,6 +1,26 @@
 # Progresso
 
-Atualizado em 19/10/2026.
+Atualizado em 20/10/2026.
+
+## Deploy de produção GCP
+
+Publicado no projeto `educai-511017`, região `southamerica-east1`, a partir do
+commit `8a80ddb`. A revisão técnica `educai-8a80ddb` serve SPA e API, conecta ao
+banco `educai` existente e usa GCS para materiais. Antes da migração foi criado
+o backup `1792458906805`; a migração `026_notification_delivery.sql` foi
+aplicada e as contagens de dados foram preservadas.
+
+Cloud Run permanece com mínimo zero e máximo um. Workers foram externalizados
+para um job agendado a cada cinco minutos, e a retenção técnica roda diariamente
+às 04:15. Smokes de frontend, rota interna, API, PostgreSQL, OAuth start,
+Classroom, Forms, OpenAI estruturada e GCS foram aprovados sem enviar mensagens
+nem alterar turmas. Logs não contêm code/state OAuth, cookies ou Authorization.
+
+O balanceador global usa `136.81.217.99`, certificado gerenciado e redirect
+HTTP para HTTPS. A ativação de `https://educai.dev.br` ainda depende do registro
+A no Registro.br e da configuração do callback no cliente OAuth Web. Inventário,
+procedimentos, validações e rollback estão em
+[`gcp-production.md`](./gcp-production.md).
 
 ## Preparação de produção GCP
 

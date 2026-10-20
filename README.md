@@ -93,6 +93,19 @@ revisões com `./scripts/deploy-gcp-test.ps1`. Consulte o
 [runbook do ambiente](./docs/gcp-test-environment.md) para OAuth, recursos,
 custos e rollback.
 
+## Produção GCP
+
+A produção usa o projeto `educai-511017`, região `southamerica-east1`, com
+Cloud Run, Cloud SQL e GCS existentes atrás de um balanceador HTTPS global. O
+endereço técnico validado é
+<https://educai-821892619668.southamerica-east1.run.app>; a ativação de
+<https://educai.dev.br> depende do registro A e da emissão do certificado.
+
+Consulte o [runbook de produção](./docs/gcp-production.md) para inventário,
+DNS/OAuth pendentes, variáveis, atualização, verificações e rollback. Atualize
+somente a partir de uma árvore Git limpa com
+`./scripts/deploy-gcp-production.ps1`.
+
 ## Qualidade e testes
 
 ```powershell
