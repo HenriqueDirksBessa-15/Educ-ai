@@ -16,11 +16,11 @@ para um job agendado a cada cinco minutos, e a retenção técnica roda diariame
 Classroom, Forms, OpenAI estruturada e GCS foram aprovados sem enviar mensagens
 nem alterar turmas. Logs não contêm code/state OAuth, cookies ou Authorization.
 
-O balanceador global usa `136.81.217.99`, certificado gerenciado e redirect
-HTTP para HTTPS. O registro A foi salvo no Registro.br; a ativação de
-`https://educai.dev.br` aguarda a transição informada pelos servidores DNS e a
-emissão automática do certificado. A configuração OAuth foi entregue para o
-cliente Web e só pode ser validada pelo novo domínio após a propagação.
+O balanceador global usa `136.81.217.99`, certificado gerenciado ativo e
+redirect HTTP para HTTPS. `https://educai.dev.br` foi validado com root, rota
+interna e health checks; o Cloud Run agora aceita tráfego externo somente pelo
+balanceador. O início OAuth pelo domínio confirmou callback, state e PKCE; o
+login completo permanece para teste com uma conta docente autorizada.
 Inventário, procedimentos, validações e rollback estão em
 [`gcp-production.md`](./gcp-production.md).
 

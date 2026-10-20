@@ -6,10 +6,10 @@ serviço e origem.
 
 ## URLs
 
-- plataforma: `https://educai.dev.br` (registro A salvo no Registro.br; aguarda
-  a transição dos servidores DNS e a emissão final do certificado);
-- endereço técnico validado:
-  `https://educai-821892619668.southamerica-east1.run.app`;
+- plataforma ativa: `https://educai.dev.br`;
+- endereço técnico do Cloud Run:
+  `https://educai-821892619668.southamerica-east1.run.app` (bloqueado
+  externamente após a ativação do balanceador);
 - API: `/api` na mesma origem; não há subdomínio `api.educai.dev.br`.
 
 ## Arquitetura e recursos
@@ -23,7 +23,7 @@ Cloud Scheduler -> Cloud Run Jobs (workers e retenção)
 
 | Recurso           | Nome/configuração                                                                                              | Finalidade                                                |
 | ----------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Cloud Run         | `educai`, revisão `educai-8a80ddb`, 1 vCPU, 512 MiB, concorrência 40, mínimo 0, máximo 1                       | SPA e API com escala a zero e limite de conexões ao banco |
+| Cloud Run         | `educai`, imagem `8a80ddb`, 1 vCPU, 512 MiB, concorrência 40, mínimo 0, máximo 1, ingresso somente interno/LB  | SPA e API com escala a zero e limite de conexões ao banco |
 | Artifact Registry | `educai-test/educai:8a80ddb`, digest `sha256:dd89b36c0b450066bb2124a791d63ef6c0c6a22126a71cd95535bab78e57c702` | imagem imutável publicada                                 |
 | Cloud SQL         | `educai-dev`, PostgreSQL 16, banco `educai`, usuário `educai_app`, `db-f1-micro`, 10 GB SSD, zonal             | banco existente preservado                                |
 | Backup Cloud SQL  | `1792458906805`, `pre-prod-deploy-1f02509`                                                                     | ponto de retorno anterior à migração `026`                |
@@ -34,7 +34,7 @@ Cloud Scheduler -> Cloud Run Jobs (workers e retenção)
 | Scheduler SA      | `educai-scheduler@educai-511017.iam.gserviceaccount.com`                                                       | invocação apenas dos jobs operacionais                    |
 | IP global         | `educai-ip`: `136.81.217.99`                                                                                   | endereço A do domínio                                     |
 | Load balancer     | NEG `educai-neg`, backend `educai-backend`, mapas `educai-url-map` e `educai-http-redirect`                    | HTTPS global e redirect 80 -> 443                         |
-| Certificado       | `educai-cert`, domínio `educai.dev.br`                                                                         | TLS gerenciado; ativa após o DNS apontar para o IP        |
+| Certificado       | `educai-cert`, domínio `educai.dev.br`                                                                         | TLS gerenciado ativo                                      |
 
 O Cloud SQL mantém backups automáticos às 03:00 UTC, retenção de sete cópias e
 agora possui proteção contra exclusão acidental. A instância continua sem PITR
@@ -98,7 +98,7 @@ root/live/ready. Seeds nunca são executadas em produção. Use
 ## Domínio e HTTPS
 
 Os nameservers são `a.auto.dns.br` e `b.auto.dns.br`. O registro abaixo foi
-salvo no painel do Registro.br em 20/10/2026:
+salvo e propagado no painel do Registro.br em 20/10/2026:
 
 | Tipo | Nome                 | Valor           |
 | ---- | -------------------- | --------------- |
@@ -113,13 +113,13 @@ gcloud compute ssl-certificates describe educai-cert `
   --project educai-511017 --global
 ```
 
-No momento da entrega, o painel indicava servidores DNS em transição por cerca
-de 1h19, os autoritativos ainda não publicavam o A e o certificado aparecia como
-`PROVISIONING/FAILED_NOT_VISIBLE`. Esse estado é esperado até o fim da transição
-e não requer recriar o balanceador ou o certificado.
+Durante a transição do Registro.br, o certificado apresentou
+`PROVISIONING/FAILED_NOT_VISIBLE`. Após a publicação do A nos dois servidores
+autoritativos, o certificado passou a `ACTIVE`; HTTP redireciona a HTTPS e o
+domínio responde 200.
 
-Quando o certificado estiver `ACTIVE` e o domínio responder 200, restrinja o
-Cloud Run para impedir acesso direto fora do balanceador:
+Após a ativação, o Cloud Run foi restringido para impedir acesso direto fora do
+balanceador:
 
 ```powershell
 gcloud run services update educai --project educai-511017 `
@@ -142,21 +142,23 @@ funcional depois dessa alteração e de um login de teste.
 
 ## Verificações realizadas
 
-| Verificação                                       | Resultado                                                                        |
-| ------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Imagem Node 22 e build de produção                | aprovado; runtime final com zero vulnerabilidades de produção                    |
-| Migração `026_notification_delivery.sql`          | aplicada após backup; contagens de dados preservadas                             |
-| Root, asset versionado e fallback de rota interna | HTTP 200; HTML sem cache e JS imutável                                           |
-| `/api/health/live` e `/api/health/ready`          | HTTP 200; PostgreSQL disponível                                                  |
-| CSP, HSTS, CORS e origem de mutações              | aprovados; origem indevida retorna 403                                           |
-| Dev login e API inexistente                       | 404                                                                              |
-| Google OAuth start                                | 302 para Google com callback de produção, `state` e PKCE S256                    |
-| Google OAuth/Classroom/Forms                      | monitor real `active`; nenhuma turma ou mensagem foi alterada                    |
-| OpenAI                                            | monitor `active` e geração estruturada real com fixture pedagógica aprovada      |
-| GCS                                               | objeto-fixture criado, lido e removido                                           |
-| Workers agendados                                 | execuções reais concluídas; filas previamente confirmadas vazias                 |
-| Logs                                              | URL redigida; sem OAuth code/state, Authorization, cookies ou erros da aplicação |
-| HTTP -> HTTPS no IP do LB                         | 301 preservando caminho e query                                                  |
+| Verificação                                       | Resultado                                                                                                             |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Imagem Node 22 e build de produção                | aprovado; runtime final com zero vulnerabilidades de produção                                                         |
+| Migração `026_notification_delivery.sql`          | aplicada após backup; contagens de dados preservadas                                                                  |
+| Root, asset versionado e fallback de rota interna | HTTP 200; HTML sem cache e JS imutável                                                                                |
+| `/api/health/live` e `/api/health/ready`          | HTTP 200; PostgreSQL disponível                                                                                       |
+| CSP, HSTS, CORS e origem de mutações              | aprovados; origem indevida retorna 403                                                                                |
+| Dev login e API inexistente                       | 404                                                                                                                   |
+| Google OAuth start                                | 302 para Google com callback de produção, `state` e PKCE S256; login completo ainda requer uma conta docente de teste |
+| Google OAuth/Classroom/Forms                      | monitor real `active`; nenhuma turma ou mensagem foi alterada                                                         |
+| OpenAI                                            | monitor `active` e geração estruturada real com fixture pedagógica aprovada                                           |
+| GCS                                               | objeto-fixture criado, lido e removido                                                                                |
+| Workers agendados                                 | execuções reais concluídas; filas previamente confirmadas vazias                                                      |
+| Logs                                              | URL redigida; sem OAuth code/state, Authorization, cookies ou erros da aplicação                                      |
+| HTTP -> HTTPS no IP do LB                         | 301 preservando caminho e query                                                                                       |
+| `https://educai.dev.br`                           | certificado `ACTIVE`, root/rota interna/health 200                                                                    |
+| URL técnica `run.app`                             | 404 externo após restringir o ingresso ao LB                                                                          |
 
 ## Rollback
 
