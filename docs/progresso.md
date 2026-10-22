@@ -1,6 +1,28 @@
 # Progresso
 
-Atualizado em 20/10/2026.
+Atualizado em 22/10/2026.
+
+## Correção do salvamento curricular em produção
+
+Investigado o HTTP 500 de `PUT /api/classes/:classId/curriculum` na revisão
+`educai-8a80ddb`. O Cloud Logging confirmou PostgreSQL `23505` na constraint
+`class_curriculum_component_pkey`: o repositório removia e reinseria componentes
+em CTEs irmãos, cuja ordem de execução não é garantida. Ao manter um componente
+já salvo, o `INSERT` podia disputar a chave antes do `DELETE`.
+
+A substituição do perfil agora ocorre em transação e em comandos sequenciais:
+validação de propriedade/atualização da turma, upsert do perfil, remoção dos
+componentes anteriores e inserção dos novos. O comportamento funcional previsto
+permanece o mesmo, inclusive múltiplos componentes e isolamento por professor.
+
+Verificações: consulta `READ ONLY` confirmou PostgreSQL 16.15, migrações 001–026
+sem divergência de checksum, tabelas/constraints e privilégios corretos; root,
+live e ready responderam 200; teste focal aprovou 6 cenários; lint, formato,
+typecheck e build de contratos/API foram aprovados. Em Cloud Build, PostgreSQL 16
+efêmero aprovou os dois cenários de migração e substituição repetida. A suíte da
+API aprovou 116/120 no primeiro ensaio concorrente; os quatro timeouts ambientais
+foram repetidos de forma serial e os 22 cenários desses arquivos passaram.
+Nenhum deploy, migração ou escrita no banco de produção foi executado.
 
 ## Deploy de produção GCP
 

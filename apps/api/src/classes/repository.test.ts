@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { DatabaseClient } from "../database.js";
+import type { DatabaseClient, TransactionClient } from "../database.js";
 import { ClassesRepository } from "./repository.js";
 
 const professorA = "5d73ea1d-9ab8-4384-960e-3a6f00e6328a";
@@ -122,10 +122,15 @@ describe("classes repository boundaries", () => {
   });
 
   it("replaces the curriculum profile only for an owned class", async () => {
+    const query = vi.fn(async (sql: string) =>
+      sql.includes("UPDATE class_group")
+        ? { rows: [{ id: "class-id" }] }
+        : { rows: [] },
+    );
+    const client = { query, release: vi.fn() } as unknown as TransactionClient;
     const database = {
-      query: vi
-        .fn()
-        .mockResolvedValue({ rows: [{ class_group_id: "class-id" }] }),
+      query: vi.fn(),
+      connect: vi.fn().mockResolvedValue(client),
     };
     const repository = new ClassesRepository(
       database as unknown as DatabaseClient,
@@ -138,9 +143,19 @@ describe("classes repository boundaries", () => {
         curricularComponents: ["Matemática", "Ciências"],
       }),
     ).resolves.toBe(true);
-    expect(database.query).toHaveBeenCalledWith(
-      expect.stringContaining("class_curriculum_component"),
-      expect.arrayContaining([professorA, "class-id"]),
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      "BEGIN",
+      expect.stringContaining("UPDATE class_group"),
+      expect.stringContaining("INSERT INTO class_curriculum_profile"),
+      expect.stringContaining("DELETE FROM class_curriculum_component"),
+      expect.stringContaining("INSERT INTO class_curriculum_component"),
+      "COMMIT",
+    ]);
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("WHERE id = $2 AND professor_id = $1"),
+      [professorA, "class-id", "8º ano EF"],
     );
+    expect(client.release).toHaveBeenCalled();
   });
 });

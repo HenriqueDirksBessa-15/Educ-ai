@@ -8,7 +8,7 @@ import type {
   StudentEnrollmentInput,
 } from "@educai/contracts";
 
-import type { DatabaseClient } from "../database.js";
+import { withTransaction, type DatabaseClient } from "../database.js";
 import type {
   ClassroomCourse,
   ClassroomStudent,
@@ -374,38 +374,35 @@ export class ClassesRepository {
     classId: string,
     input: ClassCurriculumInput,
   ): Promise<boolean> {
-    const result = (await this.database.query(
-      `WITH owned AS (
-         UPDATE class_group SET school_year = $4
-         WHERE id = $2 AND professor_id = $1 RETURNING id
-       ), profile AS (
-         INSERT INTO class_curriculum_profile (
+    return withTransaction(this.database, async (database) => {
+      const owned = (await database.query(
+        `UPDATE class_group SET school_year = $3
+         WHERE id = $2 AND professor_id = $1 RETURNING id`,
+        [professorId, classId, input.schoolYear],
+      )) as QueryResult<{ id: string }>;
+      if (!owned.rows[0]) return false;
+
+      await database.query(
+        `INSERT INTO class_curriculum_profile (
            class_group_id, education_stage, school_year
-         ) SELECT id, $3::education_stage, $4 FROM owned
+         ) VALUES ($1, $2::education_stage, $3)
          ON CONFLICT (class_group_id) DO UPDATE SET
            education_stage = EXCLUDED.education_stage,
-           school_year = EXCLUDED.school_year
-         RETURNING class_group_id
-       ), removed AS (
-         DELETE FROM class_curriculum_component
-         WHERE class_group_id IN (SELECT class_group_id FROM profile)
-       ), components AS (
-         INSERT INTO class_curriculum_component (
+           school_year = EXCLUDED.school_year`,
+        [classId, input.educationStage, input.schoolYear],
+      );
+      await database.query(
+        `DELETE FROM class_curriculum_component WHERE class_group_id = $1`,
+        [classId],
+      );
+      await database.query(
+        `INSERT INTO class_curriculum_component (
            class_group_id, curricular_component
-         ) SELECT profile.class_group_id, component
-           FROM profile CROSS JOIN unnest($5::text[]) AS component
-         RETURNING class_group_id
-       )
-       SELECT class_group_id FROM profile`,
-      [
-        professorId,
-        classId,
-        input.educationStage,
-        input.schoolYear,
-        input.curricularComponents,
-      ],
-    )) as QueryResult<{ class_group_id: string }>;
-    return Boolean(result.rows[0]);
+         ) SELECT $1, component FROM unnest($2::text[]) AS component`,
+        [classId, input.curricularComponents],
+      );
+      return true;
+    });
   }
 
   private toSummary(row: ClassRow): ClassSummary {

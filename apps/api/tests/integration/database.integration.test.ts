@@ -198,6 +198,13 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       }),
     ).toBe(true);
     expect(
+      await repository.setCurriculumProfile(professorA, classId, {
+        educationStage: "elementary_2",
+        schoolYear: "8º ano EF",
+        curricularComponents: ["Matemática", "História"],
+      }),
+    ).toBe(true);
+    expect(
       await repository.linkGoogleCourse(professorA, classId, "course-vertical"),
     ).toBe(true);
 
@@ -219,7 +226,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(detail?.curriculum).toEqual({
       educationStage: "elementary_2",
       schoolYear: "8º ano EF",
-      curricularComponents: ["Ciências", "Matemática"],
+      curricularComponents: ["História", "Matemática"],
     });
     expect(detail?.students).toHaveLength(1);
     expect(await repository.getDetail(professorB, classId)).toBeNull();
