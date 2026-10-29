@@ -14,6 +14,7 @@ type MilestoneRow = {
   id: string;
   class_id: string;
   class_name: string;
+  title: string;
   milestone_date: string;
   type: Milestone["type"];
   description: string;
@@ -40,18 +41,23 @@ type MaterialRow = {
 export class TimelineRepository {
   constructor(private readonly database: DatabaseClient) {}
 
-  async listMilestones(professorId: string): Promise<Milestone[]> {
+  async listMilestones(
+    professorId: string,
+    classId?: string,
+  ): Promise<Milestone[]> {
     const result = (await this.database.query(
       `SELECT milestone.id, milestone.class_group_id AS class_id,
-              class_group.name AS class_name, milestone.milestone_date::text,
+              class_group.name AS class_name, milestone.title,
+              milestone.milestone_date::text,
               milestone.type, milestone.description, milestone.archived_at,
               EXISTS (SELECT 1 FROM published_milestone_link link
                       WHERE link.milestone_id = milestone.id) AS has_published_content
        FROM timeline_milestone milestone
        JOIN class_group ON class_group.id = milestone.class_group_id
        WHERE milestone.professor_id = $1
+         AND ($2::uuid IS NULL OR milestone.class_group_id = $2)
        ORDER BY milestone.milestone_date, milestone.id`,
-      [professorId],
+      [professorId, classId ?? null],
     )) as QueryResult<MilestoneRow>;
     return result.rows.map((row) => this.toMilestone(row));
   }
@@ -67,9 +73,16 @@ export class TimelineRepository {
     if (!ownership.rows[0]) throw new Error("CLASS_NOT_FOUND");
     const result = (await this.database.query(
       `INSERT INTO timeline_milestone
-       (professor_id, class_group_id, milestone_date, type, description)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [professorId, input.classId, input.date, input.type, input.description],
+       (professor_id, class_group_id, title, milestone_date, type, description)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [
+        professorId,
+        input.classId,
+        input.title,
+        input.date,
+        input.type,
+        input.description,
+      ],
     )) as QueryResult<{ id: string }>;
     return result.rows[0]!.id;
   }
@@ -90,7 +103,8 @@ export class TimelineRepository {
     await this.database.query(
       `UPDATE timeline_milestone
        SET milestone_date = COALESCE($3, milestone_date),
-           type = COALESCE($4, type), description = COALESCE($5, description)
+           type = COALESCE($4, type), description = COALESCE($5, description),
+           title = COALESCE($6, title)
        WHERE id = $1 AND professor_id = $2`,
       [
         milestoneId,
@@ -98,6 +112,7 @@ export class TimelineRepository {
         input.date ?? null,
         input.type ?? null,
         input.description ?? null,
+        input.title ?? null,
       ],
     );
     return "updated";
@@ -340,6 +355,7 @@ export class TimelineRepository {
       id: row.id,
       classId: row.class_id,
       className: row.class_name,
+      title: row.title,
       date: row.milestone_date,
       type: row.type,
       description: row.description,

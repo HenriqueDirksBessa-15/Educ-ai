@@ -33,6 +33,8 @@ async function build() {
   const timelineRepository = {
     createMaterialLink: vi.fn().mockResolvedValue("material-id"),
     listMaterials: vi.fn().mockResolvedValue([]),
+    listMilestones: vi.fn().mockResolvedValue([]),
+    createMilestone: vi.fn().mockResolvedValue("milestone-id"),
   };
   const materialService = {
     upload: vi
@@ -60,6 +62,63 @@ async function build() {
   });
   return { app, timelineRepository, materialService };
 }
+
+describe("milestone routes", () => {
+  const headers = { cookie: "educai_session=session-token" };
+  const classId = "8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d";
+
+  it("lists the milestones of one class of the session professor", async () => {
+    const { app, timelineRepository } = await build();
+
+    const listed = await app.inject({
+      method: "GET",
+      url: `/api/timeline/milestones?classId=${classId}`,
+      headers,
+    });
+    const invalid = await app.inject({
+      method: "GET",
+      url: "/api/timeline/milestones?classId=nao-e-id",
+      headers,
+    });
+
+    expect(listed.statusCode).toBe(200);
+    expect(timelineRepository.listMilestones).toHaveBeenCalledWith(
+      professorId,
+      classId,
+    );
+    expect(invalid.statusCode).toBe(400);
+  });
+
+  it("requires a title to create a milestone", async () => {
+    const { app, timelineRepository } = await build();
+    const payload = {
+      classId,
+      date: "2026-12-01",
+      type: "assessment",
+      description: "Prova de frações.",
+    };
+
+    const missing = await app.inject({
+      method: "POST",
+      url: "/api/timeline/milestones",
+      headers,
+      payload,
+    });
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/timeline/milestones",
+      headers,
+      payload: { ...payload, title: "Prova 1" },
+    });
+
+    expect(missing.statusCode).toBe(400);
+    expect(created.statusCode).toBe(201);
+    expect(timelineRepository.createMilestone).toHaveBeenCalledWith(
+      professorId,
+      expect.objectContaining({ title: "Prova 1" }),
+    );
+  });
+});
 
 describe("material link routes", () => {
   it("creates a validated link for the session professor", async () => {

@@ -3,6 +3,8 @@ import type {
   ClassRemoval,
   ClassSummary,
   EducationStage,
+  Milestone,
+  MilestoneType,
   StudentImportPreview,
   StudentImportResult,
   StudentImportRow,
@@ -17,7 +19,12 @@ import {
   schoolYearLabel,
   type Catalog,
 } from "./curriculumCatalog.js";
-import { classSourceLabel, enrollmentStatusLabel } from "./labels.js";
+import {
+  classSourceLabel,
+  enrollmentStatusLabel,
+  formatDate,
+  milestoneTypeLabel,
+} from "./labels.js";
 import { routeHref } from "./router.js";
 
 type Feedback = { kind: "ok" | "error"; text: string } | null;
@@ -779,6 +786,287 @@ function AccessCodePanel({
   );
 }
 
+/* ------------------------------ Timeline ------------------------------ */
+
+const milestoneTypes: MilestoneType[] = [
+  "lesson",
+  "assessment",
+  "event",
+  "deadline",
+  "other",
+];
+
+type MilestoneDraft = {
+  title: string;
+  date: string;
+  type: MilestoneType;
+  description: string;
+};
+
+const emptyMilestone: MilestoneDraft = {
+  title: "",
+  date: "",
+  type: "lesson",
+  description: "",
+};
+
+function MilestoneForm({
+  initial,
+  submitLabel,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  initial: MilestoneDraft;
+  submitLabel: string;
+  busy: boolean;
+  onSubmit: (draft: MilestoneDraft) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draft.title.trim() || !draft.date || !draft.description.trim()) {
+      setError("Preencha título, data e descrição.");
+      return;
+    }
+    setError(null);
+    void onSubmit({
+      ...draft,
+      title: draft.title.trim(),
+      description: draft.description.trim(),
+    });
+  };
+  return (
+    <form className="stacked-form" onSubmit={submit} noValidate>
+      <label>
+        <span>Título do marco</span>
+        <input
+          value={draft.title}
+          maxLength={120}
+          onChange={(event) =>
+            setDraft({ ...draft, title: event.target.value })
+          }
+        />
+      </label>
+      <label>
+        <span>Data</span>
+        <input
+          type="date"
+          value={draft.date}
+          onChange={(event) => setDraft({ ...draft, date: event.target.value })}
+        />
+      </label>
+      <label>
+        <span>Tipo</span>
+        <select
+          value={draft.type}
+          onChange={(event) =>
+            setDraft({ ...draft, type: event.target.value as MilestoneType })
+          }
+        >
+          {milestoneTypes.map((type) => (
+            <option key={type} value={type}>
+              {milestoneTypeLabel(type)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Descrição</span>
+        <textarea
+          value={draft.description}
+          maxLength={500}
+          onChange={(event) =>
+            setDraft({ ...draft, description: event.target.value })
+          }
+        />
+      </label>
+      {error && (
+        <p className="notice error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="inline-actions">
+        <button type="button" className="secondary-action" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={busy}>
+          {busy ? "Salvando…" : submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ClassTimeline({ classId }: { classId: string }) {
+  const confirm = useConfirm();
+  const [milestones, setMilestones] = useState<Milestone[] | null>(null);
+  const [editing, setEditing] = useState<"new" | string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setMilestones(
+        await request<Milestone[]>(`/timeline/milestones?classId=${classId}`),
+      );
+    } catch (error) {
+      setMilestones([]);
+      setFeedback({ kind: "error", text: serverText(error) });
+    }
+  }, [classId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const save = async (draft: MilestoneDraft, milestone?: Milestone) => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      if (milestone)
+        await request(
+          `/timeline/milestones/${milestone.id}`,
+          json("PATCH", draft),
+        );
+      else
+        await request(
+          "/timeline/milestones",
+          json("POST", { ...draft, classId }),
+        );
+      setEditing(null);
+      await load();
+      setFeedback({
+        kind: "ok",
+        text: milestone ? "Marco atualizado." : "Marco criado.",
+      });
+    } catch (error) {
+      setFeedback({ kind: "error", text: serverText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (milestone: Milestone) => {
+    const confirmed = await confirm(
+      milestone.hasPublishedContent
+        ? {
+            title: `Excluir ${milestone.title}?`,
+            body: "Atenção: este marco está ligado a conteúdo já publicado para os alunos. O conteúdo continua publicado, mas perde a ligação com esta data.",
+            confirmLabel: "Excluir mesmo assim",
+            danger: true,
+          }
+        : {
+            title: `Excluir ${milestone.title}?`,
+            body: "O marco sai da linha do tempo da turma.",
+            confirmLabel: "Excluir marco",
+            danger: true,
+          },
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await request(
+        `/timeline/milestones/${milestone.id}${milestone.hasPublishedContent ? "?confirm=true" : ""}`,
+        { method: "DELETE" },
+      );
+      await load();
+      setFeedback({ kind: "ok", text: "Marco excluído." });
+    } catch (error) {
+      setFeedback({ kind: "error", text: serverText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="timeline-panel" aria-labelledby="linha-do-tempo">
+      <h2 id="linha-do-tempo">Linha do tempo</h2>
+      <FeedbackMessage value={feedback} />
+      {milestones === null ? (
+        <p className="empty-state">Abrindo a linha do tempo…</p>
+      ) : milestones.length === 0 && editing !== "new" ? (
+        <p className="empty-state">
+          Nenhum marco ainda. Marque aulas, avaliações e prazos para a turma se
+          organizar.
+        </p>
+      ) : (
+        <ul className="student-list">
+          {milestones.map((milestone) =>
+            editing === milestone.id ? (
+              <li key={milestone.id}>
+                <MilestoneForm
+                  initial={{
+                    title: milestone.title,
+                    date: milestone.date,
+                    type: milestone.type,
+                    description: milestone.description,
+                  }}
+                  submitLabel="Salvar marco"
+                  busy={busy}
+                  onSubmit={(draft) => save(draft, milestone)}
+                  onCancel={() => setEditing(null)}
+                />
+              </li>
+            ) : (
+              <li key={milestone.id}>
+                <span>
+                  <strong>{milestone.title}</strong>
+                  <span className="muted-line">
+                    {formatDate(milestone.date)} ·{" "}
+                    {milestoneTypeLabel(milestone.type)}
+                    {milestone.hasPublishedContent &&
+                      " · Ligado a conteúdo publicado"}
+                  </span>
+                  <span>{milestone.description}</span>
+                </span>
+                {milestone.isPast ? (
+                  <span className="tag">Já passou · só leitura</span>
+                ) : (
+                  <span className="inline-actions">
+                    <button
+                      type="button"
+                      className="secondary-action"
+                      disabled={busy}
+                      onClick={() => setEditing(milestone.id)}
+                    >
+                      Editar {milestone.title}
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-action"
+                      disabled={busy}
+                      onClick={() => void remove(milestone)}
+                    >
+                      Excluir {milestone.title}
+                    </button>
+                  </span>
+                )}
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+      {editing === "new" ? (
+        <MilestoneForm
+          initial={emptyMilestone}
+          submitLabel="Criar marco"
+          busy={busy}
+          onSubmit={(draft) => save(draft)}
+          onCancel={() => setEditing(null)}
+        />
+      ) : (
+        <button type="button" onClick={() => setEditing("new")}>
+          + Criar marco
+        </button>
+      )}
+    </section>
+  );
+}
+
 /* ----------------------------- Class page ----------------------------- */
 
 export function ClassDetailPage({
@@ -1144,6 +1432,8 @@ export function ClassDetailPage({
           </details>
         )}
       </section>
+
+      {!detail.archivedAt && <ClassTimeline classId={classId} />}
 
       {!detail.archivedAt && detail.accessCode && (
         <AccessCodePanel detail={detail} onSaved={() => loadDetail()} />

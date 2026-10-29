@@ -40,6 +40,13 @@ Atualizado em 29/10/2026.
   `component` e `schoolYear` (ano do perfil curricular). A lista de turmas
   ganhou busca e filtros; as opções de disciplina e ano vêm das turmas já
   lidas. O filtro de situação substitui o botão de turmas arquivadas.
+- **DEF-10 (RF008).** A tela da turma ganhou a linha do tempo: criar, editar
+  e excluir marcos (título, data, tipo, descrição), com os tipos atuais.
+  Marco passado aparece só para leitura; marco ligado a conteúdo publicado
+  pede confirmação com alerta antes de excluir; sem marcos, a tela explica e
+  oferece criar. Migração 030: `timeline_milestone.title` (os marcos antigos
+  herdam o começo da descrição). `GET /api/timeline/milestones?classId=`
+  filtra por turma.
 
 ## Correção do salvamento curricular em produção
 

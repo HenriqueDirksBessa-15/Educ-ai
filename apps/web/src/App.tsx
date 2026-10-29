@@ -629,7 +629,7 @@ function TimelinePanel({
                   className={milestone.isPast ? "muted-item" : ""}
                 >
                   <span>{formatDate(milestone.date)}</span>
-                  <strong>{milestone.description}</strong>
+                  <strong>{milestone.title}</strong>
                   <small>
                     {milestone.className} · {milestoneTypeLabel(milestone.type)}
                   </small>

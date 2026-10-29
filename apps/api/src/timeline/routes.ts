@@ -3,6 +3,7 @@ import {
   materialLinkInputSchema,
   materialListQuerySchema,
   milestoneCreateSchema,
+  milestoneListQuerySchema,
   milestoneUpdateSchema,
 } from "@educai/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -33,9 +34,12 @@ export function registerTimelineRoutes(
   app.get("/api/timeline/milestones", async (request, reply) => {
     const user = await identity(request, reply);
     if (!user) return;
+    const parsed = milestoneListQuerySchema.safeParse(request.query);
+    if (!parsed.success) return validationError(reply);
     return {
       data: await dependencies.timelineRepository.listMilestones(
         user.professorId,
+        parsed.data.classId,
       ),
     };
   });

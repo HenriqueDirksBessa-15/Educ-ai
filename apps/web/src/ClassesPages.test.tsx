@@ -90,7 +90,12 @@ const catalog = {
 type Handler = (body: unknown) => unknown;
 
 // Routes are "METHOD /path"; unknown requests fail the test loudly.
-function mockApi(routes: Record<string, unknown | Handler>) {
+function mockApi(input: Record<string, unknown | Handler>) {
+  // The class page also reads its timeline; empty unless a test says otherwise.
+  const routes: Record<string, unknown | Handler> = {
+    "GET /timeline/milestones": { data: [] },
+    ...input,
+  };
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const key = `${init?.method ?? "GET"} ${url.replace(/^\/api/, "").split("?")[0]}`;
     if (!(key in routes)) throw new Error(`unexpected request: ${key}`);
@@ -619,6 +624,8 @@ describe("removing classes and students", () => {
       if (key === `GET /classes/${localId}`)
         return Response.json({ data: detail(localId) });
       if (key === "GET /curriculum") return Response.json(catalog);
+      if (key === "GET /timeline/milestones")
+        return Response.json({ data: [] });
       if (key === `POST /classes/${localId}/students`)
         return Response.json(
           { error: { code: "VALIDATION_ERROR", message } },
@@ -703,6 +710,117 @@ describe("removing classes and students", () => {
     expect(bodyOf(fetchMock, `PUT /classes/${localId}/email-domain`)).toEqual({
       domain: "colegio.edu.br",
     });
+  });
+
+  it("creates, edits and deletes milestones on the class timeline", async () => {
+    const milestone = (overrides: Record<string, unknown>) => ({
+      id: "33333333-3333-4333-8333-333333333331",
+      classId: localId,
+      className: "Reforço de leitura",
+      title: "Prova 1",
+      date: "2099-03-10",
+      type: "assessment",
+      description: "Frações.",
+      isPast: false,
+      isArchived: false,
+      hasPublishedContent: false,
+      ...overrides,
+    });
+    let timeline: unknown[] = [];
+    const fetchMock = mockApi({
+      [`GET /classes/${localId}`]: { data: detail(localId) },
+      "GET /curriculum": catalog,
+      "GET /timeline/milestones": () => ({ data: timeline }),
+      "POST /timeline/milestones": () => {
+        timeline = [
+          milestone({}),
+          milestone({
+            id: "33333333-3333-4333-8333-333333333332",
+            title: "Aula inaugural",
+            date: "2020-02-01",
+            type: "lesson",
+            isPast: true,
+          }),
+          milestone({
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Feira publicada",
+            type: "event",
+            hasPublishedContent: true,
+          }),
+        ];
+        return { data: { id: "33333333-3333-4333-8333-333333333331" } };
+      },
+      "PATCH /timeline/milestones/33333333-3333-4333-8333-333333333331": {
+        data: { updated: true },
+      },
+      "DELETE /timeline/milestones/33333333-3333-4333-8333-333333333333": {},
+    });
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={vi.fn()} />);
+
+    expect(await screen.findByText(/Nenhum marco ainda/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "+ Criar marco" }));
+    fireEvent.change(screen.getByLabelText("Título do marco"), {
+      target: { value: "Prova 1" },
+    });
+    fireEvent.change(screen.getByLabelText("Data"), {
+      target: { value: "2099-03-10" },
+    });
+    fireEvent.change(screen.getByLabelText("Tipo"), {
+      target: { value: "assessment" },
+    });
+    fireEvent.change(screen.getByLabelText("Descrição"), {
+      target: { value: "Frações." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar marco" }));
+    expect(await screen.findByText("Marco criado.")).toBeInTheDocument();
+    expect(bodyOf(fetchMock, "POST /timeline/milestones")).toEqual({
+      title: "Prova 1",
+      date: "2099-03-10",
+      type: "assessment",
+      description: "Frações.",
+      classId: localId,
+    });
+
+    // Marco passado é só leitura.
+    expect(screen.getByText("Já passou · só leitura")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Editar Aula inaugural" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar Prova 1" }));
+    fireEvent.change(screen.getByLabelText("Título do marco"), {
+      target: { value: "Prova 1 remarcada" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar marco" }));
+    expect(await screen.findByText("Marco atualizado.")).toBeInTheDocument();
+    expect(
+      bodyOf(
+        fetchMock,
+        "PATCH /timeline/milestones/33333333-3333-4333-8333-333333333331",
+      ),
+    ).toMatchObject({ title: "Prova 1 remarcada" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Excluir Feira publicada" }),
+    );
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: "Excluir Feira publicada?",
+      }),
+    ).toHaveTextContent("ligado a conteúdo já publicado");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Excluir mesmo assim" }),
+      );
+    });
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            init?.method === "DELETE" && String(url).endsWith("?confirm=true"),
+        ),
+      ).toBe(true),
+    );
   });
 
   it("brings an archived class back to the list", async () => {

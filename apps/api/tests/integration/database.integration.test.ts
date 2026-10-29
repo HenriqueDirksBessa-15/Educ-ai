@@ -119,6 +119,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "027_class_archive.sql",
       "028_student_registration.sql",
       "029_access_code_domain.sql",
+      "030_milestone_title.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -348,6 +349,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     });
     await new TimelineRepository(testPool).createMilestone(professorA, {
       classId: emptyClass,
+      title: "Revisão",
       date: "2026-12-01",
       type: "lesson",
       description: "Aula de revisão.",
@@ -797,6 +799,98 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       [math7, science7].sort(),
     );
     expect(await ids({ q: "%" })).toEqual([]);
+  }, 60_000);
+
+  it("keeps a class timeline with titles, read-only past and confirmed linked deletion", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Marco A'), ($3, $4, 'Professor Marco B')
+       RETURNING id`,
+      [
+        `milestone-a-${randomUUID()}`,
+        `milestone-a-${randomUUID()}@example.invalid`,
+        `milestone-b-${randomUUID()}`,
+        `milestone-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const [professorA, professorB] = professors.rows.map((row) => row.id);
+    const classes = new ClassesRepository(testPool);
+    const timeline = new TimelineRepository(testPool);
+    const classA = await classes.create(professorA!, {
+      name: "Turma do marco",
+      schoolYear: "6º ano EF",
+      localAccessCode: `mark-${randomUUID().slice(0, 12)}`,
+    });
+    const otherClass = await classes.create(professorA!, {
+      name: "Outra turma do marco",
+      schoolYear: "6º ano EF",
+      localAccessCode: `mark-o-${randomUUID().slice(0, 12)}`,
+    });
+    const future = await timeline.createMilestone(professorA!, {
+      classId: classA,
+      title: "Prova 1",
+      date: "2099-03-10",
+      type: "assessment",
+      description: "Frações.",
+    });
+    const past = await timeline.createMilestone(professorA!, {
+      classId: classA,
+      title: "Aula inaugural",
+      date: "2020-02-01",
+      type: "lesson",
+      description: "Apresentação.",
+    });
+    await timeline.createMilestone(professorA!, {
+      classId: otherClass,
+      title: "Em outra turma",
+      date: "2099-04-01",
+      type: "event",
+      description: "Feira.",
+    });
+    await expect(
+      timeline.createMilestone(professorB!, {
+        classId: classA,
+        title: "Intruso",
+        date: "2099-05-01",
+        type: "event",
+        description: "Não deve entrar.",
+      }),
+    ).rejects.toThrow("CLASS_NOT_FOUND");
+
+    const listed = await timeline.listMilestones(professorA!, classA);
+    expect(listed.map((item) => [item.title, item.isPast])).toEqual([
+      ["Aula inaugural", true],
+      ["Prova 1", false],
+    ]);
+    expect(await timeline.listMilestones(professorB!, classA)).toEqual([]);
+    expect(
+      await timeline.updateMilestone(professorA!, past, { title: "Mudado" }),
+    ).toBe("past");
+    expect(
+      await timeline.updateMilestone(professorA!, future, {
+        title: "Prova 1 (remarcada)",
+      }),
+    ).toBe("updated");
+
+    await testPool.query(
+      "INSERT INTO published_milestone_link (milestone_id) VALUES ($1)",
+      [future],
+    );
+    expect(await timeline.deleteMilestone(professorA!, future, false)).toBe(
+      "confirmation_required",
+    );
+    await testPool.query(
+      "DELETE FROM published_milestone_link WHERE milestone_id = $1",
+      [future],
+    );
+    expect(await timeline.deleteMilestone(professorA!, future, true)).toBe(
+      "deleted",
+    );
+    expect(
+      (await timeline.listMilestones(professorA!, classA)).map(
+        (item) => item.title,
+      ),
+    ).toEqual(["Aula inaugural"]);
   }, 60_000);
 
   it("creates materials atomically and isolates links and files by professor", async () => {

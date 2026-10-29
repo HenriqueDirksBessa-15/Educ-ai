@@ -298,6 +298,7 @@ export const milestoneTypeSchema = z.enum([
 
 export const milestoneCreateSchema = z.object({
   classId: z.guid(),
+  title: z.string().trim().min(1).max(120),
   date: z.iso.date(),
   type: milestoneTypeSchema,
   description: z.string().trim().min(1).max(500),
@@ -309,6 +310,10 @@ export const milestoneUpdateSchema = milestoneCreateSchema
   .refine((value) => Object.keys(value).length > 0, {
     message: "Informe ao menos um campo editável.",
   });
+
+export const milestoneListQuerySchema = z.object({
+  classId: z.guid().optional(),
+});
 
 export const milestoneSchema = milestoneCreateSchema.extend({
   id: z.guid(),
