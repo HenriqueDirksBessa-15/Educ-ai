@@ -115,6 +115,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "024_lesson_plan_teacher_fields.sql",
       "025_activity_form_question_mapping.sql",
       "026_notification_delivery.sql",
+      "027_class_archive.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -308,6 +309,165 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(afterManual.rows).toEqual([
       { name: "Nome do Google", origin: "google" },
     ]);
+  }, 60_000);
+
+  it("deletes, archives or unlinks classes and protects Google students", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Remoção A'), ($3, $4, 'Professor Remoção B')
+       RETURNING id`,
+      [
+        `removal-a-${randomUUID()}`,
+        `removal-a-${randomUUID()}@example.invalid`,
+        `removal-b-${randomUUID()}`,
+        `removal-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const professorA = professors.rows[0]!.id;
+    const professorB = professors.rows[1]!.id;
+    const classes = new ClassesRepository(testPool);
+    const newClass = (name: string) =>
+      classes.create(professorA, {
+        name,
+        schoolYear: "6º ano EF",
+        localAccessCode: `rem-${randomUUID().slice(0, 12)}`,
+      });
+
+    // Turma local sem conteúdo: excluída de fato, com alunos e marcos.
+    const emptyClass = await newClass("Turma vazia");
+    await classes.enrollStudent(professorA, emptyClass, {
+      name: "Aluno Manual",
+      email: `manual-${randomUUID()}@example.invalid`,
+      origin: "spreadsheet",
+    });
+    await new TimelineRepository(testPool).createMilestone(professorA, {
+      classId: emptyClass,
+      date: "2026-12-01",
+      type: "lesson",
+      description: "Aula de revisão.",
+    });
+    expect(await classes.remove(professorB, emptyClass)).toBe("not_found");
+    expect(await classes.removalPlan(professorA, emptyClass)).toEqual({
+      action: "delete",
+      plans: 0,
+      activities: 0,
+      grades: 0,
+    });
+    expect(await classes.remove(professorA, emptyClass)).toBe("deleted");
+    expect(await classes.getDetail(professorA, emptyClass)).toBeNull();
+
+    // Turma local com plano: só pode ser arquivada, e volta ao desarquivar.
+    const planClass = await newClass("Turma com plano");
+    await new PlansRepository(testPool).create(professorA, {
+      title: "Plano que impede a exclusão",
+      curricularComponent: "Matemática",
+      schoolYear: "6º ano EF",
+      objectives: "Objetivo.",
+      contents: "Conteúdo.",
+      methodology: "Metodologia.",
+      evaluationStrategy: "Avaliação.",
+      classIds: [planClass],
+      bnccSkillIds: [],
+      materialIds: [],
+    });
+    expect(await classes.remove(professorA, planClass)).toBe("has_content");
+    expect(await classes.setArchived(professorB, planClass, true)).toBe(false);
+    expect(await classes.setArchived(professorA, planClass, true)).toBe(true);
+    expect(
+      (await classes.list(professorA)).some((item) => item.id === planClass),
+    ).toBe(false);
+    expect(
+      (await classes.list(professorA, true)).map((item) => item.id),
+    ).toContain(planClass);
+    expect(await classes.setArchived(professorA, planClass, false)).toBe(true);
+    expect(
+      (await classes.list(professorA)).find((item) => item.id === planClass),
+    ).toMatchObject({ archivedAt: null });
+
+    // Turma do Google: perde só o vínculo local e a sincronização não a reativa.
+    const googleClass = await newClass("Turma do Google");
+    const courseId = `course-removal-${randomUUID()}`;
+    expect(
+      await classes.linkGoogleCourse(professorA, googleClass, courseId),
+    ).toBe(true);
+    const googleSubject = `google-${randomUUID()}`;
+    await classes.syncGoogleStudents(professorA, googleClass, [
+      {
+        googleSubject,
+        name: "Aluna do Google",
+        email: `google-${randomUUID()}@example.invalid`,
+      },
+    ]);
+    const manualEmail = `manual-g-${randomUUID()}@example.invalid`;
+    await classes.enrollStudent(professorA, googleClass, {
+      name: "Aluno Manual na Turma Google",
+      email: manualEmail,
+      origin: "spreadsheet",
+    });
+    const roster = (await classes.getDetail(professorA, googleClass))!.students;
+    const googleStudent = roster.find((item) => item.origin === "google")!;
+    const manualStudent = roster.find((item) => item.email === manualEmail)!;
+
+    expect(
+      await classes.removeEnrollment(professorA, googleClass, googleStudent.id),
+    ).toBe("google");
+    expect(
+      await classes.removeEnrollment(professorB, googleClass, manualStudent.id),
+    ).toBe("not_found");
+    expect(
+      await classes.removeEnrollment(professorA, googleClass, manualStudent.id),
+    ).toBe("removed");
+
+    // Restrito não recebe a atividade: a publicação lista só os ativos.
+    const activities = new ActivitiesRepository(testPool);
+    expect(await activities.classroomAssignees(professorA, googleClass)).toBe(
+      null,
+    );
+    expect(
+      await classes.setEnrollmentStatus(
+        professorB,
+        googleClass,
+        googleStudent.id,
+        "restricted",
+      ),
+    ).toBe(false);
+    expect(
+      await classes.setEnrollmentStatus(
+        professorA,
+        googleClass,
+        googleStudent.id,
+        "restricted",
+      ),
+    ).toBe(true);
+    expect(
+      await activities.classroomAssignees(professorA, googleClass),
+    ).toEqual([]);
+    await classes.syncGoogleStudents(professorA, googleClass, [
+      {
+        googleSubject,
+        name: "Aluna do Google",
+        email: googleStudent.email,
+      },
+    ]);
+    expect(
+      (await classes.getDetail(professorA, googleClass))!.students[0],
+    ).toMatchObject({ status: "restricted" });
+
+    expect(await classes.remove(professorA, googleClass)).toBe("unlinked");
+    await classes.syncGoogleCourses(professorA, [
+      {
+        googleClassroomId: courseId,
+        name: "Turma do Google",
+        description: null,
+        schoolYear: "6º ano EF",
+      },
+    ]);
+    expect(
+      (await classes.list(professorA)).some((item) => item.id === googleClass),
+    ).toBe(false);
+    expect(
+      (await classes.getDetail(professorA, googleClass))!.archivedAt,
+    ).not.toBeNull();
   }, 60_000);
 
   it("creates materials atomically and isolates links and files by professor", async () => {

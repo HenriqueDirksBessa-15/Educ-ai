@@ -3,6 +3,7 @@ import type {
   ClassCurriculumInput,
   ClassCreate,
   ClassDetail,
+  ClassRemoval,
   ClassSummary,
   ClassUpdate,
   StudentEnrollmentInput,
@@ -26,6 +27,7 @@ type ClassRow = {
   origin: ClassSummary["source"];
   sync_status: ClassDetail["syncStatus"];
   last_synced_at: Date | null;
+  archived_at: Date | null;
 };
 type StudentRow = {
   id: string;
@@ -53,11 +55,13 @@ export type GoogleCourseContext = {
 export class ClassesRepository {
   constructor(private readonly database: DatabaseClient) {}
 
-  async list(professorId: string): Promise<ClassSummary[]> {
+  async list(professorId: string, archived = false): Promise<ClassSummary[]> {
     const result = (await this.database.query(
-      `SELECT id, name, description, school_year, origin
-       FROM class_group WHERE professor_id = $1 ORDER BY name, id`,
-      [professorId],
+      `SELECT id, name, description, school_year, origin, archived_at
+       FROM class_group WHERE professor_id = $1
+         AND (archived_at IS NOT NULL) = $2
+       ORDER BY name, id`,
+      [professorId, archived],
     )) as QueryResult<ClassRow>;
     return result.rows.map((row) => this.toSummary(row));
   }
@@ -69,7 +73,7 @@ export class ClassesRepository {
   ): Promise<ClassDetail | null> {
     const classResult = (await this.database.query(
       `SELECT id, name, description, school_year, local_access_code,
-              general_notice, origin, sync_status, last_synced_at
+              general_notice, origin, sync_status, last_synced_at, archived_at
        FROM class_group WHERE id = $1 AND professor_id = $2`,
       [classId, professorId],
     )) as QueryResult<ClassRow>;
@@ -164,12 +168,135 @@ export class ClassesRepository {
     return result.rows.length > 0;
   }
 
-  async remove(professorId: string, classId: string): Promise<boolean> {
+  async removalPlan(
+    professorId: string,
+    classId: string,
+  ): Promise<ClassRemoval | null> {
     const result = (await this.database.query(
-      `DELETE FROM class_group
-       WHERE id = $1 AND professor_id = $2 AND origin = 'local'
-       RETURNING id`,
+      `SELECT class_group.origin,
+              (SELECT count(*)::int FROM lesson_plan_class link
+               WHERE link.class_group_id = class_group.id) AS plans,
+              (SELECT count(*)::int FROM activity_classroom_distribution destination
+               WHERE destination.class_group_id = class_group.id) AS activities,
+              (SELECT count(*)::int FROM bulletin
+               WHERE bulletin.class_group_id = class_group.id) AS grades,
+              (SELECT count(*)::int FROM feedback
+               WHERE feedback.class_group_id = class_group.id)
+              + (SELECT count(*)::int FROM timeline_milestone milestone
+                 JOIN published_milestone_link link ON link.milestone_id = milestone.id
+                 WHERE milestone.class_group_id = class_group.id) AS other_content
+       FROM class_group WHERE id = $1 AND professor_id = $2`,
       [classId, professorId],
+    )) as QueryResult<{
+      origin: ClassSummary["source"];
+      plans: number;
+      activities: number;
+      grades: number;
+      other_content: number;
+    }>;
+    const row = result.rows[0];
+    if (!row) return null;
+    const hasContent =
+      row.plans + row.activities + row.grades + row.other_content > 0;
+    return {
+      action:
+        row.origin === "google" ? "unlink" : hasContent ? "archive" : "delete",
+      plans: row.plans,
+      activities: row.activities,
+      grades: row.grades,
+    };
+  }
+
+  // Exclui de fato só turma local sem conteúdo. Turma do Google perde apenas o
+  // vínculo local: fica arquivada aqui e a sincronização não a reativa.
+  async remove(
+    professorId: string,
+    classId: string,
+  ): Promise<"deleted" | "unlinked" | "has_content" | "not_found"> {
+    const plan = await this.removalPlan(professorId, classId);
+    if (!plan) return "not_found";
+    if (plan.action === "archive") return "has_content";
+    if (plan.action === "unlink") {
+      await this.setArchived(professorId, classId, true);
+      return "unlinked";
+    }
+    return withTransaction(this.database, async (database) => {
+      await database.query(
+        "DELETE FROM material_class WHERE class_group_id = $1",
+        [classId],
+      );
+      await database.query(
+        "DELETE FROM timeline_milestone WHERE class_group_id = $1",
+        [classId],
+      );
+      await database.query("DELETE FROM enrollment WHERE class_group_id = $1", [
+        classId,
+      ]);
+      const deleted = (await database.query(
+        `DELETE FROM class_group
+         WHERE id = $1 AND professor_id = $2 AND origin = 'local'
+         RETURNING id`,
+        [classId, professorId],
+      )) as QueryResult<{ id: string }>;
+      return deleted.rows[0] ? "deleted" : "not_found";
+    });
+  }
+
+  async setArchived(
+    professorId: string,
+    classId: string,
+    archived: boolean,
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `UPDATE class_group
+       SET archived_at = CASE WHEN $3 THEN coalesce(archived_at, now()) END
+       WHERE id = $1 AND professor_id = $2
+       RETURNING id`,
+      [classId, professorId, archived],
+    )) as QueryResult<{ id: string }>;
+    return result.rows.length > 0;
+  }
+
+  // Aluno do Google só sai pelo Classroom; aqui ele pode ser restringido.
+  async removeEnrollment(
+    professorId: string,
+    classId: string,
+    studentId: string,
+  ): Promise<"removed" | "google" | "not_found"> {
+    const result = (await this.database.query(
+      `WITH target AS (
+         SELECT enrollment.id, enrollment.origin
+         FROM enrollment
+         JOIN class_group ON class_group.id = enrollment.class_group_id
+         WHERE enrollment.class_group_id = $1 AND enrollment.student_id = $3
+           AND class_group.professor_id = $2
+       ), removed AS (
+         DELETE FROM enrollment USING target
+         WHERE enrollment.id = target.id AND target.origin <> 'google'
+         RETURNING enrollment.id
+       )
+       SELECT EXISTS (SELECT 1 FROM removed) AS removed FROM target`,
+      [classId, professorId, studentId],
+    )) as QueryResult<{ removed: boolean }>;
+    const row = result.rows[0];
+    if (!row) return "not_found";
+    return row.removed ? "removed" : "google";
+  }
+
+  async setEnrollmentStatus(
+    professorId: string,
+    classId: string,
+    studentId: string,
+    status: "active" | "restricted",
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `UPDATE enrollment SET status = $4, updated_at = now()
+       FROM class_group
+       WHERE class_group.id = enrollment.class_group_id
+         AND enrollment.class_group_id = $1 AND class_group.professor_id = $2
+         AND enrollment.student_id = $3
+       RETURNING enrollment.id`,
+      [classId, professorId, studentId, status],
     )) as QueryResult<{ id: string }>;
     return result.rows.length > 0;
   }
@@ -411,6 +538,7 @@ export class ClassesRepository {
       description: row.description,
       schoolYear: row.school_year,
       source: row.origin,
+      archivedAt: row.archived_at?.toISOString() ?? null,
     };
   }
 }

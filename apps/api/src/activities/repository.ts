@@ -476,6 +476,27 @@ export class ActivitiesRepository {
     });
   }
 
+  // Aluno restrito não recebe a atividade: com restrição na turma, a
+  // publicação vai só para os alunos ativos do Google.
+  async classroomAssignees(
+    professorId: string,
+    classId: string,
+  ): Promise<string[] | null> {
+    const result = (await this.database.query(
+      `SELECT bool_or(enrollment.status = 'restricted') AS has_restricted,
+              coalesce(array_agg(student.google_subject ORDER BY student.google_subject)
+                FILTER (WHERE enrollment.status = 'active'
+                  AND student.google_subject IS NOT NULL), '{}') AS active
+       FROM class_group
+       JOIN enrollment ON enrollment.class_group_id = class_group.id
+       JOIN student ON student.id = enrollment.student_id
+       WHERE class_group.id = $1 AND class_group.professor_id = $2`,
+      [classId, professorId],
+    )) as QueryResult<{ has_restricted: boolean | null; active: string[] }>;
+    const row = result.rows[0];
+    return row?.has_restricted ? row.active : null;
+  }
+
   async getPublication(
     professorId: string,
     activityId: string,

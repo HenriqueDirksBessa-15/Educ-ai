@@ -32,6 +32,9 @@ export type ClassroomWorkInput = {
   activity: Activity;
   courseId: string;
   responderUri: string;
+  // IDs Google dos alunos ativos quando a turma tem aluno restrito; null
+  // publica para a turma inteira.
+  studentIds?: string[] | null;
 };
 
 export interface GoogleActivityPublisher {
@@ -160,6 +163,8 @@ export class ProductionGoogleActivityPublisher
     );
     if (existing) return { ...existing, credential: authorization.credential };
 
+    if (input.studentIds && input.studentIds.length === 0)
+      throw new GooglePublishingError("GOOGLE_NO_ACTIVE_STUDENTS");
     const due = new Date(input.activity.dueAt);
     const marker = activityMarker(input.activity.id);
     const created = await this.requestJson<{
@@ -177,6 +182,12 @@ export class ProductionGoogleActivityPublisher
           state: "PUBLISHED",
           workType: "ASSIGNMENT",
           maxPoints: input.activity.totalPoints,
+          ...(input.studentIds
+            ? {
+                assigneeMode: "INDIVIDUAL_STUDENTS",
+                individualStudentsOptions: { studentIds: input.studentIds },
+              }
+            : {}),
           dueDate: {
             year: due.getUTCFullYear(),
             month: due.getUTCMonth() + 1,

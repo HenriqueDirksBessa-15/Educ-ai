@@ -1,5 +1,6 @@
 import type {
   ClassDetail,
+  ClassRemoval,
   ClassSummary,
   EducationStage,
 } from "@educai/contracts";
@@ -54,6 +55,19 @@ export function ClassListPage({
   const [details, setDetails] = useState<Record<string, ClassDetail>>({});
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const [archived, setArchived] = useState<ClassSummary[] | null>(null);
+
+  const toggleArchived = async () => {
+    if (archived) {
+      setArchived(null);
+      return;
+    }
+    try {
+      setArchived(await request<ClassSummary[]>("/classes?archived=true"));
+    } catch (error) {
+      setFeedback({ kind: "error", text: (error as Error).message });
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -153,6 +167,34 @@ export function ClassListPage({
           })}
         </ul>
       )}
+      <button
+        type="button"
+        className="secondary-action"
+        onClick={() => void toggleArchived()}
+      >
+        {archived ? "Esconder turmas arquivadas" : "Ver turmas arquivadas"}
+      </button>
+      {archived &&
+        (archived.length === 0 ? (
+          <p className="empty-state">Nenhuma turma arquivada.</p>
+        ) : (
+          <ul className="card-list" aria-label="Turmas arquivadas">
+            {archived.map((group) => (
+              <li key={group.id} className="card-row">
+                <div>
+                  <strong className="card-title">{group.name}</strong>
+                  <span className="tag">Arquivada</span>
+                </div>
+                <a
+                  className="secondary-action"
+                  href={routeHref("turmas", group.id)}
+                >
+                  Abrir {group.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ))}
     </>
   );
 }
@@ -414,6 +456,89 @@ export function ClassDetailPage({
     );
   };
 
+  const removeClass = async () => {
+    if (!detail) return;
+    let plan: ClassRemoval;
+    try {
+      plan = await request<ClassRemoval>(`/classes/${classId}/removal`);
+    } catch (error) {
+      setFeedback({ kind: "error", text: (error as Error).message });
+      return;
+    }
+    const options = {
+      delete: {
+        title: `Excluir a turma ${detail.name}?`,
+        body: "Os alunos saem da turma e os marcos dela são apagados. Isso não pode ser desfeito.",
+        confirmLabel: "Excluir turma",
+        danger: true,
+      },
+      archive: {
+        title: `A turma ${detail.name} não pode ser excluída`,
+        body: `Ela tem ${plural(plan.plans, "plano", "planos")}, ${plural(plan.activities, "atividade", "atividades")} e ${plural(plan.grades, "boletim", "boletins")}. Você pode arquivá-la: ela sai da lista, mas nada se perde, e dá para desarquivar depois.`,
+        confirmLabel: "Arquivar turma",
+      },
+      unlink: {
+        title: `Remover ${detail.name} do EDUC.AI?`,
+        body: "Esta turma vem do Google Sala de Aula. Vamos tirar só o vínculo aqui no EDUC.AI: ela continua no Classroom, com os alunos e as atividades de lá. Para apagá-la de vez, faça isso no Google Sala de Aula.",
+        confirmLabel: "Remover vínculo local",
+      },
+    }[plan.action];
+    if (!(await confirm(options))) return;
+    setBusy(true);
+    try {
+      if (plan.action === "archive")
+        await request(`/classes/${classId}/archive`, { method: "POST" });
+      else await request(`/classes/${classId}`, { method: "DELETE" });
+      await reload();
+      window.location.hash = routeHref("turmas");
+    } catch (error) {
+      setFeedback({ kind: "error", text: (error as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeStudent = async (student: ClassDetail["students"][number]) => {
+    const confirmed = await confirm({
+      title: `Remover ${student.name} da turma?`,
+      body: "O aluno sai desta turma. As respostas e notas que ele já tem continuam guardadas.",
+      confirmLabel: "Remover aluno",
+      danger: true,
+    });
+    if (!confirmed) return;
+    await run(
+      () =>
+        request(`/classes/${classId}/students/${student.id}`, {
+          method: "DELETE",
+        }),
+      `${student.name} saiu da turma.`,
+    );
+  };
+
+  const setStudentStatus = async (
+    student: ClassDetail["students"][number],
+    status: "active" | "restricted",
+  ) => {
+    if (status === "restricted") {
+      const confirmed = await confirm({
+        title: `Marcar ${student.name} como restrito?`,
+        body: "Aluno restrito não recebe as próximas atividades desta turma, e as respostas dele não entram na correção. Você pode reativar quando quiser.",
+        confirmLabel: "Marcar como restrito",
+      });
+      if (!confirmed) return;
+    }
+    await run(
+      () =>
+        request(
+          `/classes/${classId}/students/${student.id}`,
+          json("PATCH", { status }),
+        ),
+      status === "restricted"
+        ? `${student.name} agora está restrito.`
+        : `${student.name} está ativo de novo.`,
+    );
+  };
+
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const found = validateProfile(profile);
@@ -453,6 +578,28 @@ export function ClassDetailPage({
       <a className="back-link" href={routeHref("turmas")}>
         ← Voltar para turmas
       </a>
+      {detail.archivedAt && (
+        <div className="notice warning" role="status">
+          <span>
+            {detail.source === "google"
+              ? "Esta turma foi removida do EDUC.AI. Ela continua no Google Sala de Aula."
+              : "Esta turma está arquivada. Ela não aparece na sua lista de turmas."}
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () =>
+                  request(`/classes/${classId}/restore`, { method: "POST" }),
+                "A turma voltou para a sua lista.",
+              )
+            }
+          >
+            Desarquivar
+          </button>
+        </div>
+      )}
       <header className="page-head">
         <h1>{detail.name}</h1>
         <p>
@@ -536,11 +683,80 @@ export function ClassDetailPage({
                 <span className="muted-line">
                   {enrollmentStatusLabel(student.status)}
                 </span>
+                <span className="inline-actions">
+                  {student.status === "restricted" ? (
+                    <button
+                      type="button"
+                      className="secondary-action"
+                      disabled={busy}
+                      onClick={() => void setStudentStatus(student, "active")}
+                    >
+                      Reativar {student.name}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="secondary-action"
+                      disabled={busy}
+                      onClick={() =>
+                        void setStudentStatus(student, "restricted")
+                      }
+                    >
+                      Marcar {student.name} como restrito
+                    </button>
+                  )}
+                  {student.origin !== "google" && (
+                    <button
+                      type="button"
+                      className="danger-action"
+                      disabled={busy}
+                      onClick={() => void removeStudent(student)}
+                    >
+                      Remover {student.name}
+                    </button>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
         )}
+        {detail.students.some((student) => student.origin === "google") && (
+          <details className="muted-line">
+            <summary>Como tirar um aluno do Google Sala de Aula</summary>
+            <p>
+              Alunos que vêm do Google só saem pelo Classroom. Abra o{" "}
+              <a
+                href="https://classroom.google.com"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Google Sala de Aula
+              </a>
+              , entre na turma, vá em Pessoas, toque nos três pontos ao lado do
+              aluno e escolha Remover. Depois, toque em “Atualizar lista de
+              alunos” aqui. Enquanto isso, você pode marcá-lo como restrito.
+            </p>
+          </details>
+        )}
       </section>
+
+      {!detail.archivedAt && (
+        <section className="timeline-panel" aria-labelledby="excluir-turma">
+          <h2 id="excluir-turma">Excluir turma</h2>
+          <p className="muted-line">
+            Turmas com planos, atividades ou notas são arquivadas em vez de
+            excluídas, para nada se perder.
+          </p>
+          <button
+            type="button"
+            className="danger-action"
+            disabled={busy}
+            onClick={() => void removeClass()}
+          >
+            Excluir {detail.name}
+          </button>
+        </section>
+      )}
     </>
   );
 }

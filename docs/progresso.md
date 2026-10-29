@@ -1,6 +1,20 @@
 # Progresso
 
-Atualizado em 22/10/2026.
+Atualizado em 29/10/2026.
+
+## Pós-QA — lacunas do DERS (P2)
+
+- **DEF-04 (RF006/RF007).** Excluir turma segue `GET /api/classes/:id/removal`:
+  turma local sem conteúdo é excluída (matrículas, marcos e vínculos de
+  material saem juntos); com planos, atividades distribuídas, boletins,
+  feedbacks ou marcos publicados, a API recusa com 409 e a tela oferece
+  arquivar (`archived_at`, migração 027, com desarquivar); turma do Google
+  perde só o vínculo local (fica arquivada e a sincronização não a reativa).
+  Aluno manual sai da turma; aluno do Google é recusado com 409 e a tela
+  mostra "Marcar como restrito" e o passo a passo do Classroom. Aluno restrito
+  não entra na conciliação de respostas e a atividade é publicada no Classroom
+  só para os alunos ativos (`INDIVIDUAL_STUDENTS`); trabalhos já publicados não
+  são alterados.
 
 ## Correção do salvamento curricular em produção
 

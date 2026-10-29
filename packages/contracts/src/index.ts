@@ -129,6 +129,21 @@ export const classSummarySchema = z.object({
   description: z.string().nullable(),
   schoolYear: z.string().min(1),
   source: z.enum(["local", "google"]),
+  archivedAt: z.iso.datetime().nullable().optional(),
+});
+
+// O que acontece ao excluir uma turma: turma local sem conteúdo é excluída;
+// com planos, atividades ou notas, só pode ser arquivada; turma do Google
+// perde apenas o vínculo local (fica arquivada aqui, continua no Classroom).
+export const classRemovalSchema = z.object({
+  action: z.enum(["delete", "archive", "unlink"]),
+  plans: z.number().int().nonnegative(),
+  activities: z.number().int().nonnegative(),
+  grades: z.number().int().nonnegative(),
+});
+
+export const enrollmentStatusUpdateSchema = z.object({
+  status: z.enum(["active", "restricted"]),
 });
 
 export const classCreateSchema = z.object({
@@ -1028,6 +1043,10 @@ export type CurriculumSearchResponse = z.infer<
 >;
 export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
+export type ClassRemoval = z.infer<typeof classRemovalSchema>;
+export type EnrollmentStatusUpdate = z.infer<
+  typeof enrollmentStatusUpdateSchema
+>;
 export type ClassCreate = z.infer<typeof classCreateSchema>;
 export type ClassUpdate = z.infer<typeof classUpdateSchema>;
 export type EducationStage = z.infer<typeof educationStageSchema>;

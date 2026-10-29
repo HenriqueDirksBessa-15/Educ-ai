@@ -94,6 +94,7 @@ describe("activity publication service", () => {
       markDistributionFailure: vi.fn(),
       markPublicationFailure: vi.fn(),
       completeExternalPublication: vi.fn().mockResolvedValue(true),
+      classroomAssignees: vi.fn().mockResolvedValue(["google-active-1"]),
     };
     const auth = {
       getCredential: vi.fn().mockResolvedValue({
@@ -138,6 +139,11 @@ describe("activity publication service", () => {
     });
     expect(google.ensureForm).toHaveBeenCalledTimes(1);
     expect(google.ensureCourseWork).toHaveBeenCalledTimes(1);
+    // Turma com aluno restrito: a atividade vai só para os ativos.
+    expect(google.ensureCourseWork).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ studentIds: ["google-active-1"] }),
+    );
     expect(activities.savePublishedForm).toHaveBeenCalledWith(
       activity.professorId,
       activity.id,

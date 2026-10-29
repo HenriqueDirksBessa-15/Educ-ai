@@ -37,6 +37,9 @@ function dependencies(credential: unknown) {
     getGoogleClassroomId: vi.fn(),
     syncGoogleStudents: vi.fn(),
     setCurriculumProfile: vi.fn(),
+    remove: vi.fn(),
+    removeEnrollment: vi.fn(),
+    setEnrollmentStatus: vi.fn(),
   };
   const classroomAdapter = {
     isFixture: false,
@@ -59,6 +62,91 @@ async function build(input: ReturnType<typeof dependencies>) {
   });
   return app;
 }
+
+describe("class and student removal routes", () => {
+  const classId = "8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d";
+  const studentId = "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d";
+  const headers = { cookie: "educai_session=session-token" };
+
+  it("refuses to delete a class with content and points to archiving", async () => {
+    const input = dependencies(null);
+    input.classesRepository.remove.mockResolvedValue("has_content");
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/classes/${classId}`,
+      headers,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.message).toContain("Arquive a turma");
+    expect(input.classesRepository.remove).toHaveBeenCalledWith(
+      professorId,
+      classId,
+    );
+  });
+
+  it("reports when a Google class only lost its local link", async () => {
+    const input = dependencies(null);
+    input.classesRepository.remove.mockResolvedValue("unlinked");
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/api/classes/${classId}`,
+      headers,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ data: { status: "unlinked" } });
+  });
+
+  it("blocks removing a Google student and removes a manual one", async () => {
+    const input = dependencies(null);
+    input.classesRepository.removeEnrollment
+      .mockResolvedValueOnce("google")
+      .mockResolvedValueOnce("removed");
+    const app = await build(input);
+    const url = `/api/classes/${classId}/students/${studentId}`;
+
+    const blocked = await app.inject({ method: "DELETE", url, headers });
+    const removed = await app.inject({ method: "DELETE", url, headers });
+
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error.message).toContain("marque-o como restrito");
+    expect(removed.statusCode).toBe(204);
+  });
+
+  it("only accepts active or restricted as a new enrollment status", async () => {
+    const input = dependencies(null);
+    input.classesRepository.setEnrollmentStatus.mockResolvedValue(true);
+    const app = await build(input);
+    const url = `/api/classes/${classId}/students/${studentId}`;
+
+    const invalid = await app.inject({
+      method: "PATCH",
+      url,
+      headers,
+      payload: { status: "pending" },
+    });
+    const restricted = await app.inject({
+      method: "PATCH",
+      url,
+      headers,
+      payload: { status: "restricted" },
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(restricted.statusCode).toBe(200);
+    expect(input.classesRepository.setEnrollmentStatus).toHaveBeenCalledWith(
+      professorId,
+      classId,
+      studentId,
+      "restricted",
+    );
+  });
+});
 
 describe("Classroom synchronization route", () => {
   it("does not call Classroom without a professor credential", async () => {

@@ -218,6 +218,62 @@ describe("Google activity publisher", () => {
   });
 });
 
+describe("Classroom work for a class with restricted students", () => {
+  it("assigns the work only to the active students", async () => {
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/courseWork?")) return jsonResponse({ courseWork: [] });
+      if (url.endsWith("/courseWork") && init?.method === "POST")
+        return jsonResponse({
+          id: "work-2",
+          alternateLink: "https://classroom.test/work-2",
+        });
+      throw new Error("unexpected request " + url);
+    });
+    const publisher = new ProductionGoogleActivityPublisher(
+      config,
+      fetcher as typeof fetch,
+      tokenProvider,
+    );
+
+    await publisher.ensureCourseWork(credential, {
+      activity,
+      courseId: "course-1",
+      responderUri: "https://forms.test/form-1",
+      studentIds: ["google-active-1"],
+    });
+    const created = fetcher.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+    )!;
+    expect(JSON.parse(String((created[1] as RequestInit).body))).toMatchObject({
+      assigneeMode: "INDIVIDUAL_STUDENTS",
+      individualStudentsOptions: { studentIds: ["google-active-1"] },
+    });
+  });
+
+  it("refuses to publish when every student is restricted", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ courseWork: [] }));
+    const publisher = new ProductionGoogleActivityPublisher(
+      config,
+      fetcher as typeof fetch,
+      tokenProvider,
+    );
+
+    await expect(
+      publisher.ensureCourseWork(credential, {
+        activity,
+        courseId: "course-1",
+        responderUri: "https://forms.test/form-1",
+        studentIds: [],
+      }),
+    ).rejects.toMatchObject({ code: "GOOGLE_NO_ACTIVE_STUDENTS" });
+    expect(
+      fetcher.mock.calls.some(
+        ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+      ),
+    ).toBe(false);
+  });
+});
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,

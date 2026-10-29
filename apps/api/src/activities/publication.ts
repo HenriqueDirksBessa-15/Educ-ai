@@ -137,6 +137,10 @@ export class ActivityPublicationService {
           activity,
           courseId: distribution.googleClassroomId,
           responderUri: publication.responderUri,
+          studentIds: await this.activities.classroomAssignees(
+            professorId,
+            distribution.classId,
+          ),
         });
         await this.auth.saveCredential(professorId, work.credential);
         credential = { ...credential, ...work.credential };

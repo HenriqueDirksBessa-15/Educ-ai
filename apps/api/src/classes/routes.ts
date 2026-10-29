@@ -2,9 +2,10 @@ import {
   classCurriculumInputSchema,
   classCreateSchema,
   classUpdateSchema,
+  enrollmentStatusUpdateSchema,
   studentEnrollmentInputSchema,
 } from "@educai/contracts";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { AppConfig } from "../config.js";
 import { requireIdentity, sessionCookieName } from "../auth/routes.js";
@@ -26,6 +27,8 @@ export function registerClassesRoutes(
   },
 ): void {
   const cookieName = sessionCookieName(dependencies.config.nodeEnv);
+  const owner = (request: FastifyRequest, reply: FastifyReply) =>
+    requireIdentity(request, reply, dependencies.authRepository, cookieName);
   app.post("/api/classes/sync", async (request, reply) => {
     const identity = await requireIdentity(
       request,
@@ -85,18 +88,111 @@ export function registerClassesRoutes(
       throw error;
     }
   });
-  app.get("/api/classes", async (request, reply) => {
-    const identity = await requireIdentity(
-      request,
-      reply,
-      dependencies.authRepository,
-      cookieName,
+  app.get<{ Querystring: { archived?: string } }>(
+    "/api/classes",
+    async (request, reply) => {
+      const identity = await owner(request, reply);
+      if (!identity) return;
+      return {
+        data: await dependencies.classesRepository.list(
+          identity.professorId,
+          request.query.archived === "true",
+        ),
+      };
+    },
+  );
+
+  app.get<{ Params: { classId: string } }>(
+    "/api/classes/:classId/removal",
+    async (request, reply) => {
+      const identity = await owner(request, reply);
+      if (!identity) return;
+      const plan = await dependencies.classesRepository.removalPlan(
+        identity.professorId,
+        request.params.classId,
+      );
+      if (!plan) return notFound(reply, "Turma não encontrada.");
+      return { data: plan };
+    },
+  );
+
+  app.delete<{ Params: { classId: string } }>(
+    "/api/classes/:classId",
+    async (request, reply) => {
+      const identity = await owner(request, reply);
+      if (!identity) return;
+      const result = await dependencies.classesRepository.remove(
+        identity.professorId,
+        request.params.classId,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Turma não encontrada.");
+      if (result === "has_content")
+        return conflict(
+          reply,
+          "Esta turma tem planos, atividades ou notas. Arquive a turma em vez de excluir.",
+        );
+      return { data: { status: result } };
+    },
+  );
+
+  for (const [action, archived] of [
+    ["archive", true],
+    ["restore", false],
+  ] as const)
+    app.post<{ Params: { classId: string } }>(
+      `/api/classes/:classId/${action}`,
+      async (request, reply) => {
+        const identity = await owner(request, reply);
+        if (!identity) return;
+        const updated = await dependencies.classesRepository.setArchived(
+          identity.professorId,
+          request.params.classId,
+          archived,
+        );
+        if (!updated) return notFound(reply, "Turma não encontrada.");
+        return { data: { archived } };
+      },
     );
-    if (!identity) return;
-    return {
-      data: await dependencies.classesRepository.list(identity.professorId),
-    };
-  });
+
+  app.delete<{ Params: { classId: string; studentId: string } }>(
+    "/api/classes/:classId/students/:studentId",
+    async (request, reply) => {
+      const identity = await owner(request, reply);
+      if (!identity) return;
+      const result = await dependencies.classesRepository.removeEnrollment(
+        identity.professorId,
+        request.params.classId,
+        request.params.studentId,
+      );
+      if (result === "not_found")
+        return notFound(reply, "Aluno não encontrado nesta turma.");
+      if (result === "google")
+        return conflict(
+          reply,
+          "Este aluno vem do Google Sala de Aula. Remova-o no Classroom ou marque-o como restrito aqui.",
+        );
+      return reply.code(204).send();
+    },
+  );
+
+  app.patch<{ Params: { classId: string; studentId: string }; Body: unknown }>(
+    "/api/classes/:classId/students/:studentId",
+    async (request, reply) => {
+      const identity = await owner(request, reply);
+      if (!identity) return;
+      const parsed = enrollmentStatusUpdateSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const updated = await dependencies.classesRepository.setEnrollmentStatus(
+        identity.professorId,
+        request.params.classId,
+        request.params.studentId,
+        parsed.data.status,
+      );
+      if (!updated) return notFound(reply, "Aluno não encontrado nesta turma.");
+      return { data: { status: parsed.data.status } };
+    },
+  );
 
   app.post<{ Params: { classId: string } }>(
     "/api/classes/:classId/google",

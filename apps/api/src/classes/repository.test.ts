@@ -17,11 +17,86 @@ describe("classes repository boundaries", () => {
 
     expect(database.query).toHaveBeenCalledWith(
       expect.stringContaining("WHERE professor_id = $1"),
-      [professorA],
+      [professorA, false],
     );
     expect(database.query).not.toHaveBeenCalledWith(expect.any(String), [
       professorB,
+      false,
     ]);
+  });
+
+  it("archives instead of deleting a local class with content", async () => {
+    const database = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            origin: "local",
+            plans: 1,
+            activities: 0,
+            grades: 0,
+            other_content: 0,
+          },
+        ],
+      }),
+    };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(repository.remove(professorA, "class-1")).resolves.toBe(
+      "has_content",
+    );
+    expect(database.query).toHaveBeenCalledTimes(1);
+    expect(String(database.query.mock.calls[0]![0])).toContain(
+      "lesson_plan_class",
+    );
+  });
+
+  it("only unlinks a Google class, keeping its content", async () => {
+    const database = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              origin: "google",
+              plans: 3,
+              activities: 2,
+              grades: 1,
+              other_content: 0,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: "class-1" }] }),
+    };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(repository.remove(professorA, "class-1")).resolves.toBe(
+      "unlinked",
+    );
+    const [sql, values] = database.query.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain("archived_at");
+    expect(sql).not.toContain("DELETE");
+    expect(values).toEqual(["class-1", professorA, true]);
+  });
+
+  it("never deletes a Google enrollment", async () => {
+    const database = {
+      query: vi.fn().mockResolvedValue({ rows: [{ removed: false }] }),
+    };
+    const repository = new ClassesRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await expect(
+      repository.removeEnrollment(professorA, "class-1", "student-1"),
+    ).resolves.toBe("google");
+    const [sql, values] = database.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("target.origin <> 'google'");
+    expect(sql).toContain("class_group.professor_id = $2");
+    expect(values).toEqual(["class-1", professorA, "student-1"]);
   });
 
   it("uses an upsert for repeated student synchronization", async () => {

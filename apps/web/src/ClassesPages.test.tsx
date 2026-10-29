@@ -319,6 +319,187 @@ describe("class page", () => {
   });
 });
 
+describe("removing classes and students", () => {
+  const students = [
+    {
+      id: "22222222-2222-4222-8222-222222222221",
+      name: "Ana Google",
+      email: "ana@example.invalid",
+      origin: "google",
+      status: "active",
+      isInconsistent: false,
+      inconsistencyReason: null,
+    },
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      name: "Beto Manual",
+      email: "beto@example.invalid",
+      origin: "spreadsheet",
+      status: "active",
+      isInconsistent: false,
+      inconsistencyReason: null,
+    },
+  ];
+
+  const confirmWith = async (label: string) => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: label }));
+    });
+  };
+
+  it("deletes a local class without content after confirmation", async () => {
+    const fetchMock = mockApi({
+      [`GET /classes/${localId}`]: { data: detail(localId) },
+      "GET /curriculum": catalog,
+      [`GET /classes/${localId}/removal`]: {
+        data: { action: "delete", plans: 0, activities: 0, grades: 0 },
+      },
+      [`DELETE /classes/${localId}`]: { data: { status: "deleted" } },
+    });
+    const reload = vi.fn().mockResolvedValue(undefined);
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={reload} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Excluir Reforço de leitura" }),
+    );
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: "Excluir a turma Reforço de leitura?",
+      }),
+    ).toBeInTheDocument();
+    await confirmWith("Excluir turma");
+
+    await waitFor(() => expect(window.location.hash).toBe("#/turmas"));
+    expect(reload).toHaveBeenCalled();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          init?.method === "DELETE" &&
+          String(url).endsWith(`/classes/${localId}`),
+      ),
+    ).toBe(true);
+  });
+
+  it("offers archiving when the class has plans, activities or grades", async () => {
+    const fetchMock = mockApi({
+      [`GET /classes/${localId}`]: { data: detail(localId) },
+      "GET /curriculum": catalog,
+      [`GET /classes/${localId}/removal`]: {
+        data: { action: "archive", plans: 2, activities: 1, grades: 0 },
+      },
+      [`POST /classes/${localId}/archive`]: { data: { archived: true } },
+    });
+    renderWithConfirm(
+      <ClassDetailPage
+        classId={localId}
+        reload={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Excluir Reforço de leitura" }),
+    );
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "A turma Reforço de leitura não pode ser excluída",
+    });
+    expect(dialog).toHaveTextContent("2 planos, 1 atividade e 0 boletins");
+    await confirmWith("Arquivar turma");
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).endsWith("/archive")),
+      ).toBe(true),
+    );
+    expect(
+      fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE"),
+    ).toBe(false);
+  });
+
+  it("removes only the local link of a Google class, with a warning", async () => {
+    mockApi({
+      [`GET /classes/${googleId}`]: { data: detail(googleId) },
+      "GET /curriculum": catalog,
+      [`GET /classes/${googleId}/removal`]: {
+        data: { action: "unlink", plans: 0, activities: 0, grades: 0 },
+      },
+    });
+    renderWithConfirm(<ClassDetailPage classId={googleId} reload={vi.fn()} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Excluir 7º ano B" }),
+    );
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: "Remover 7º ano B do EDUC.AI?",
+      }),
+    ).toHaveTextContent("continua no Classroom");
+  });
+
+  it("removes a manual student but only restricts a Google student", async () => {
+    const fetchMock = mockApi({
+      [`GET /classes/${googleId}`]: { data: detail(googleId, { students }) },
+      "GET /curriculum": catalog,
+      [`PATCH /classes/${googleId}/students/${students[0]!.id}`]: {
+        data: { status: "restricted" },
+      },
+      [`DELETE /classes/${googleId}/students/${students[1]!.id}`]: {},
+    });
+    renderWithConfirm(<ClassDetailPage classId={googleId} reload={vi.fn()} />);
+
+    await screen.findByText("Ana Google");
+    expect(
+      screen.queryByRole("button", { name: "Remover Ana Google" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Como tirar um aluno do Google Sala de Aula"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Marcar Ana Google como restrito" }),
+    );
+    await confirmWith("Marcar como restrito");
+    expect(
+      await screen.findByText("Ana Google agora está restrito."),
+    ).toBeInTheDocument();
+    expect(
+      bodyOf(
+        fetchMock,
+        `PATCH /classes/${googleId}/students/${students[0]!.id}`,
+      ),
+    ).toEqual({ status: "restricted" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remover Beto Manual" }),
+    );
+    await confirmWith("Remover aluno");
+    expect(
+      await screen.findByText("Beto Manual saiu da turma."),
+    ).toBeInTheDocument();
+  });
+
+  it("brings an archived class back to the list", async () => {
+    const fetchMock = mockApi({
+      [`GET /classes/${localId}`]: {
+        data: detail(localId, { archivedAt: "2026-10-29T12:00:00.000Z" }),
+      },
+      "GET /curriculum": catalog,
+      [`POST /classes/${localId}/restore`]: { data: { archived: false } },
+    });
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Desarquivar" }));
+    expect(
+      await screen.findByText("A turma voltou para a sua lista."),
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).endsWith("/restore")),
+    ).toBe(true);
+    expect(
+      screen.queryByRole("button", { name: "Excluir Reforço de leitura" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("new class", () => {
   it("creates the class with a generated code and its subject, then opens it", async () => {
     const newId = "11111111-1111-4111-8111-111111111113";
