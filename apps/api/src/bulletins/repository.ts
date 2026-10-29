@@ -16,7 +16,7 @@ export type BulletinStudentData = {
   className: string;
   studentId: string;
   studentName: string;
-  studentEmail: string;
+  studentEmail: string | null;
   activities: BulletinActivitySnapshot[];
   feedbacks: BulletinFeedbackSnapshot[];
 };
@@ -208,14 +208,14 @@ export class BulletinsRepository {
   async startDelivery(
     professorId: string,
     bulletinId: string,
-  ): Promise<BulletinDeliveryLease | "not_found" | "busy"> {
+  ): Promise<BulletinDeliveryLease | "not_found" | "busy" | "no_email"> {
     const result = (await this.database.query(
       `WITH owned AS (
          SELECT bulletin.id, bulletin.title, bulletin.pdf_data,
                 student.email::text AS recipient_email, student.name AS student_name
          FROM bulletin JOIN student ON student.id = bulletin.student_id
          WHERE bulletin.id = $1 AND bulletin.professor_id = $2
-           AND bulletin.status <> 'pending'
+           AND bulletin.status <> 'pending' AND student.email IS NOT NULL
        ), next_attempt AS (
          SELECT coalesce(max(attempt_number), 0) + 1 AS value
          FROM bulletin_delivery WHERE bulletin_id = $1
@@ -252,11 +252,13 @@ export class BulletinsRepository {
         pdf: new Uint8Array(row.pdf_data),
       };
     const state = (await this.database.query(
-      `SELECT status FROM bulletin WHERE id = $1 AND professor_id = $2`,
+      `SELECT bulletin.status, student.email IS NULL AS no_email
+       FROM bulletin JOIN student ON student.id = bulletin.student_id
+       WHERE bulletin.id = $1 AND bulletin.professor_id = $2`,
       [bulletinId, professorId],
-    )) as QueryResult<{ status: string }>;
+    )) as QueryResult<{ status: string; no_email: boolean }>;
     if (!state.rows[0]) return "not_found";
-    return "busy";
+    return state.rows[0].no_email ? "no_email" : "busy";
   }
 
   async completeDelivery(
@@ -324,7 +326,7 @@ function toBulletin(row: Record<string, unknown>): Bulletin {
     className: String(row.class_name),
     studentId: String(row.student_id),
     studentName: String(row.student_name),
-    studentEmail: String(row.student_email),
+    studentEmail: row.student_email ? String(row.student_email) : null,
     periodType: row.period_type as Bulletin["periodType"],
     periodStart: toDateOnly(row.period_start),
     periodEnd: toDateOnly(row.period_end),

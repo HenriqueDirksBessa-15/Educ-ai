@@ -18,6 +18,8 @@ describe("notification delivery repository", () => {
       "ON CONFLICT (notification_id, revision, channel, recipient_key)",
     );
     expect(emailSql.match(/'email'::notification_channel/g)).toHaveLength(2);
+    // Aluno sem e-mail (importado por planilha) não vira entrega de e-mail.
+    expect(emailSql.match(/student\.email IS NOT NULL/g)).toHaveLength(2);
     expect(String(database.query.mock.calls[1]![0])).toContain(
       "google_classroom_id",
     );

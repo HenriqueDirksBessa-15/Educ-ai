@@ -194,7 +194,8 @@ export const enrollmentStatusSchema = z.enum([
 export const studentSummarySchema = z.object({
   id: z.guid(),
   name: z.string().min(1),
-  email: z.email(),
+  // Alunos importados por planilha podem não ter e-mail.
+  email: z.email().nullable(),
   origin: z.enum(["google", "spreadsheet", "access_code"]),
   status: enrollmentStatusSchema,
 });
@@ -208,8 +209,35 @@ export const studentEnrollmentInputSchema = z.object({
 
 export const enrolledStudentSchema = studentSummarySchema.extend({
   id: z.guid(),
+  registrationNumber: z.string().nullable().optional(),
   isInconsistent: z.boolean(),
   inconsistencyReason: z.string().nullable(),
+});
+
+export const studentImportRequestSchema = z.object({
+  csv: z.string().min(1).max(1_000_000),
+});
+
+export const studentImportRowSchema = z.object({
+  line: z.number().int().positive(),
+  name: z.string(),
+  registrationNumber: z.string(),
+  email: z.string().nullable(),
+  // new: aluno novo; linked: já existe pelo e-mail e entra na turma;
+  // unchanged: já está na turma; error: linha não pode ser importada.
+  status: z.enum(["new", "linked", "unchanged", "error"]),
+  errors: z.array(z.string()),
+});
+
+export const studentImportPreviewSchema = z.object({
+  rows: z.array(studentImportRowSchema),
+  canImport: z.boolean(),
+});
+
+export const studentImportResultSchema = z.object({
+  created: z.number().int().nonnegative(),
+  linked: z.number().int().nonnegative(),
+  unchanged: z.number().int().nonnegative(),
 });
 
 export const classDetailSchema = classSummarySchema.extend({
@@ -981,7 +1009,7 @@ export const bulletinSchema = z.object({
   className: z.string().min(1),
   studentId: z.guid(),
   studentName: z.string().min(1),
-  studentEmail: z.email(),
+  studentEmail: z.email().nullable(),
   periodType: bulletinPeriodTypeSchema,
   periodStart: z.iso.date(),
   periodEnd: z.iso.date(),
@@ -1044,6 +1072,9 @@ export type CurriculumSearchResponse = z.infer<
 export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 export type ClassRemoval = z.infer<typeof classRemovalSchema>;
+export type StudentImportRow = z.infer<typeof studentImportRowSchema>;
+export type StudentImportPreview = z.infer<typeof studentImportPreviewSchema>;
+export type StudentImportResult = z.infer<typeof studentImportResultSchema>;
 export type EnrollmentStatusUpdate = z.infer<
   typeof enrollmentStatusUpdateSchema
 >;

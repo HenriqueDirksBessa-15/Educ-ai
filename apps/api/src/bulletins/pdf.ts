@@ -11,7 +11,7 @@ export type BulletinPdfSnapshot = {
   professorName: string;
   className: string;
   studentName: string;
-  studentEmail: string;
+  studentEmail: string | null;
   periodType: BulletinPeriodType;
   periodStart: string;
   periodEnd: string;
@@ -59,7 +59,11 @@ export async function generateBulletinPdf(
 
   write("EDUC.AI", { bold: true, size: 18, gap: 8 });
   write(snapshot.title, { bold: true, size: 15, gap: 10 });
-  write(`Aluno: ${snapshot.studentName} (${snapshot.studentEmail})`);
+  write(
+    snapshot.studentEmail
+      ? `Aluno: ${snapshot.studentName} (${snapshot.studentEmail})`
+      : `Aluno: ${snapshot.studentName}`,
+  );
   write(`Turma: ${snapshot.className}`);
   write(`Professor: ${snapshot.professorName}`);
   write(

@@ -30,6 +30,7 @@ import { BulletinService } from "../../src/bulletins/service.js";
 import { FixtureBulletinEmailSender } from "../../src/bulletins/email.js";
 import { RetentionService } from "../../src/privacy/retention.js";
 import { ClassesRepository } from "../../src/classes/repository.js";
+import { parseStudentCsv } from "../../src/classes/student-import.js";
 import { TimelineRepository } from "../../src/timeline/repository.js";
 import { PlansRepository } from "../../src/plans/repository.js";
 import { NotificationRepository } from "../../src/notifications/repository.js";
@@ -116,6 +117,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "025_activity_form_question_mapping.sql",
       "026_notification_delivery.sql",
       "027_class_archive.sql",
+      "028_student_registration.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -468,6 +470,146 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(
       (await classes.getDetail(professorA, googleClass))!.archivedAt,
     ).not.toBeNull();
+  }, 60_000);
+
+  it("imports students from a sheet reconciling by email without duplicates", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Planilha A'), ($3, $4, 'Professor Planilha B')
+       RETURNING id`,
+      [
+        `sheet-a-${randomUUID()}`,
+        `sheet-a-${randomUUID()}@example.invalid`,
+        `sheet-b-${randomUUID()}`,
+        `sheet-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const professorA = professors.rows[0]!.id;
+    const professorB = professors.rows[1]!.id;
+    const classes = new ClassesRepository(testPool);
+    const target = await classes.create(professorA, {
+      name: "Turma da planilha",
+      schoolYear: "7º ano EF",
+      localAccessCode: `sheet-${randomUUID().slice(0, 12)}`,
+    });
+    // Aluna que já veio do Google por outra turma: a planilha não a altera.
+    const googleClass = await classes.create(professorA, {
+      name: "Turma Google da planilha",
+      schoolYear: "7º ano EF",
+      localAccessCode: `sheet-g-${randomUUID().slice(0, 12)}`,
+    });
+    await classes.linkGoogleCourse(
+      professorA,
+      googleClass,
+      `course-sheet-${randomUUID()}`,
+    );
+    const googleEmail = `google-sheet-${randomUUID()}@example.invalid`;
+    await classes.syncGoogleStudents(professorA, googleClass, [
+      {
+        googleSubject: `google-${randomUUID()}`,
+        name: "Nome do Google",
+        email: googleEmail,
+      },
+    ]);
+    const newEmail = `novo-${randomUUID()}@example.invalid`;
+    const noEmailName = `Sem Email ${randomUUID().slice(0, 8)}`;
+    const sheet = parseStudentCsv(
+      [
+        "nome;matricula;email",
+        `Aluno Novo;R1;${newEmail.toUpperCase()}`,
+        `Nome Trocado na Planilha;R2;${googleEmail}`,
+        `${noEmailName};R3;`,
+      ].join("\n"),
+    );
+    if (!sheet.ok) throw new Error(sheet.error);
+
+    expect(
+      await classes.previewStudentImport(professorB, target, sheet.rows),
+    ).toBeNull();
+    const preview = await classes.previewStudentImport(
+      professorA,
+      target,
+      sheet.rows,
+    );
+    expect(preview!.rows.map((row) => row.status)).toEqual([
+      "new",
+      "linked",
+      "new",
+    ]);
+    expect(
+      await classes.importStudents(professorA, target, sheet.rows),
+    ).toEqual({
+      status: "imported",
+      result: { created: 2, linked: 1, unchanged: 0 },
+    });
+    const google = await testPool.query<{ name: string; origin: string }>(
+      "SELECT name, origin FROM student WHERE email = $1",
+      [googleEmail],
+    );
+    expect(google.rows).toEqual([{ name: "Nome do Google", origin: "google" }]);
+    const roster = (await classes.getDetail(professorA, target))!.students;
+    expect(
+      roster.map((student) => [student.registrationNumber, student.email]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["R1", newEmail],
+        ["R2", googleEmail],
+        ["R3", null],
+      ]),
+    );
+
+    // Repetir a planilha não duplica nem reativa aluno restrito.
+    const googleStudent = roster.find(
+      (student) => student.email === googleEmail,
+    )!;
+    await classes.setEnrollmentStatus(
+      professorA,
+      target,
+      googleStudent.id,
+      "restricted",
+    );
+    expect(
+      await classes.importStudents(professorA, target, sheet.rows),
+    ).toEqual({
+      status: "imported",
+      result: { created: 0, linked: 0, unchanged: 3 },
+    });
+    const again = (await classes.getDetail(professorA, target))!.students;
+    expect(again).toHaveLength(3);
+    expect(
+      again.find((student) => student.id === googleStudent.id),
+    ).toMatchObject({ status: "restricted" });
+    const noEmail = await testPool.query<{ count: string }>(
+      "SELECT count(*) FROM student WHERE name = $1 AND email IS NULL",
+      [noEmailName],
+    );
+    expect(Number(noEmail.rows[0]!.count)).toBe(1);
+
+    // Matrícula de outro aluno da turma: erro na linha, nada é gravado.
+    const conflict = parseStudentCsv(
+      `nome,matricula,email\nOutra Pessoa,r1,outra-${randomUUID()}@example.invalid`,
+    );
+    if (!conflict.ok) throw new Error(conflict.error);
+    const refused = await classes.importStudents(
+      professorA,
+      target,
+      conflict.rows,
+    );
+    expect(refused).toMatchObject({
+      status: "invalid",
+      preview: {
+        canImport: false,
+        rows: [
+          {
+            status: "error",
+            errors: ["Matrícula já usada por outro aluno desta turma."],
+          },
+        ],
+      },
+    });
+    expect(
+      (await classes.getDetail(professorA, target))!.students,
+    ).toHaveLength(3);
   }, 60_000);
 
   it("creates materials atomically and isolates links and files by professor", async () => {

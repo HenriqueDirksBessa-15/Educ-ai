@@ -477,6 +477,77 @@ describe("removing classes and students", () => {
     ).toBeInTheDocument();
   });
 
+  it("previews a student sheet line by line and imports only when it is clean", async () => {
+    const csv = "nome;matricula;email\nAna;1;\n;2;";
+    const rows = [
+      {
+        line: 2,
+        name: "Ana",
+        registrationNumber: "1",
+        email: null,
+        status: "new",
+        errors: [],
+      },
+      {
+        line: 3,
+        name: "",
+        registrationNumber: "2",
+        email: null,
+        status: "error",
+        errors: ["Falta o nome."],
+      },
+    ];
+    const fetchMock = mockApi({
+      [`GET /classes/${localId}`]: { data: detail(localId) },
+      "GET /curriculum": catalog,
+      [`POST /classes/${localId}/students/import/preview`]: (
+        body: unknown,
+      ) => ({
+        data: (body as { csv: string }).csv.includes(";2;")
+          ? { rows, canImport: false }
+          : { rows: [rows[0]], canImport: true },
+      }),
+      [`POST /classes/${localId}/students/import/confirm`]: {
+        data: { created: 1, linked: 0, unchanged: 0 },
+      },
+    });
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={vi.fn()} />);
+
+    const input = await screen.findByLabelText("Arquivo CSV");
+    fireEvent.change(input, {
+      target: { files: [new File([csv], "alunos.csv", { type: "text/csv" })] },
+    });
+    const table = await screen.findByRole("table", {
+      name: "Prévia da importação",
+    });
+    expect(within(table).getByText(/Falta o nome/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "1 linha precisa de correção. Ajuste a planilha e envie de novo.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Importar 2 alunos" }),
+    ).toBeDisabled();
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["nome;matricula\nAna;1"], "alunos.csv")],
+      },
+    });
+    const importButton = await screen.findByRole("button", {
+      name: "Importar 1 aluno",
+    });
+    expect(importButton).toBeEnabled();
+    fireEvent.click(importButton);
+    expect(
+      await screen.findByText(/Importação concluída: 1 aluno novo/),
+    ).toBeInTheDocument();
+    expect(
+      bodyOf(fetchMock, `POST /classes/${localId}/students/import/confirm`),
+    ).toEqual({ csv: "nome;matricula\nAna;1" });
+  });
+
   it("brings an archived class back to the list", async () => {
     const fetchMock = mockApi({
       [`GET /classes/${localId}`]: {

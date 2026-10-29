@@ -7,6 +7,9 @@ import type {
   ClassSummary,
   ClassUpdate,
   StudentEnrollmentInput,
+  StudentImportPreview,
+  StudentImportResult,
+  StudentImportRow,
 } from "@educai/contracts";
 
 import { withTransaction, type DatabaseClient } from "../database.js";
@@ -15,6 +18,7 @@ import type {
   ClassroomStudent,
 } from "../classroom/adapter.js";
 import { createHash } from "node:crypto";
+import type { ParsedStudentRow } from "./student-import.js";
 
 type QueryResult<Row> = { rows: Row[]; rowCount?: number | null };
 type ClassRow = {
@@ -32,7 +36,8 @@ type ClassRow = {
 type StudentRow = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
+  registration_number: string | null;
   origin: "google" | "spreadsheet" | "access_code";
   status: "active" | "restricted" | "pending";
   is_inconsistent: boolean;
@@ -81,7 +86,8 @@ export class ClassesRepository {
     if (!group) return null;
     const students = (await this.database.query(
       `SELECT student.id, student.name, student.email::text, student.origin,
-              enrollment.status, student.is_inconsistent, student.inconsistency_reason
+              enrollment.status, enrollment.registration_number,
+              student.is_inconsistent, student.inconsistency_reason
        FROM enrollment
        JOIN student ON student.id = enrollment.student_id
        WHERE enrollment.class_group_id = $1
@@ -109,6 +115,7 @@ export class ClassesRepository {
         id: row.id,
         name: row.name,
         email: row.email,
+        registrationNumber: row.registration_number,
         origin: row.origin,
         status: row.status,
         isInconsistent: row.is_inconsistent,
@@ -336,6 +343,141 @@ export class ClassesRepository {
          updated_at = now()`,
       [classId, student.rows[0]!.id, input.status ?? "active", input.origin],
     );
+  }
+
+  // Classifica cada linha da planilha sem gravar nada. A reconciliação é
+  // por e-mail (sem duplicar aluno) e, sem e-mail, pela matrícula na turma.
+  async previewStudentImport(
+    professorId: string,
+    classId: string,
+    rows: ParsedStudentRow[],
+    database: DatabaseClient = this.database,
+  ): Promise<
+    (StudentImportPreview & { studentIds: Array<string | null> }) | null
+  > {
+    const owned = (await database.query(
+      "SELECT id FROM class_group WHERE id = $1 AND professor_id = $2",
+      [classId, professorId],
+    )) as QueryResult<{ id: string }>;
+    if (!owned.rows[0]) return null;
+    const enrolled = (await database.query(
+      `SELECT student.id, lower(student.email::text) AS email,
+              lower(enrollment.registration_number) AS registration
+       FROM enrollment JOIN student ON student.id = enrollment.student_id
+       WHERE enrollment.class_group_id = $1`,
+      [classId],
+    )) as QueryResult<{
+      id: string;
+      email: string | null;
+      registration: string | null;
+    }>;
+    const emails = rows.flatMap((row) => (row.email ? [row.email] : []));
+    const known = (await database.query(
+      `SELECT id, lower(email::text) AS email FROM student
+       WHERE lower(email::text) = ANY($1::text[])`,
+      [emails],
+    )) as QueryResult<{ id: string; email: string }>;
+    const byEmail = new Map(known.rows.map((row) => [row.email, row.id]));
+    const inClass = new Set(enrolled.rows.map((row) => row.id));
+    const byRegistration = new Map(
+      enrolled.rows.flatMap((row) =>
+        row.registration ? [[row.registration, row.id] as const] : [],
+      ),
+    );
+
+    const studentIds: Array<string | null> = [];
+    const preview: StudentImportRow[] = rows.map((row) => {
+      const errors = [...row.errors];
+      const studentId = row.email ? (byEmail.get(row.email) ?? null) : null;
+      const holder = byRegistration.get(row.registrationNumber.toLowerCase());
+      const sameStudent = row.email
+        ? studentId !== null && holder === studentId
+        : holder !== undefined;
+      if (holder && !sameStudent)
+        errors.push("Matrícula já usada por outro aluno desta turma.");
+      studentIds.push(studentId ?? (sameStudent ? holder! : null));
+      const status: StudentImportRow["status"] =
+        errors.length > 0
+          ? "error"
+          : sameStudent || (studentId && inClass.has(studentId))
+            ? "unchanged"
+            : studentId
+              ? "linked"
+              : "new";
+      return {
+        line: row.line,
+        name: row.name,
+        registrationNumber: row.registrationNumber,
+        email: row.email,
+        status,
+        errors,
+      };
+    });
+    return {
+      rows: preview,
+      canImport: preview.every((row) => row.status !== "error"),
+      studentIds,
+    };
+  }
+
+  // Grava a planilha numa transação, revalidando antes. Aluno existente não
+  // tem o nome trocado (o Google segue fonte primária) e matrícula repetida
+  // não reativa aluno restrito.
+  async importStudents(
+    professorId: string,
+    classId: string,
+    rows: ParsedStudentRow[],
+  ): Promise<
+    | { status: "imported"; result: StudentImportResult }
+    | { status: "invalid"; preview: StudentImportPreview }
+    | { status: "not_found" }
+  > {
+    return withTransaction(this.database, async (database) => {
+      const preview = await this.previewStudentImport(
+        professorId,
+        classId,
+        rows,
+        database,
+      );
+      if (!preview) return { status: "not_found" as const };
+      if (!preview.canImport)
+        return {
+          status: "invalid" as const,
+          preview: { rows: preview.rows, canImport: false },
+        };
+      const result: StudentImportResult = {
+        created: 0,
+        linked: 0,
+        unchanged: 0,
+      };
+      for (const [index, row] of preview.rows.entries()) {
+        let studentId = preview.studentIds[index] ?? null;
+        if (!studentId) {
+          const inserted = (await database.query(
+            `INSERT INTO student (name, email, origin)
+             VALUES ($1, $2, 'spreadsheet')
+             ON CONFLICT (email) DO UPDATE SET email = student.email
+             RETURNING id`,
+            [row.name, row.email],
+          )) as QueryResult<{ id: string }>;
+          studentId = inserted.rows[0]!.id;
+        }
+        await database.query(
+          `INSERT INTO enrollment
+             (class_group_id, student_id, status, origin, registration_number)
+           VALUES ($1, $2, 'active', 'spreadsheet', $3)
+           ON CONFLICT (class_group_id, student_id) DO UPDATE SET
+             registration_number = coalesce(
+               enrollment.registration_number, EXCLUDED.registration_number),
+             updated_at = now()`,
+          [classId, studentId, row.registrationNumber],
+        );
+        if (row.status === "new") result.created += 1;
+        else if (row.status === "linked") result.linked += 1;
+        else result.unchanged += 1;
+      }
+      return { status: "imported" as const, result };
+    });
   }
 
   async syncGoogleCourses(

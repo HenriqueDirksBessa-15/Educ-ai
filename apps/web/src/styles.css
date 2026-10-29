@@ -1197,6 +1197,33 @@ input[type="radio"] {
   border-bottom: 0;
 }
 
+/* Import preview: scrolls inside its box so the page never scrolls sideways. */
+.table-scroll {
+  max-width: 100%;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+.data-table caption {
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
 /* Long option texts (e.g. BNCC stages) must never widen the page. */
 select {
   max-width: 100%;

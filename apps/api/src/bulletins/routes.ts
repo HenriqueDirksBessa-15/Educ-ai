@@ -107,6 +107,14 @@ export function registerBulletinRoutes(
             message: "Já existe um envio em andamento.",
           },
         });
+      if (result.status === "no_email")
+        return reply.code(409).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message:
+              "Este aluno não tem e-mail cadastrado. Baixe o PDF e entregue de outra forma.",
+          },
+        });
       if (result.status === "failed")
         return reply.code(503).send({
           error: {

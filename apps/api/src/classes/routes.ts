@@ -4,6 +4,7 @@ import {
   classUpdateSchema,
   enrollmentStatusUpdateSchema,
   studentEnrollmentInputSchema,
+  studentImportRequestSchema,
 } from "@educai/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -12,6 +13,7 @@ import { requireIdentity, sessionCookieName } from "../auth/routes.js";
 import type { AuthRepository } from "../auth/repository.js";
 import { GOOGLE_CLASSROOM_SYNC_SCOPES } from "../auth/google-gateway.js";
 import type { ClassesRepository } from "./repository.js";
+import { parseStudentCsv } from "./student-import.js";
 import {
   ClassroomAdapterError,
   type ClassroomAdapter,
@@ -152,6 +154,48 @@ export function registerClassesRoutes(
         );
         if (!updated) return notFound(reply, "Turma não encontrada.");
         return { data: { archived } };
+      },
+    );
+
+  for (const step of ["preview", "confirm"] as const)
+    app.post<{ Params: { classId: string }; Body: unknown }>(
+      `/api/classes/:classId/students/import/${step}`,
+      async (request, reply) => {
+        const identity = await owner(request, reply);
+        if (!identity) return;
+        const parsed = studentImportRequestSchema.safeParse(request.body);
+        if (!parsed.success) return validationError(reply);
+        const sheet = parseStudentCsv(parsed.data.csv);
+        if (!sheet.ok)
+          return reply.code(400).send({
+            error: { code: "VALIDATION_ERROR", message: sheet.error },
+          });
+        if (step === "preview") {
+          const preview =
+            await dependencies.classesRepository.previewStudentImport(
+              identity.professorId,
+              request.params.classId,
+              sheet.rows,
+            );
+          if (!preview) return notFound(reply, "Turma não encontrada.");
+          return { data: { rows: preview.rows, canImport: preview.canImport } };
+        }
+        const imported = await dependencies.classesRepository.importStudents(
+          identity.professorId,
+          request.params.classId,
+          sheet.rows,
+        );
+        if (imported.status === "not_found")
+          return notFound(reply, "Turma não encontrada.");
+        if (imported.status === "invalid")
+          return reply.code(400).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Corrija as linhas com erro antes de importar.",
+            },
+            data: imported.preview,
+          });
+        return { data: imported.result };
       },
     );
 

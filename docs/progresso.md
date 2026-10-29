@@ -15,6 +15,16 @@ Atualizado em 29/10/2026.
   não entra na conciliação de respostas e a atividade é publicada no Classroom
   só para os alunos ativos (`INDIVIDUAL_STUDENTS`); trabalhos já publicados não
   são alterados.
+- **DEF-05 (RF007/CT-014).** Importação de alunos por CSV na tela da turma
+  (colunas nome e matricula obrigatórias, email opcional; vírgula ou ponto e
+  vírgula). A prévia mostra cada linha como aluno novo, já cadastrado (entra
+  na turma), já na turma ou erro, e só libera a importação sem erros; a
+  confirmação revalida numa transação. A reconciliação é por e-mail, sem
+  duplicar; sem e-mail, pela matrícula na turma. Aluno existente, inclusive de
+  origem Google, não tem o nome alterado. Migração 028: `student.email`
+  passa a aceitar nulo e `enrollment.registration_number` é único por turma.
+  Aluno sem e-mail não gera entrega de notificação e o envio do boletim
+  explica que o PDF deve ser entregue de outra forma.
 
 ## Correção do salvamento curricular em produção
 

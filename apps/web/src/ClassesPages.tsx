@@ -3,11 +3,14 @@ import type {
   ClassRemoval,
   ClassSummary,
   EducationStage,
+  StudentImportPreview,
+  StudentImportResult,
+  StudentImportRow,
 } from "@educai/contracts";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
-import { json, request } from "./api.js";
+import { ApiError, json, request } from "./api.js";
 import { useConfirm } from "./ConfirmDialog.js";
 import {
   loadCatalog,
@@ -387,6 +390,155 @@ const profileBody = (value: Profile) => ({
   curricularComponents: [value.subject],
 });
 
+/* --------------------------- Student import --------------------------- */
+
+const importStatusLabel: Record<StudentImportRow["status"], string> = {
+  new: "Aluno novo",
+  linked: "Já cadastrado; entra na turma",
+  unchanged: "Já está na turma",
+  error: "Não pode ser importado",
+};
+
+const readText = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.readAsText(file);
+  });
+
+const serverText = (error: unknown) =>
+  error instanceof ApiError && error.serverMessage
+    ? error.serverMessage
+    : (error as Error).message;
+
+function StudentImport({
+  classId,
+  onImported,
+}: {
+  classId: string;
+  onImported: () => Promise<void>;
+}) {
+  const id = useId();
+  const [csv, setCsv] = useState<string | null>(null);
+  const [preview, setPreview] = useState<StudentImportPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  const readFile = async (file: File | undefined) => {
+    setPreview(null);
+    setFeedback(null);
+    if (!file) return;
+    setBusy(true);
+    try {
+      const text = await readText(file);
+      setCsv(text);
+      setPreview(
+        await request<StudentImportPreview>(
+          `/classes/${classId}/students/import/preview`,
+          json("POST", { csv: text }),
+        ),
+      );
+    } catch (error) {
+      setFeedback({ kind: "error", text: serverText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!csv) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const result = await request<StudentImportResult>(
+        `/classes/${classId}/students/import/confirm`,
+        json("POST", { csv }),
+      );
+      setPreview(null);
+      setCsv(null);
+      await onImported();
+      setFeedback({
+        kind: "ok",
+        text: `Importação concluída: ${plural(result.created, "aluno novo", "alunos novos")}, ${plural(result.linked, "já cadastrado vinculado", "já cadastrados vinculados")} e ${plural(result.unchanged, "que já estava", "que já estavam")} na turma.`,
+      });
+    } catch (error) {
+      setFeedback({ kind: "error", text: serverText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const errors = preview?.rows.filter((row) => row.status === "error") ?? [];
+  return (
+    <section className="timeline-panel" aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>Importar alunos de uma planilha</h2>
+      <p className="muted-line" id={`${id}-help`}>
+        Salve a planilha como CSV com as colunas nome e matricula; email é
+        opcional. Pode separar por vírgula ou ponto e vírgula. Alunos que já
+        existem são reconhecidos pelo e-mail e não são duplicados.
+      </p>
+      <label>
+        <span>Arquivo CSV</span>
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          aria-describedby={`${id}-help`}
+          disabled={busy}
+          onChange={(event) => void readFile(event.target.files?.[0])}
+        />
+      </label>
+      <FeedbackMessage value={feedback} />
+      {preview && (
+        <>
+          <p role="status">
+            {errors.length > 0
+              ? `${plural(errors.length, "linha precisa", "linhas precisam")} de correção. Ajuste a planilha e envie de novo.`
+              : `${plural(preview.rows.length, "linha pronta", "linhas prontas")} para importar.`}
+          </p>
+          <div className="table-scroll">
+            <table className="data-table">
+              <caption>Prévia da importação</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Linha</th>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Matrícula</th>
+                  <th scope="col">E-mail</th>
+                  <th scope="col">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.map((row) => (
+                  <tr key={row.line}>
+                    <td>{row.line}</td>
+                    <td>{row.name || "—"}</td>
+                    <td>{row.registrationNumber || "—"}</td>
+                    <td>{row.email ?? "—"}</td>
+                    <td>
+                      {importStatusLabel[row.status]}
+                      {row.errors.length > 0 && `: ${row.errors.join(" ")}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button
+            type="button"
+            disabled={busy || !preview.canImport}
+            onClick={() => void confirmImport()}
+          >
+            {busy
+              ? "Importando…"
+              : `Importar ${plural(preview.rows.length, "aluno", "alunos")}`}
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 /* ----------------------------- Class page ----------------------------- */
 
 export function ClassDetailPage({
@@ -673,7 +825,7 @@ export function ClassDetailPage({
           <p className="empty-state">
             {detail.source === "google"
               ? "Nenhum aluno ainda. Toque em “Atualizar lista de alunos” para trazer os alunos do Google Sala de Aula."
-              : "Nenhum aluno ainda. Crie a turma no Google Sala de Aula para os alunos entrarem."}
+              : "Nenhum aluno ainda. Importe uma planilha abaixo ou crie a turma no Google Sala de Aula para os alunos entrarem."}
           </p>
         ) : (
           <ul className="student-list">
@@ -682,6 +834,8 @@ export function ClassDetailPage({
                 <span>{student.name}</span>
                 <span className="muted-line">
                   {enrollmentStatusLabel(student.status)}
+                  {student.registrationNumber &&
+                    ` · Matrícula ${student.registrationNumber}`}
                 </span>
                 <span className="inline-actions">
                   {student.status === "restricted" ? (
@@ -739,6 +893,10 @@ export function ClassDetailPage({
           </details>
         )}
       </section>
+
+      {!detail.archivedAt && (
+        <StudentImport classId={classId} onImported={() => loadDetail()} />
+      )}
 
       {!detail.archivedAt && (
         <section className="timeline-panel" aria-labelledby="excluir-turma">

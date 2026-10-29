@@ -173,7 +173,9 @@ export function BulletinsPage() {
   const sendOne = async (bulletin: Bulletin) => {
     const confirmed = await confirm({
       title: "Enviar boletim por e-mail?",
-      body: `O boletim de ${bulletin.studentName} será enviado para ${bulletin.studentEmail}.`,
+      body: bulletin.studentEmail
+        ? `O boletim de ${bulletin.studentName} será enviado para ${bulletin.studentEmail}.`
+        : `${bulletin.studentName} não tem e-mail cadastrado. Baixe o PDF e entregue de outra forma.`,
       confirmLabel: "Enviar boletim",
     });
     if (!confirmed) return;

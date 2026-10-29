@@ -83,7 +83,7 @@ export class BulletinService {
     bulletinId: string,
   ): Promise<
     | { status: "sent" }
-    | { status: "not_found" | "busy" }
+    | { status: "not_found" | "busy" | "no_email" }
     | { status: "failed"; errorCode: string }
   > {
     const lease = await this.repository.startDelivery(professorId, bulletinId);

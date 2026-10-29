@@ -40,6 +40,8 @@ function dependencies(credential: unknown) {
     remove: vi.fn(),
     removeEnrollment: vi.fn(),
     setEnrollmentStatus: vi.fn(),
+    previewStudentImport: vi.fn(),
+    importStudents: vi.fn(),
   };
   const classroomAdapter = {
     isFixture: false,
@@ -144,6 +146,85 @@ describe("class and student removal routes", () => {
       classId,
       studentId,
       "restricted",
+    );
+  });
+});
+
+describe("student import routes", () => {
+  const classId = "8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d";
+  const headers = { cookie: "educai_session=session-token" };
+
+  it("explains a sheet without the required columns before touching the database", async () => {
+    const input = dependencies(null);
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/classes/${classId}/students/import/preview`,
+      headers,
+      payload: { csv: "nome,email\nAna,ana@example.invalid" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.message).toContain("nome e matricula");
+    expect(input.classesRepository.previewStudentImport).not.toHaveBeenCalled();
+  });
+
+  it("returns the preview without the internal student ids", async () => {
+    const input = dependencies(null);
+    input.classesRepository.previewStudentImport.mockResolvedValue({
+      rows: [
+        {
+          line: 2,
+          name: "Ana",
+          registrationNumber: "1",
+          email: null,
+          status: "new",
+          errors: [],
+        },
+      ],
+      canImport: true,
+      studentIds: [null],
+    });
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/classes/${classId}/students/import/preview`,
+      headers,
+      payload: { csv: "nome,matricula\nAna,1" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toEqual({
+      rows: [expect.objectContaining({ status: "new" })],
+      canImport: true,
+    });
+    expect(input.classesRepository.previewStudentImport).toHaveBeenCalledWith(
+      professorId,
+      classId,
+      [expect.objectContaining({ name: "Ana", registrationNumber: "1" })],
+    );
+  });
+
+  it("refuses to import while a line still has an error", async () => {
+    const input = dependencies(null);
+    input.classesRepository.importStudents.mockResolvedValue({
+      status: "invalid",
+      preview: { rows: [], canImport: false },
+    });
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/classes/${classId}/students/import/confirm`,
+      headers,
+      payload: { csv: "nome,matricula\n,1" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.message).toBe(
+      "Corrija as linhas com erro antes de importar.",
     );
   });
 });

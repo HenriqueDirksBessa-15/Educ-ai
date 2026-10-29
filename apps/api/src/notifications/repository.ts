@@ -70,6 +70,7 @@ export class NotificationRepository {
               lower(student.email::text), student.email
        FROM notification_outbox notification
        JOIN student ON student.id = notification.student_id
+         AND student.email IS NOT NULL
        WHERE notification.recipient_kind = 'student'
          AND notification.channel = 'email'
          AND notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
@@ -87,6 +88,7 @@ export class NotificationRepository {
        JOIN enrollment ON enrollment.class_group_id = notification.class_group_id
          AND enrollment.status = 'active'
        JOIN student ON student.id = enrollment.student_id
+         AND student.email IS NOT NULL
        WHERE notification.recipient_kind = 'class_group'
          AND notification.channel = 'email'
          AND notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
