@@ -200,12 +200,17 @@ export const studentSummarySchema = z.object({
   status: enrollmentStatusSchema,
 });
 
-export const studentEnrollmentInputSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  email: z.email(),
-  origin: z.enum(["spreadsheet", "access_code"]),
-  status: enrollmentStatusSchema.optional(),
-});
+export const studentEnrollmentInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    email: z.email().nullable().optional(),
+    registrationNumber: z.string().trim().min(1).max(40).nullable().optional(),
+    origin: z.enum(["spreadsheet", "access_code"]),
+    status: enrollmentStatusSchema.optional(),
+  })
+  .refine((value) => Boolean(value.email || value.registrationNumber), {
+    message: "Informe o e-mail ou a matrícula do aluno.",
+  });
 
 export const enrolledStudentSchema = studentSummarySchema.extend({
   id: z.guid(),

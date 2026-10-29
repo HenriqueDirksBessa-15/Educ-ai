@@ -25,6 +25,10 @@ Atualizado em 29/10/2026.
   passa a aceitar nulo e `enrollment.registration_number` é único por turma.
   Aluno sem e-mail não gera entrega de notificação e o envio do boletim
   explica que o PDF deve ser entregue de outra forma.
+- **DEF-07 (RF006-FA3).** Cadastro manual de aluno na tela da turma (nome e
+  matrícula, e-mail opcional). Matrícula repetida na mesma turma responde 409
+  com aviso e não altera nada; se o aluno estiver restrito, o aviso diz que
+  ele continua restrito e como reativá-lo.
 
 ## Correção do salvamento curricular em produção
 

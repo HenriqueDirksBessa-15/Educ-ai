@@ -299,11 +299,14 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       [email],
     );
     expect(synced.rows).toEqual([{ name: "Nome do Google", origin: "google" }]);
-    await repository.enrollStudent(professorB, classB, {
-      name: "Outro Nome Manual",
-      email,
-      origin: "spreadsheet",
-    });
+    // Cadastro repetido na mesma turma é recusado e não altera o aluno.
+    expect(
+      await repository.enrollStudent(professorB, classB, {
+        name: "Outro Nome Manual",
+        email,
+        origin: "spreadsheet",
+      }),
+    ).toEqual({ existing: "active" });
     const afterManual = await testPool.query<{ name: string; origin: string }>(
       "SELECT name, origin FROM student WHERE email = $1",
       [email],
@@ -578,6 +581,27 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(again).toHaveLength(3);
     expect(
       again.find((student) => student.id === googleStudent.id),
+    ).toMatchObject({ status: "restricted" });
+    // Cadastro manual repetido: 409 na rota, sem reativar o aluno restrito.
+    expect(
+      await classes.enrollStudent(professorA, target, {
+        name: "Outro Nome",
+        email: googleEmail,
+        origin: "spreadsheet",
+        status: "active",
+      }),
+    ).toEqual({ existing: "restricted" });
+    expect(
+      await classes.enrollStudent(professorA, target, {
+        name: "Sem Email Repetido",
+        registrationNumber: "r3",
+        origin: "spreadsheet",
+      }),
+    ).toEqual({ existing: "active" });
+    expect(
+      (await classes.getDetail(professorA, target))!.students.find(
+        (student) => student.id === googleStudent.id,
+      ),
     ).toMatchObject({ status: "restricted" });
     const noEmail = await testPool.query<{ count: string }>(
       "SELECT count(*) FROM student WHERE name = $1 AND email IS NULL",

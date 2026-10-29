@@ -548,6 +548,44 @@ describe("removing classes and students", () => {
     ).toEqual({ csv: "nome;matricula\nAna;1" });
   });
 
+  it("warns that a student is already enrolled instead of adding twice", async () => {
+    const message =
+      "Este aluno já está nesta turma e continua restrito. Para reativá-lo, use “Reativar” na lista de alunos.";
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const key = `${init?.method ?? "GET"} ${url.replace(/^\/api/, "").split("?")[0]}`;
+      if (key === `GET /classes/${localId}`)
+        return Response.json({ data: detail(localId) });
+      if (key === "GET /curriculum") return Response.json(catalog);
+      if (key === `POST /classes/${localId}/students`)
+        return Response.json(
+          { error: { code: "VALIDATION_ERROR", message } },
+          { status: 409 },
+        );
+      throw new Error(`unexpected request: ${key}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={vi.fn()} />);
+
+    fireEvent.change(await screen.findByLabelText("Nome do aluno"), {
+      target: { value: "Ana" },
+    });
+    fireEvent.change(screen.getByLabelText("Matrícula"), {
+      target: { value: "2026001" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar aluno" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    const sent = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+    );
+    expect(JSON.parse(String((sent![1] as RequestInit).body))).toEqual({
+      name: "Ana",
+      registrationNumber: "2026001",
+      email: null,
+      origin: "spreadsheet",
+    });
+  });
+
   it("brings an archived class back to the list", async () => {
     const fetchMock = mockApi({
       [`GET /classes/${localId}`]: {

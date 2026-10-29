@@ -308,16 +308,26 @@ export class ClassesRepository {
     return result.rows.length > 0;
   }
 
+  // Matrícula repetida não muda nada: devolve o estado atual, para que um
+  // aluno restrito nunca seja reativado por um novo cadastro.
   async enrollStudent(
     professorId: string,
     classId: string,
     input: StudentEnrollmentInput,
-  ): Promise<void> {
+  ): Promise<"enrolled" | { existing: StudentRow["status"] }> {
     const ownership = (await this.database.query(
       "SELECT id FROM class_group WHERE id = $1 AND professor_id = $2",
       [classId, professorId],
     )) as QueryResult<{ id: string }>;
     if (!ownership.rows[0]) throw new Error("CLASS_NOT_FOUND");
+    if (!input.email) {
+      const holder = (await this.database.query(
+        `SELECT status FROM enrollment
+         WHERE class_group_id = $1 AND lower(registration_number) = lower($2)`,
+        [classId, input.registrationNumber],
+      )) as QueryResult<{ status: StudentRow["status"] }>;
+      if (holder.rows[0]) return { existing: holder.rows[0].status };
+    }
     const student = (await this.database.query(
       `INSERT INTO student (name, email, origin)
        VALUES ($1, $2, $3)
@@ -332,17 +342,29 @@ export class ClassesRepository {
            ELSE student.origin
          END
        RETURNING id`,
-      [input.name, input.email, input.origin],
+      [input.name, input.email ?? null, input.origin],
     )) as QueryResult<{ id: string }>;
-    await this.database.query(
-      `INSERT INTO enrollment (class_group_id, student_id, status, origin)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (class_group_id, student_id) DO UPDATE SET
-         status = EXCLUDED.status,
-         origin = CASE WHEN enrollment.origin = 'google' THEN enrollment.origin ELSE EXCLUDED.origin END,
-         updated_at = now()`,
-      [classId, student.rows[0]!.id, input.status ?? "active", input.origin],
-    );
+    const enrolled = (await this.database.query(
+      `INSERT INTO enrollment
+         (class_group_id, student_id, status, origin, registration_number)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (class_group_id, student_id) DO NOTHING
+       RETURNING id`,
+      [
+        classId,
+        student.rows[0]!.id,
+        input.status ?? "active",
+        input.origin,
+        input.registrationNumber ?? null,
+      ],
+    )) as QueryResult<{ id: string }>;
+    if (enrolled.rows[0]) return "enrolled";
+    const current = (await this.database.query(
+      `SELECT status FROM enrollment
+       WHERE class_group_id = $1 AND student_id = $2`,
+      [classId, student.rows[0]!.id],
+    )) as QueryResult<{ status: StudentRow["status"] }>;
+    return { existing: current.rows[0]!.status };
   }
 
   // Classifica cada linha da planilha sem gravar nada. A reconciliação é

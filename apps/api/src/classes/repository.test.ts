@@ -105,18 +105,22 @@ describe("classes repository boundaries", () => {
         .fn()
         .mockResolvedValueOnce({ rows: [{ id: "class-id" }] })
         .mockResolvedValueOnce({ rows: [{ id: "student-id" }] })
-        .mockResolvedValueOnce({ rows: [] }),
+        .mockResolvedValueOnce({ rows: [{ id: "enrollment-id" }] }),
     };
-    await new ClassesRepository(
-      database as unknown as DatabaseClient,
-    ).enrollStudent(professorA, "class-id", {
-      name: "Aluno Teste",
-      email: "aluno@example.invalid",
-      origin: "spreadsheet",
-    });
+    await expect(
+      new ClassesRepository(
+        database as unknown as DatabaseClient,
+      ).enrollStudent(professorA, "class-id", {
+        name: "Aluno Teste",
+        email: "aluno@example.invalid",
+        origin: "spreadsheet",
+      }),
+    ).resolves.toBe("enrolled");
 
     expect(database.query).toHaveBeenCalledWith(
-      expect.stringContaining("ON CONFLICT (class_group_id, student_id)"),
+      expect.stringContaining(
+        "ON CONFLICT (class_group_id, student_id) DO NOTHING",
+      ),
       expect.any(Array),
     );
     const studentSql = String(database.query.mock.calls[1]![0]);
@@ -126,6 +130,32 @@ describe("classes repository boundaries", () => {
     );
     expect(studentSql).toContain("ELSE student.name");
     expect(studentSql).toContain("ELSE student.origin");
+  });
+
+  it("reports a repeated enrollment without reactivating a restricted student", async () => {
+    const database = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: "class-id" }] })
+        .mockResolvedValueOnce({ rows: [{ id: "student-id" }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ status: "restricted" }] }),
+    };
+
+    await expect(
+      new ClassesRepository(
+        database as unknown as DatabaseClient,
+      ).enrollStudent(professorA, "class-id", {
+        name: "Aluno Teste",
+        email: "aluno@example.invalid",
+        origin: "spreadsheet",
+        status: "active",
+      }),
+    ).resolves.toEqual({ existing: "restricted" });
+    for (const [sql] of database.query.mock.calls)
+      expect(String(sql)).not.toMatch(
+        /UPDATE enrollment|DO UPDATE SET\s+status/,
+      );
   });
 
   it("keeps Google course identity scoped to each professor", async () => {

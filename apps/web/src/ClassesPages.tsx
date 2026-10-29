@@ -539,6 +539,88 @@ function StudentImport({
   );
 }
 
+function StudentAddForm({
+  classId,
+  onAdded,
+}: {
+  classId: string;
+  onAdded: () => Promise<void>;
+}) {
+  const id = useId();
+  const [name, setName] = useState("");
+  const [registration, setRegistration] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!name.trim() || !registration.trim()) {
+      setFeedback({
+        kind: "error",
+        text: "Escreva o nome e a matrícula do aluno.",
+      });
+      return;
+    }
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await request(
+        `/classes/${classId}/students`,
+        json("POST", {
+          name: name.trim(),
+          registrationNumber: registration.trim(),
+          email: email.trim() || null,
+          origin: "spreadsheet",
+        }),
+      );
+      await onAdded();
+      setFeedback({ kind: "ok", text: `${name.trim()} entrou na turma.` });
+      setName("");
+      setRegistration("");
+      setEmail("");
+    } catch (error) {
+      setFeedback({ kind: "error", text: serverText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="stacked-form"
+      aria-labelledby={`${id}-title`}
+      onSubmit={(event) => void submit(event)}
+      noValidate
+    >
+      <h3 id={`${id}-title`}>Adicionar aluno</h3>
+      <label>
+        <span>Nome do aluno</span>
+        <input value={name} onChange={(event) => setName(event.target.value)} />
+      </label>
+      <label>
+        <span>Matrícula</span>
+        <input
+          value={registration}
+          onChange={(event) => setRegistration(event.target.value)}
+        />
+      </label>
+      <label>
+        <span>E-mail (opcional)</span>
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </label>
+      <FeedbackMessage value={feedback} />
+      <button type="submit" disabled={busy}>
+        {busy ? "Adicionando…" : "Adicionar aluno"}
+      </button>
+    </form>
+  );
+}
+
 /* ----------------------------- Class page ----------------------------- */
 
 export function ClassDetailPage({
@@ -893,6 +975,12 @@ export function ClassDetailPage({
           </details>
         )}
       </section>
+
+      {!detail.archivedAt && (
+        <section className="timeline-panel" aria-label="Novo aluno">
+          <StudentAddForm classId={classId} onAdded={() => loadDetail()} />
+        </section>
+      )}
 
       {!detail.archivedAt && (
         <StudentImport classId={classId} onImported={() => loadDetail()} />

@@ -496,11 +496,18 @@ export function registerClassesRoutes(
       const parsed = studentEnrollmentInputSchema.safeParse(request.body);
       if (!parsed.success) return validationError(reply);
       try {
-        await dependencies.classesRepository.enrollStudent(
+        const result = await dependencies.classesRepository.enrollStudent(
           identity.professorId,
           request.params.classId,
           parsed.data,
         );
+        if (result !== "enrolled")
+          return conflict(
+            reply,
+            result.existing === "restricted"
+              ? "Este aluno já está nesta turma e continua restrito. Para reativá-lo, use “Reativar” na lista de alunos."
+              : "Este aluno já está matriculado nesta turma.",
+          );
         return reply.code(201).send({ data: { status: "enrolled" } });
       } catch (error) {
         if (error instanceof Error && error.message === "CLASS_NOT_FOUND")
@@ -508,7 +515,10 @@ export function registerClassesRoutes(
             error: { code: "NOT_FOUND", message: "Turma não encontrada." },
           });
         if (isUniqueViolation(error))
-          return conflict(reply, "Aluno já matriculado ou e-mail duplicado.");
+          return conflict(
+            reply,
+            "Esta matrícula já é de outro aluno desta turma.",
+          );
         throw error;
       }
     },

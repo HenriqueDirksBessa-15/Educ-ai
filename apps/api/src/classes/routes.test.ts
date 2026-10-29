@@ -42,6 +42,7 @@ function dependencies(credential: unknown) {
     setEnrollmentStatus: vi.fn(),
     previewStudentImport: vi.fn(),
     importStudents: vi.fn(),
+    enrollStudent: vi.fn(),
   };
   const classroomAdapter = {
     isFixture: false,
@@ -147,6 +148,57 @@ describe("class and student removal routes", () => {
       studentId,
       "restricted",
     );
+  });
+});
+
+describe("manual enrollment route", () => {
+  const classId = "8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d";
+  const headers = { cookie: "educai_session=session-token" };
+  const enroll = (app: Awaited<ReturnType<typeof build>>, payload: unknown) =>
+    app.inject({
+      method: "POST",
+      url: `/api/classes/${classId}/students`,
+      headers,
+      payload,
+    });
+
+  it("answers 409 with a warning for a repeated enrollment", async () => {
+    const input = dependencies(null);
+    input.classesRepository.enrollStudent
+      .mockResolvedValueOnce({ existing: "active" })
+      .mockResolvedValueOnce({ existing: "restricted" });
+    const app = await build(input);
+    const payload = {
+      name: "Ana",
+      email: "ana@example.invalid",
+      origin: "spreadsheet",
+    };
+
+    const active = await enroll(app, payload);
+    const restricted = await enroll(app, payload);
+
+    expect(active.statusCode).toBe(409);
+    expect(active.json().error.message).toBe(
+      "Este aluno já está matriculado nesta turma.",
+    );
+    expect(restricted.statusCode).toBe(409);
+    expect(restricted.json().error.message).toContain("continua restrito");
+  });
+
+  it("needs an email or a registration number", async () => {
+    const input = dependencies(null);
+    input.classesRepository.enrollStudent.mockResolvedValue("enrolled");
+    const app = await build(input);
+
+    const missing = await enroll(app, { name: "Ana", origin: "spreadsheet" });
+    const byRegistration = await enroll(app, {
+      name: "Ana",
+      registrationNumber: "2026001",
+      origin: "spreadsheet",
+    });
+
+    expect(missing.statusCode).toBe(400);
+    expect(byRegistration.statusCode).toBe(201);
   });
 });
 
