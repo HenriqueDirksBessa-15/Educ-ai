@@ -28,6 +28,7 @@ const config: AppConfig = {
   notificationMaxAttempts: 5,
   notificationLeaseSeconds: 300,
   notificationRetryBaseSeconds: 60,
+  notificationMaxAgeDays: 7,
   materialStorageDirectory: "storage/materials-test",
   materialStorageBackend: "local",
   materialStoragePrefix: "materials-test",

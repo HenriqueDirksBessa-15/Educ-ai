@@ -18,8 +18,48 @@ export type NotificationDeliveryLease = {
   materialLinks: Array<{ title: string; url: string }>;
 };
 
+// Notificações descartadas (expiradas ou canceladas) nunca voltam para a fila.
+const NOT_DISCARDED = `coalesce(notification.error_code, '') NOT IN ('EXPIRED', 'CANCELLED_BEFORE_DEPLOY')`;
+
 export class NotificationRepository {
   constructor(private readonly database: DatabaseClient) {}
+
+  // Descarta como EXPIRED o que ainda poderia ser enviado e passou do prazo,
+  // para que um canal configurado depois não dispare mensagens antigas.
+  // Falhas esgotadas mantêm o motivo original.
+  async expireStale(maxAgeDays: number, maxAttempts: number): Promise<number> {
+    const result = (await this.database.query(
+      `WITH expired AS (
+         UPDATE notification_outbox notification
+         SET status = 'failed', error_code = 'EXPIRED', sent_at = NULL
+         WHERE notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
+           AND notification.created_at < now() - ($1 * interval '1 day')
+           AND (notification.status = 'pending'
+             OR NOT EXISTS (
+               SELECT 1 FROM notification_delivery delivery
+               WHERE delivery.notification_id = notification.id
+                 AND delivery.revision = notification.revision
+                 AND delivery.channel = notification.channel
+             )
+             OR EXISTS (
+               SELECT 1 FROM notification_delivery delivery
+               WHERE delivery.notification_id = notification.id
+                 AND delivery.revision = notification.revision
+                 AND delivery.channel = notification.channel
+                 AND delivery.status <> 'sent' AND delivery.attempt_count < $2
+             ))
+         RETURNING notification.id
+       ), expired_deliveries AS (
+         UPDATE notification_delivery delivery
+         SET status = 'failed', lease_expires_at = NULL, last_error_code = 'EXPIRED'
+         FROM expired WHERE delivery.notification_id = expired.id
+           AND delivery.status <> 'sent'
+       )
+       SELECT count(*)::int AS expired FROM expired`,
+      [maxAgeDays, maxAttempts],
+    )) as QueryResult<{ expired: number }>;
+    return Number(result.rows[0]?.expired ?? 0);
+  }
 
   async prepareDeliveries(): Promise<void> {
     await this.database.query(
@@ -32,7 +72,7 @@ export class NotificationRepository {
        JOIN student ON student.id = notification.student_id
        WHERE notification.recipient_kind = 'student'
          AND notification.channel = 'email'
-         AND notification.status IN ('pending', 'failed')
+         AND notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
          AND NOT EXISTS (
            SELECT 1 FROM notification_delivery existing
            WHERE existing.notification_id = notification.id
@@ -49,7 +89,7 @@ export class NotificationRepository {
        JOIN student ON student.id = enrollment.student_id
        WHERE notification.recipient_kind = 'class_group'
          AND notification.channel = 'email'
-         AND notification.status IN ('pending', 'failed')
+         AND notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
          AND NOT EXISTS (
            SELECT 1 FROM notification_delivery existing
            WHERE existing.notification_id = notification.id
@@ -67,7 +107,7 @@ export class NotificationRepository {
        JOIN class_group ON class_group.id = notification.class_group_id
        WHERE notification.recipient_kind = 'class_group'
          AND notification.channel = 'google_classroom'
-         AND notification.status IN ('pending', 'failed')
+         AND notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
          AND class_group.google_classroom_id IS NOT NULL
          AND NOT EXISTS (
            SELECT 1 FROM notification_delivery existing
@@ -80,7 +120,7 @@ export class NotificationRepository {
     await this.database.query(
       `UPDATE notification_outbox notification
        SET status = 'failed', error_code = 'NOTIFICATION_RECIPIENT_MISSING'
-       WHERE notification.status IN ('pending', 'failed')
+       WHERE notification.status IN ('pending', 'failed') AND ${NOT_DISCARDED}
          AND NOT EXISTS (
            SELECT 1 FROM notification_delivery delivery
            WHERE delivery.notification_id = notification.id
@@ -102,7 +142,7 @@ export class NotificationRepository {
            ON notification.id = delivery.notification_id
           AND notification.revision = delivery.revision
           AND notification.channel = delivery.channel
-         WHERE delivery.attempt_count < $1 AND delivery.available_at <= now()
+         WHERE delivery.attempt_count < $1 AND ${NOT_DISCARDED} AND delivery.available_at <= now()
            AND NOT (delivery.channel = ANY($3::notification_channel[]))
            AND (delivery.status = 'failed' OR
              (delivery.status = 'pending' AND

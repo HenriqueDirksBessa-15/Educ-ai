@@ -100,6 +100,12 @@ const configSchema = z
       .min(1)
       .max(3_600)
       .default(60),
+    NOTIFICATION_MAX_AGE_DAYS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .default(7),
     MATERIAL_STORAGE_DIRECTORY: z
       .string()
       .trim()
@@ -199,6 +205,7 @@ export type AppConfig = {
   notificationMaxAttempts: number;
   notificationLeaseSeconds: number;
   notificationRetryBaseSeconds: number;
+  notificationMaxAgeDays: number;
   materialStorageDirectory: string;
   materialStorageBackend: z.infer<
     typeof configSchema
@@ -279,6 +286,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     notificationMaxAttempts: result.data.NOTIFICATION_MAX_ATTEMPTS,
     notificationLeaseSeconds: result.data.NOTIFICATION_LEASE_SECONDS,
     notificationRetryBaseSeconds: result.data.NOTIFICATION_RETRY_BASE_SECONDS,
+    notificationMaxAgeDays: result.data.NOTIFICATION_MAX_AGE_DAYS,
     materialStorageDirectory: result.data.MATERIAL_STORAGE_DIRECTORY,
     materialStorageBackend: result.data.MATERIAL_STORAGE_BACKEND,
     materialStorageBucket: result.data.MATERIAL_STORAGE_BUCKET,

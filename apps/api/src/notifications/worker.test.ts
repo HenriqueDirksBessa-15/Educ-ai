@@ -33,6 +33,7 @@ const baseLease: NotificationDeliveryLease = {
 
 function build(lease: NotificationDeliveryLease) {
   const repository = {
+    expireStale: vi.fn().mockResolvedValue(0),
     prepareDeliveries: vi.fn(),
     claimNext: vi.fn().mockResolvedValueOnce(lease).mockResolvedValueOnce(null),
     complete: vi.fn(),
@@ -65,6 +66,7 @@ function build(lease: NotificationDeliveryLease) {
       maxAttempts: 5,
       leaseSeconds: 300,
       retryBaseSeconds: 60,
+      maxAgeDays: 7,
     },
     logger as never,
   );
@@ -72,6 +74,22 @@ function build(lease: NotificationDeliveryLease) {
 }
 
 describe("notification delivery worker", () => {
+  it("discards stale notifications before preparing deliveries", async () => {
+    const { worker, repository, logger } = build(baseLease);
+    repository.expireStale.mockResolvedValueOnce(3);
+
+    await worker.runCycle();
+
+    expect(repository.expireStale).toHaveBeenCalledWith(7, 5);
+    expect(repository.expireStale.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.prepareDeliveries.mock.invocationCallOrder[0]!,
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      { expired: 3, maxAgeDays: 7 },
+      "stale notifications discarded as expired",
+    );
+  });
+
   it("delivers individual feedback by idempotent email", async () => {
     const { worker, repository, email, classroom } = build(baseLease);
 

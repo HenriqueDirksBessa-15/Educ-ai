@@ -74,6 +74,7 @@ async function runWorkersOnce(): Promise<void> {
         maxAttempts: config.notificationMaxAttempts,
         leaseSeconds: config.notificationLeaseSeconds,
         retryBaseSeconds: config.notificationRetryBaseSeconds,
+        maxAgeDays: config.notificationMaxAgeDays,
       },
       loggerHost.log,
     );

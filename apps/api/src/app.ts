@@ -264,6 +264,7 @@ export async function createApp({
       maxAttempts: config.notificationMaxAttempts,
       leaseSeconds: config.notificationLeaseSeconds,
       retryBaseSeconds: config.notificationRetryBaseSeconds,
+      maxAgeDays: config.notificationMaxAgeDays,
     },
     app.log,
   );

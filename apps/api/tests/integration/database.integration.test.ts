@@ -1153,6 +1153,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         maxAttempts: 5,
         leaseSeconds: 300,
         retryBaseSeconds: 60,
+        maxAgeDays: 7,
       },
       { error: vi.fn(), warn: vi.fn() } as never,
     );
@@ -1197,6 +1198,95 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       [[feedbackId, globalFeedbackId]],
     );
     expect(Number(notificationDeliveries.rows[0]!.count)).toBe(2);
+    // Fila velha: depois de 7 dias a notificação é descartada como EXPIRED e não
+    // volta para a fila; a recente segue saindo.
+    const expiryClient = await testPool.connect();
+    try {
+      await expiryClient.query("BEGIN");
+      await expiryClient.query(
+        `UPDATE notification_outbox SET status = 'pending', error_code = NULL,
+           sent_at = NULL, revision = revision + 1,
+           created_at = CASE WHEN feedback_id = $2 THEN now() - interval '8 days'
+             ELSE now() END
+         WHERE feedback_id = ANY($1::uuid[])`,
+        [[feedbackId, globalFeedbackId], globalFeedbackId],
+      );
+      const expiryEmail = {
+        isFixture: false,
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+      const expiryAnnouncements = new FixtureClassroomAnnouncementSender();
+      const expiryAnnounce = vi.spyOn(
+        expiryAnnouncements,
+        "ensureAnnouncement",
+      );
+      const expiryLogger = { error: vi.fn(), warn: vi.fn() };
+      const expiryWorker = new NotificationDeliveryWorker(
+        new NotificationRepository(expiryClient),
+        collectionAuth as unknown as AuthRepository,
+        expiryEmail,
+        expiryAnnouncements,
+        {
+          intervalMs: 30_000,
+          maxAttempts: 5,
+          leaseSeconds: 300,
+          retryBaseSeconds: 60,
+          maxAgeDays: 7,
+        },
+        expiryLogger as never,
+      );
+      await expect(expiryWorker.runCycle()).resolves.toEqual({
+        status: "completed",
+        delivered: 1,
+        failed: 0,
+        skipped: 0,
+      });
+      await expect(expiryWorker.runCycle()).resolves.toEqual({
+        status: "completed",
+        delivered: 0,
+        failed: 0,
+        skipped: 0,
+      });
+      expect(expiryEmail.send).toHaveBeenCalledTimes(1);
+      expect(expiryAnnounce).not.toHaveBeenCalled();
+      expect(expiryLogger.warn).toHaveBeenCalledWith(
+        { expired: 1, maxAgeDays: 7 },
+        "stale notifications discarded as expired",
+      );
+      const expiredRows = await expiryClient.query<{
+        recipient_kind: string;
+        status: string;
+        error_code: string | null;
+        deliveries: number;
+      }>(
+        `SELECT notification.recipient_kind, notification.status,
+                notification.error_code,
+                (SELECT count(*)::int FROM notification_delivery delivery
+                 WHERE delivery.notification_id = notification.id
+                   AND delivery.revision = notification.revision) AS deliveries
+         FROM notification_outbox notification
+         WHERE notification.feedback_id = ANY($1::uuid[])
+         ORDER BY notification.recipient_kind::text`,
+        [[feedbackId, globalFeedbackId]],
+      );
+      expect(expiredRows.rows).toEqual([
+        {
+          recipient_kind: "class_group",
+          status: "failed",
+          error_code: "EXPIRED",
+          deliveries: 0,
+        },
+        {
+          recipient_kind: "student",
+          status: "sent",
+          error_code: null,
+          deliveries: 1,
+        },
+      ]);
+    } finally {
+      await expiryClient.query("ROLLBACK");
+      expiryClient.release();
+    }
     const bulletins = new BulletinsRepository(testPool);
     const bulletinService = new BulletinService(
       bulletins,
@@ -1315,6 +1405,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       notificationMaxAttempts: 5,
       notificationLeaseSeconds: 300,
       notificationRetryBaseSeconds: 60,
+      notificationMaxAgeDays: 7,
       materialStorageDirectory: "storage/materials-test",
       materialStorageBackend: "local",
       materialStoragePrefix: "materials-test",

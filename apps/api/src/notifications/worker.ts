@@ -47,6 +47,7 @@ export class NotificationDeliveryWorker {
       maxAttempts: number;
       leaseSeconds: number;
       retryBaseSeconds: number;
+      maxAgeDays: number;
     },
     private readonly logger: FastifyBaseLogger,
   ) {}
@@ -77,6 +78,15 @@ export class NotificationDeliveryWorker {
     this.running = true;
     const disabledChannels: NotificationDeliveryLease["channel"][] = [];
     try {
+      const expired = await this.repository.expireStale(
+        this.options.maxAgeDays,
+        this.options.maxAttempts,
+      );
+      if (expired > 0)
+        this.logger.warn(
+          { expired, maxAgeDays: this.options.maxAgeDays },
+          "stale notifications discarded as expired",
+        );
       await this.repository.prepareDeliveries();
       for (let processed = 0; processed < 100; processed += 1) {
         const lease = await this.repository.claimNext(

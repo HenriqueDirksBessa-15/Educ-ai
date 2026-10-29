@@ -169,6 +169,7 @@ npm run check
 | `NOTIFICATION_MAX_ATTEMPTS`       | Máximo de tentativas por destinatário     |
 | `NOTIFICATION_LEASE_SECONDS`      | Lease contra workers concorrentes         |
 | `NOTIFICATION_RETRY_BASE_SECONDS` | Base do backoff exponencial               |
+| `NOTIFICATION_MAX_AGE_DAYS`       | Idade máxima antes de descartar (EXPIRED) |
 | `MATERIAL_STORAGE_DIRECTORY`      | Diretório privado dos arquivos locais     |
 | `MATERIAL_STORAGE_BACKEND`        | Backend de arquivos: `local` ou `gcs`     |
 | `MATERIAL_STORAGE_BUCKET`         | Bucket obrigatório para o backend GCS     |
