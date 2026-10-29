@@ -21,7 +21,10 @@ import { ActivityCollectionWorker } from "./corrections/worker.js";
 import { createDatabasePool } from "./database.js";
 import { ProductionClassroomAnnouncementSender } from "./notifications/classroom.js";
 import { NotificationRepository } from "./notifications/repository.js";
-import { NotificationDeliveryWorker } from "./notifications/worker.js";
+import {
+  NotificationDeliveryWorker,
+  notificationCycleFailure,
+} from "./notifications/worker.js";
 import { ConfiguredOpenAIAdapter } from "./openai/adapter.js";
 
 async function runWorkersOnce(): Promise<void> {
@@ -85,16 +88,22 @@ async function runWorkersOnce(): Promise<void> {
 
     await monitor.runCycle();
     await collectionWorker.runCycle();
-    await notificationWorker.runCycle();
+    const failure = notificationCycleFailure(
+      await notificationWorker.runCycle(),
+    );
+    if (failure) throw new NotificationCycleError(failure);
   } finally {
     await database.end();
     await loggerHost.close();
   }
 }
 
+class NotificationCycleError extends Error {}
+
 runWorkersOnce().catch((error: unknown) => {
   console.error(
-    error instanceof ConfigurationError
+    error instanceof ConfigurationError ||
+      error instanceof NotificationCycleError
       ? error.message
       : "Falha ao executar os workers operacionais.",
   );

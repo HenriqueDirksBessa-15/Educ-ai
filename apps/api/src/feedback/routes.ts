@@ -12,6 +12,7 @@ import {
   OpenAIPlanGenerationError,
   type OpenAIAdapter,
 } from "../openai/adapter.js";
+import { restoreStudentName } from "./pseudonym.js";
 import type { FeedbackRepository } from "./repository.js";
 
 export function registerFeedbackRoutes(
@@ -95,18 +96,26 @@ export function registerFeedbackRoutes(
     async (request, reply) => {
       const user = await identity(request, reply);
       if (!user) return;
-      const context = await dependencies.repository.getPromptContext(
+      const source = await dependencies.repository.getPromptContext(
         user.professorId,
         request.params.feedbackId,
       );
-      if (!context) return locked(reply);
+      if (!source) return locked(reply);
+      const { context } = source;
       try {
         const generated = await dependencies.adapter.generateFeedback(context);
         const result = await dependencies.repository.recordGenerationSuccess(
           user.professorId,
           request.params.feedbackId,
           context,
-          generated,
+          {
+            ...generated,
+            suggestion: restoreStudentName(
+              generated.suggestion,
+              context.audience,
+              source.studentName,
+            ),
+          },
         );
         if (!result) return locked(reply);
         return { data: result };

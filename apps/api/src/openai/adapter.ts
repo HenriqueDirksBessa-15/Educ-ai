@@ -701,6 +701,11 @@ function buildFeedbackPrompt(context: FeedbackPromptContext): string {
     `Nota: ${context.grade === null ? "não aplicável" : `${context.grade}/10`}`,
     `Comentário docente: ${context.teacherComment || "não informado"}`,
     `Evidências por questão: ${context.answerSummaries.join(" | ") || "não informadas"}`,
+    ...(context.scope === "individual"
+      ? [
+          `O destinatário é identificado só pelo código interno "${context.audience}". Não escreva esse código no texto; dirija-se ao estudante em segunda pessoa, sem nome.`,
+        ]
+      : []),
     "Produza pontos fortes, oportunidades de melhoria e uma mensagem sugerida. O professor revisará o texto antes do envio.",
   ].join("\n\n");
 }

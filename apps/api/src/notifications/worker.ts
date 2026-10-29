@@ -14,6 +14,25 @@ import type {
   NotificationRepository,
 } from "./repository.js";
 
+export type NotificationCycleSummary = {
+  status: "busy" | "completed" | "failed";
+  delivered: number;
+  failed: number;
+  // Entregas devolvidas à fila porque o canal está desativado (ex.: e-mail sem provedor).
+  skipped: number;
+};
+
+const EMAIL_PROVIDER_NOT_CONFIGURED = "EMAIL_PROVIDER_NOT_CONFIGURED";
+
+export function notificationCycleFailure(
+  summary: NotificationCycleSummary,
+): string | null {
+  if (summary.status === "failed") return "O ciclo de notificações falhou.";
+  if (summary.failed > 0 && summary.delivered === 0)
+    return `Todas as ${summary.failed} entregas de notificação falharam.`;
+  return null;
+}
+
 export class NotificationDeliveryWorker {
   private timer?: NodeJS.Timeout;
   private running = false;
@@ -47,27 +66,42 @@ export class NotificationDeliveryWorker {
     this.timer = undefined;
   }
 
-  async runCycle(): Promise<void> {
-    if (this.running) return;
+  async runCycle(): Promise<NotificationCycleSummary> {
+    const summary: NotificationCycleSummary = {
+      status: "busy",
+      delivered: 0,
+      failed: 0,
+      skipped: 0,
+    };
+    if (this.running) return summary;
     this.running = true;
+    const disabledChannels: NotificationDeliveryLease["channel"][] = [];
     try {
       await this.repository.prepareDeliveries();
       for (let processed = 0; processed < 100; processed += 1) {
         const lease = await this.repository.claimNext(
           this.options.maxAttempts,
           this.options.leaseSeconds,
+          disabledChannels,
         );
         if (!lease) break;
-        await this.deliver(lease);
+        const outcome = await this.deliver(lease);
+        summary[outcome] += 1;
+        if (outcome === "skipped") disabledChannels.push(lease.channel);
       }
+      summary.status = "completed";
     } catch (error) {
+      summary.status = "failed";
       this.logger.error({ err: error }, "notification delivery cycle failed");
     } finally {
       this.running = false;
     }
+    return summary;
   }
 
-  private async deliver(lease: NotificationDeliveryLease): Promise<void> {
+  private async deliver(
+    lease: NotificationDeliveryLease,
+  ): Promise<"delivered" | "failed" | "skipped"> {
     try {
       const externalMessageId =
         lease.channel === "email"
@@ -79,8 +113,25 @@ export class NotificationDeliveryWorker {
         lease.revision,
         externalMessageId,
       );
+      return "delivered";
     } catch (error) {
       const errorCode = normalizeDeliveryError(error);
+      if (
+        lease.channel === "email" &&
+        errorCode === EMAIL_PROVIDER_NOT_CONFIGURED
+      ) {
+        await this.repository.skip(
+          lease.deliveryId,
+          lease.notificationId,
+          lease.revision,
+          errorCode,
+        );
+        this.logger.warn(
+          { notificationId: lease.notificationId, errorCode },
+          "email channel disabled; delivery kept in queue",
+        );
+        return "skipped";
+      }
       const terminal = lease.attemptCount >= this.options.maxAttempts;
       const retrySeconds = Math.min(
         this.options.retryBaseSeconds * 2 ** (lease.attemptCount - 1),
@@ -109,6 +160,7 @@ export class NotificationDeliveryWorker {
         },
         "notification delivery failed",
       );
+      return "failed";
     }
   }
 

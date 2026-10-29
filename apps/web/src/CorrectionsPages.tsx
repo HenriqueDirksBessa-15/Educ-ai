@@ -497,10 +497,13 @@ function CorrectionForm({
         kind: "ok",
         text: "Sugestão da IA colocada nos campos. Confira antes de aprovar.",
       });
-    } catch {
+    } catch (error) {
       setFeedback({
         kind: "error",
-        text: errorMessage("OPENAI_CORRECTION_FAILED"),
+        text:
+          error instanceof ApiError && error.code === "VALIDATION_ERROR"
+            ? "A resposta está em branco ou é ambígua. Faça a correção manual."
+            : errorMessage("OPENAI_CORRECTION_FAILED"),
       });
     } finally {
       setBusy(false);

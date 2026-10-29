@@ -25,7 +25,8 @@ export class NotificationRepository {
     await this.database.query(
       `INSERT INTO notification_delivery
          (notification_id, revision, channel, recipient_key, recipient_email)
-       SELECT notification.id, notification.revision, 'email',
+       SELECT notification.id, notification.revision,
+              'email'::notification_channel,
               lower(student.email::text), student.email
        FROM notification_outbox notification
        JOIN student ON student.id = notification.student_id
@@ -39,7 +40,8 @@ export class NotificationRepository {
              AND existing.channel = 'email'
          )
        UNION ALL
-       SELECT notification.id, notification.revision, 'email',
+       SELECT notification.id, notification.revision,
+              'email'::notification_channel,
               lower(student.email::text), student.email
        FROM notification_outbox notification
        JOIN enrollment ON enrollment.class_group_id = notification.class_group_id
@@ -91,6 +93,7 @@ export class NotificationRepository {
   async claimNext(
     maxAttempts: number,
     leaseSeconds: number,
+    disabledChannels: NotificationDeliveryLease["channel"][] = [],
   ): Promise<NotificationDeliveryLease | null> {
     const result = (await this.database.query(
       `WITH candidate AS (
@@ -100,6 +103,7 @@ export class NotificationRepository {
           AND notification.revision = delivery.revision
           AND notification.channel = delivery.channel
          WHERE delivery.attempt_count < $1 AND delivery.available_at <= now()
+           AND NOT (delivery.channel = ANY($3::notification_channel[]))
            AND (delivery.status = 'failed' OR
              (delivery.status = 'pending' AND
               (delivery.lease_expires_at IS NULL OR delivery.lease_expires_at < now())))
@@ -131,7 +135,7 @@ export class NotificationRepository {
        FROM claimed
        JOIN notification_outbox notification ON notification.id = claimed.notification_id
        JOIN feedback ON feedback.id = notification.feedback_id`,
-      [maxAttempts, leaseSeconds],
+      [maxAttempts, leaseSeconds, disabledChannels],
     )) as QueryResult<Record<string, unknown>>;
     const row = result.rows[0];
     return row
@@ -176,10 +180,13 @@ export class NotificationRepository {
        FROM completed WHERE notification.id = completed.notification_id
          AND notification.revision = completed.revision
          AND NOT EXISTS (
+           -- O CTE e esta subconsulta leem o mesmo snapshot: a entrega recém-concluída
+           -- ainda aparece como 'pending' aqui, por isso fica fora da verificação.
            SELECT 1 FROM notification_delivery delivery
            WHERE delivery.notification_id = notification.id
              AND delivery.revision = notification.revision
              AND delivery.channel = notification.channel
+             AND delivery.id <> $1
              AND delivery.status <> 'sent'
          )`,
       [deliveryId, notificationId, revision, externalMessageId],
@@ -207,6 +214,28 @@ export class NotificationRepository {
        FROM failed WHERE notification.id = failed.notification_id
          AND notification.revision = failed.revision`,
       [deliveryId, notificationId, revision, errorCode, retrySeconds, terminal],
+    );
+  }
+
+  // Devolve a entrega à fila sem gastar tentativa: o canal está desativado,
+  // não falhou. Ela segue pendente até o canal ser configurado.
+  async skip(
+    deliveryId: string,
+    notificationId: string,
+    revision: number,
+    reasonCode: string,
+  ): Promise<void> {
+    await this.database.query(
+      `WITH skipped AS (
+         UPDATE notification_delivery SET status = 'pending', lease_expires_at = NULL,
+           attempt_count = greatest(attempt_count - 1, 0), last_error_code = $4
+         WHERE id = $1 AND notification_id = $2 AND revision = $3
+           AND status = 'pending' RETURNING notification_id, revision
+       )
+       UPDATE notification_outbox notification SET error_code = $4
+       FROM skipped WHERE notification.id = skipped.notification_id
+         AND notification.revision = skipped.revision`,
+      [deliveryId, notificationId, revision, reasonCode],
     );
   }
 

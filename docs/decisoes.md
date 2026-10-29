@@ -149,3 +149,4 @@
 | D-08 | Dia 12         | Fixar janela de edição de feedback                                           | Resolvida tecnicamente por DT-48: configurável, padrão provisório de 24 horas              |
 | D-09 | Dia 13         | Definir origem de presença, participação e responsáveis                      | Resolvida por DT-53: campos omitidos; envio usa e-mail institucional do aluno              |
 | D-10 | Dia 13         | Definir meio de envio de e-mail compatível com o escopo                      | Arquitetura resolvida por DT-54; provedor de produção permanece operacional                |
+| D-11 | Pós-QA         | Aluno por professor (migração): hoje `student` é global por e-mail           | Aberta; DEF-02 mitigado: cadastro manual não sobrescreve nome, Google segue fonte primária |

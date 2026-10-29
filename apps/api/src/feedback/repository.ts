@@ -12,6 +12,7 @@ import type {
   FeedbackGenerationResult,
   FeedbackPromptContext,
 } from "../openai/adapter.js";
+import { pseudonymizeFeedbackContext } from "./pseudonym.js";
 
 type QueryResult<Row> = { rows: Row[]; rowCount?: number | null };
 
@@ -202,13 +203,21 @@ export class FeedbackRepository {
     return "locked";
   }
 
+  // `context` já sai sem o nome do aluno e é o único dado enviado à OpenAI;
+  // `studentName` fica no servidor para restaurar o nome na sugestão.
   async getPromptContext(
     professorId: string,
     feedbackId: string,
-  ): Promise<FeedbackPromptContext | null> {
+  ): Promise<{
+    context: FeedbackPromptContext;
+    studentName: string | null;
+  } | null> {
     const result = (await this.database.query(
       `SELECT feedback.scope, feedback.title, feedback.content,
-              coalesce(student.name, class_group.name) AS audience,
+              CASE WHEN feedback.student_id IS NOT NULL
+                THEN 'aluno ' || left(feedback.student_id::text, 8)
+                ELSE class_group.name END AS audience,
+              student.name AS student_name,
               activity.title AS activity_title, submission.grade,
               submission.teacher_comment,
               coalesce((SELECT array_agg(
@@ -234,6 +243,7 @@ export class FeedbackRepository {
       title: string;
       content: string;
       audience: string;
+      student_name: string | null;
       activity_title: string | null;
       grade: string | number | null;
       teacher_comment: string | null;
@@ -242,14 +252,20 @@ export class FeedbackRepository {
     const row = result.rows[0];
     if (!row) return null;
     return {
-      scope: row.scope,
-      audience: row.audience,
-      title: row.title,
-      currentContent: row.content,
-      activityTitle: row.activity_title,
-      grade: row.grade === null ? null : Number(row.grade),
-      teacherComment: row.teacher_comment,
-      answerSummaries: row.answer_summaries,
+      context: pseudonymizeFeedbackContext(
+        {
+          scope: row.scope,
+          audience: row.audience,
+          title: row.title,
+          currentContent: row.content,
+          activityTitle: row.activity_title,
+          grade: row.grade === null ? null : Number(row.grade),
+          teacherComment: row.teacher_comment,
+          answerSummaries: row.answer_summaries,
+        },
+        row.student_name,
+      ),
+      studentName: row.student_name,
     };
   }
 

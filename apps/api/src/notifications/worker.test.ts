@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthRepository } from "../auth/repository.js";
-import type { TransactionalEmailSender } from "../bulletins/email.js";
+import {
+  BulletinEmailError,
+  type TransactionalEmailSender,
+} from "../bulletins/email.js";
 import type { ClassroomAnnouncementSender } from "./classroom.js";
 import type {
   NotificationDeliveryLease,
   NotificationRepository,
 } from "./repository.js";
-import { NotificationDeliveryWorker } from "./worker.js";
+import {
+  NotificationDeliveryWorker,
+  notificationCycleFailure,
+} from "./worker.js";
 
 const baseLease: NotificationDeliveryLease = {
   deliveryId: "delivery-1",
@@ -31,6 +37,7 @@ function build(lease: NotificationDeliveryLease) {
     claimNext: vi.fn().mockResolvedValueOnce(lease).mockResolvedValueOnce(null),
     complete: vi.fn(),
     fail: vi.fn(),
+    skip: vi.fn(),
     fallbackToEmail: vi.fn(),
   };
   const authRepository = {
@@ -160,5 +167,99 @@ describe("notification delivery worker", () => {
       1,
       "GOOGLE_SERVICE_UNAVAILABLE",
     );
+  });
+
+  it("summarizes delivered and failed items in the cycle", async () => {
+    const delivered = build(baseLease);
+    await expect(delivered.worker.runCycle()).resolves.toEqual({
+      status: "completed",
+      delivered: 1,
+      failed: 0,
+      skipped: 0,
+    });
+
+    const failing = build(baseLease);
+    failing.email.send.mockRejectedValue(new Error("EMAIL_UNAVAILABLE"));
+    await expect(failing.worker.runCycle()).resolves.toEqual({
+      status: "completed",
+      delivered: 0,
+      failed: 1,
+      skipped: 0,
+    });
+  });
+
+  it("keeps email deliveries queued while no email provider is configured", async () => {
+    const classroomLease = {
+      ...baseLease,
+      deliveryId: "delivery-2",
+      channel: "google_classroom" as const,
+      recipientEmail: null,
+      googleClassroomId: "course-1",
+    };
+    const { worker, repository, email, logger } = build(baseLease);
+    repository.claimNext
+      .mockReset()
+      .mockResolvedValueOnce(baseLease)
+      .mockResolvedValueOnce(classroomLease)
+      .mockResolvedValueOnce(null);
+    email.send.mockRejectedValue(
+      new BulletinEmailError("EMAIL_PROVIDER_NOT_CONFIGURED"),
+    );
+
+    const summary = await worker.runCycle();
+
+    expect(summary).toEqual({
+      status: "completed",
+      delivered: 1,
+      failed: 0,
+      skipped: 1,
+    });
+    expect(notificationCycleFailure(summary)).toBeNull();
+    expect(repository.skip).toHaveBeenCalledWith(
+      "delivery-1",
+      "notification-1",
+      1,
+      "EMAIL_PROVIDER_NOT_CONFIGURED",
+    );
+    expect(repository.fail).not.toHaveBeenCalled();
+    expect(repository.claimNext).toHaveBeenLastCalledWith(5, 300, ["email"]);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCode: "EMAIL_PROVIDER_NOT_CONFIGURED" }),
+      "email channel disabled; delivery kept in queue",
+    );
+  });
+
+  it("reports a broken cycle instead of hiding it", async () => {
+    const { worker, repository, logger } = build(baseLease);
+    repository.prepareDeliveries.mockRejectedValue(
+      new Error("column is of type notification_channel"),
+    );
+
+    await expect(worker.runCycle()).resolves.toMatchObject({
+      status: "failed",
+    });
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("fails the job only when the cycle breaks or every delivery fails", () => {
+    const base = { delivered: 0, failed: 0, skipped: 0 };
+    expect(notificationCycleFailure({ ...base, status: "failed" })).toBe(
+      "O ciclo de notificações falhou.",
+    );
+    expect(
+      notificationCycleFailure({ ...base, status: "completed", failed: 3 }),
+    ).toBe("Todas as 3 entregas de notificação falharam.");
+    expect(
+      notificationCycleFailure({
+        ...base,
+        status: "completed",
+        delivered: 1,
+        failed: 2,
+      }),
+    ).toBeNull();
+    expect(
+      notificationCycleFailure({ ...base, status: "completed", skipped: 4 }),
+    ).toBeNull();
+    expect(notificationCycleFailure({ ...base, status: "busy" })).toBeNull();
   });
 });

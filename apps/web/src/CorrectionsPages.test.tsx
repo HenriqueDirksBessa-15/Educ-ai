@@ -391,6 +391,31 @@ describe("correction queue", () => {
     ).toBe(false);
   });
 
+  it("asks for manual correction when the answer is blank or ambiguous", async () => {
+    mockApi({
+      ...queueRoutes([carla]),
+      "POST /submissions/s1/corrections/suggest": () => ({
+        status: 422,
+        body: { error: { code: "VALIDATION_ERROR", message: "x" } },
+      }),
+    });
+    withConfirm(<CorrectionQueuePage activityId={activityId} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Corrigir Carla Mendes" }),
+    );
+    const form = screen.getByRole("region", {
+      name: "Correção de Carla Mendes",
+    });
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Pedir sugestão à IA" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "A resposta está em branco ou é ambígua. Faça a correção manual.",
+    );
+  });
+
   it("explains when answers cannot be fetched yet", async () => {
     mockApi({
       [`GET /activities/${activityId}`]: { data: activity },

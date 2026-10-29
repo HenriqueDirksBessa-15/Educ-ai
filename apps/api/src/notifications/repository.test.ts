@@ -13,9 +13,11 @@ describe("notification delivery repository", () => {
     await repository.prepareDeliveries();
 
     expect(database.query).toHaveBeenCalledTimes(3);
-    expect(String(database.query.mock.calls[0]![0])).toContain(
+    const emailSql = String(database.query.mock.calls[0]![0]);
+    expect(emailSql).toContain(
       "ON CONFLICT (notification_id, revision, channel, recipient_key)",
     );
+    expect(emailSql.match(/'email'::notification_channel/g)).toHaveLength(2);
     expect(String(database.query.mock.calls[1]![0])).toContain(
       "google_classroom_id",
     );
@@ -34,7 +36,33 @@ describe("notification delivery repository", () => {
     const [sql, values] = database.query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("FOR UPDATE OF delivery SKIP LOCKED");
     expect(sql).toContain("lease_expires_at");
-    expect(values).toEqual([5, 300]);
+    expect(sql).toContain(
+      "NOT (delivery.channel = ANY($3::notification_channel[]))",
+    );
+    expect(values).toEqual([5, 300, []]);
+  });
+
+  it("returns a delivery of a disabled channel to the queue without spending an attempt", async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const repository = new NotificationRepository(
+      database as unknown as DatabaseClient,
+    );
+
+    await repository.skip(
+      "delivery-1",
+      "notification-1",
+      2,
+      "EMAIL_PROVIDER_NOT_CONFIGURED",
+    );
+    const [sql, values] = database.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("status = 'pending'");
+    expect(sql).toContain("attempt_count = greatest(attempt_count - 1, 0)");
+    expect(values).toEqual([
+      "delivery-1",
+      "notification-1",
+      2,
+      "EMAIL_PROVIDER_NOT_CONFIGURED",
+    ]);
   });
 
   it("switches a failed global Classroom intent to email fallback", async () => {

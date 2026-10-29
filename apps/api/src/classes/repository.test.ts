@@ -44,12 +44,13 @@ describe("classes repository boundaries", () => {
       expect.stringContaining("ON CONFLICT (class_group_id, student_id)"),
       expect.any(Array),
     );
-    expect(database.query).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "student.origin = 'google' AND EXCLUDED.origin <> 'google'",
-      ),
-      expect.any(Array),
+    const studentSql = String(database.query.mock.calls[1]![0]);
+    expect(studentSql).toContain("ON CONFLICT (email) DO UPDATE SET");
+    expect(studentSql).toContain(
+      "WHEN EXCLUDED.origin = 'google' THEN EXCLUDED.name",
     );
+    expect(studentSql).toContain("ELSE student.name");
+    expect(studentSql).toContain("ELSE student.origin");
   });
 
   it("keeps Google course identity scoped to each professor", async () => {

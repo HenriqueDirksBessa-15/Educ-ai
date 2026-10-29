@@ -161,8 +161,8 @@ export class DiscursiveCorrectionsRepository {
          (submission_id, answer_id, version, action, origin, model,
           error_code, prompt_context, snapshot)
        SELECT updated.id, $3, next_version.value, 'ai_failure',
-              $4::correction_history_origin, $5, $6, $7::jsonb,
-              jsonb_build_object('errorCode', $6)
+              $4::correction_history_origin, $5, $6::text, $7::jsonb,
+              jsonb_build_object('errorCode', $6::text)
        FROM updated CROSS JOIN next_version`,
       [
         professorId,

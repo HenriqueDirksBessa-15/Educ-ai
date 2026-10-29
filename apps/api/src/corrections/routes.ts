@@ -65,6 +65,17 @@ export function registerCorrectionRoutes(
           dependencies.config.openai.model,
           dependencies.adapter.isFixture ? "fixture" : "openai",
         );
+        if (
+          errorCode === "DISCURSIVE_ANSWER_EMPTY" ||
+          errorCode === "DISCURSIVE_ANSWER_AMBIGUOUS"
+        )
+          return reply.code(422).send({
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "A resposta está em branco ou é ambígua. Faça a correção manual.",
+            },
+          });
         return reply.code(503).send({
           error: {
             code: "INTEGRATION_UNAVAILABLE",

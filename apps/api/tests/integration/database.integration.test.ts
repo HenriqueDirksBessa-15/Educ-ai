@@ -232,6 +232,84 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(await repository.getDetail(professorB, classId)).toBeNull();
   }, 60_000);
 
+  it("keeps a student's name when another professor enrolls the same email", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Aluno A'), ($3, $4, 'Professor Aluno B')
+       RETURNING id`,
+      [
+        `student-a-${randomUUID()}`,
+        `student-a-${randomUUID()}@example.invalid`,
+        `student-b-${randomUUID()}`,
+        `student-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const professorA = professors.rows[0]!.id;
+    const professorB = professors.rows[1]!.id;
+    const repository = new ClassesRepository(testPool);
+    const classA = await repository.create(professorA, {
+      name: "Turma do aluno A",
+      schoolYear: "6º ano EF",
+      localAccessCode: `aluno-a-${randomUUID().slice(0, 8)}`,
+    });
+    const classB = await repository.create(professorB, {
+      name: "Turma do aluno B",
+      schoolYear: "6º ano EF",
+      localAccessCode: `aluno-b-${randomUUID().slice(0, 8)}`,
+    });
+    const email = `shared-${randomUUID()}@example.invalid`;
+
+    await repository.enrollStudent(professorA, classA, {
+      name: "Aluno Original",
+      email,
+      origin: "spreadsheet",
+    });
+    await repository.enrollStudent(professorB, classB, {
+      name: "Nome Trocado",
+      email,
+      origin: "access_code",
+    });
+
+    const studentA = (
+      await repository.getDetail(professorA, classA)
+    )?.students.find((student) => student.email === email);
+    expect(studentA).toMatchObject({
+      name: "Aluno Original",
+      origin: "spreadsheet",
+    });
+
+    // O Google continua sendo a fonte primária: a sincronização atualiza nome e origem.
+    expect(
+      await repository.linkGoogleCourse(professorA, classA, "course-shared"),
+    ).toBe(true);
+    expect(
+      await repository.syncGoogleStudents(professorA, classA, [
+        {
+          googleSubject: `google-${randomUUID()}`,
+          name: "Nome do Google",
+          email,
+        },
+      ]),
+    ).toBe(1);
+    const synced = await testPool.query<{ name: string; origin: string }>(
+      "SELECT name, origin FROM student WHERE email = $1",
+      [email],
+    );
+    expect(synced.rows).toEqual([{ name: "Nome do Google", origin: "google" }]);
+    await repository.enrollStudent(professorB, classB, {
+      name: "Outro Nome Manual",
+      email,
+      origin: "spreadsheet",
+    });
+    const afterManual = await testPool.query<{ name: string; origin: string }>(
+      "SELECT name, origin FROM student WHERE email = $1",
+      [email],
+    );
+    expect(afterManual.rows).toEqual([
+      { name: "Nome do Google", origin: "google" },
+    ]);
+  }, 60_000);
+
   it("creates materials atomically and isolates links and files by professor", async () => {
     const professors = await testPool.query<{ id: string }>(
       `INSERT INTO professor (google_subject, email, display_name)
@@ -816,6 +894,38 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       criteria: "Justificativa coerente.",
       maxPoints: 3,
     });
+    const failureClient = await testPool.connect();
+    try {
+      await failureClient.query("BEGIN");
+      await new DiscursiveCorrectionsRepository(failureClient).recordFailure(
+        professorId,
+        context!,
+        "OPENAI_API_KEY_INVALID",
+        "gpt-5-mini",
+        "openai",
+      );
+      const failure = await failureClient.query<{
+        error_code: string;
+        snapshot: { errorCode: string };
+        correction_status: string;
+      }>(
+        `SELECT history.error_code, history.snapshot, submission.correction_status
+         FROM activity_correction_history history
+         JOIN activity_submission submission ON submission.id = history.submission_id
+         WHERE history.submission_id = $1 AND history.action = 'ai_failure'`,
+        [submission.id],
+      );
+      expect(failure.rows).toEqual([
+        {
+          error_code: "OPENAI_API_KEY_INVALID",
+          snapshot: { errorCode: "OPENAI_API_KEY_INVALID" },
+          correction_status: "manual_required",
+        },
+      ]);
+    } finally {
+      await failureClient.query("ROLLBACK");
+      failureClient.release();
+    }
     expect(
       await discursiveRepository.recordSuggestion(professorId, context!, {
         model: "fixture-discursive-correction-v1",
@@ -898,33 +1008,51 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         1_440,
       ),
     ).rejects.toThrow("FEEDBACK_TARGET_NOT_FOUND");
+    const feedbackStudent = await testPool.query<{
+      name: string;
+      email: string;
+    }>(
+      `SELECT student.name, student.email::text
+       FROM activity_submission submission
+       JOIN student ON student.id = submission.student_id
+       WHERE submission.id = $1`,
+      [submission.id],
+    );
+    const studentName = feedbackStudent.rows[0]!.name;
     const feedbackId = await feedbacks.create(
       professorId,
       {
         scope: "individual",
         submissionId: submission.id,
-        title: "Retorno da atividade",
-        content: "Revise o resultado e a justificativa.",
+        title: `Retorno da atividade de ${studentName}`,
+        content: `${studentName}, revise o resultado e a justificativa.`,
         teacherObservation: "Mensagem inicial.",
         links: [{ label: "Apoio", url: "https://example.test/apoio" }],
         materialIds: [],
       },
       1_440,
     );
-    const feedbackContext = await feedbacks.getPromptContext(
+    const promptSource = await feedbacks.getPromptContext(
       professorId,
       feedbackId,
     );
+    const feedbackContext = promptSource!.context;
+    expect(promptSource!.studentName).toBe(studentName);
     expect(feedbackContext).toMatchObject({
       scope: "individual",
-      audience: expect.any(String),
+      audience: expect.stringMatching(/^aluno [0-9a-f]{8}$/),
+      title: `Retorno da atividade de ${feedbackContext.audience}`,
+      currentContent: `${feedbackContext.audience}, revise o resultado e a justificativa.`,
       activityTitle: "Atividade mista de frações",
       grade: 8,
     });
+    const serializedContext = JSON.stringify(feedbackContext);
+    expect(serializedContext).not.toContain(studentName);
+    expect(serializedContext).not.toContain(feedbackStudent.rows[0]!.email);
     const feedbackGeneration = await feedbacks.recordGenerationSuccess(
       professorId,
       feedbackId,
-      feedbackContext!,
+      feedbackContext,
       {
         model: "fixture-feedback-v1",
         origin: "fixture",
@@ -1013,11 +1141,13 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       isFixture: false,
       send: vi.fn().mockResolvedValue(undefined),
     };
+    const announcementSender = new FixtureClassroomAnnouncementSender();
+    const announce = vi.spyOn(announcementSender, "ensureAnnouncement");
     const notificationWorker = new NotificationDeliveryWorker(
       new NotificationRepository(testPool),
       collectionAuth as unknown as AuthRepository,
       notificationEmailSender,
-      new FixtureClassroomAnnouncementSender(),
+      announcementSender,
       {
         intervalMs: 30_000,
         maxAttempts: 5,
@@ -1026,21 +1156,37 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       },
       { error: vi.fn(), warn: vi.fn() } as never,
     );
-    await notificationWorker.runCycle();
-    expect(notificationEmailSender.send).toHaveBeenCalledTimes(2);
+    await expect(notificationWorker.runCycle()).resolves.toEqual({
+      status: "completed",
+      delivered: 2,
+      failed: 0,
+      skipped: 0,
+    });
+    // O feedback individual sai por e-mail; o aviso global vira anúncio no Classroom.
+    expect(notificationEmailSender.send).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ courseId: expect.any(String) }),
+    );
     const completedNotifications = await testPool.query<{
+      recipient_kind: string;
       status: string;
       channel: string;
     }>(
-      `SELECT notification.status, notification.channel
+      `SELECT notification.recipient_kind, notification.status, notification.channel
        FROM notification_outbox notification
        WHERE notification.feedback_id = ANY($1::uuid[])
-       ORDER BY notification.feedback_id`,
+       ORDER BY notification.recipient_kind::text`,
       [[feedbackId, globalFeedbackId]],
     );
     expect(completedNotifications.rows).toEqual([
-      { status: "sent", channel: "email" },
-      { status: "sent", channel: "email" },
+      {
+        recipient_kind: "class_group",
+        status: "sent",
+        channel: "google_classroom",
+      },
+      { recipient_kind: "student", status: "sent", channel: "email" },
     ]);
     const notificationDeliveries = await testPool.query<{ count: string }>(
       `SELECT count(*) FROM notification_delivery

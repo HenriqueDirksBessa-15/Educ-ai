@@ -189,14 +189,13 @@ export class ClassesRepository {
        VALUES ($1, $2, $3)
        ON CONFLICT (email) DO UPDATE SET
          name = CASE
-           WHEN student.origin = 'google' AND EXCLUDED.origin <> 'google'
-             THEN student.name
-           ELSE EXCLUDED.name
+           WHEN EXCLUDED.origin = 'google' THEN EXCLUDED.name
+           ELSE student.name
          END,
          origin = CASE
-           WHEN student.origin = 'google' OR EXCLUDED.origin = 'google'
+           WHEN EXCLUDED.origin = 'google' OR student.origin = 'google'
              THEN 'google'::record_origin
-           ELSE EXCLUDED.origin
+           ELSE student.origin
          END
        RETURNING id`,
       [input.name, input.email, input.origin],

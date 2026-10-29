@@ -343,6 +343,56 @@ describe("OpenAI adapter boundary", () => {
     });
   });
 
+  it("tells the model not to write the student's internal identifier", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    strengths: ["Boa leitura."],
+                    improvements: ["Revisar contas."],
+                    message: "Continue assim.",
+                  }),
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new ConfiguredOpenAIAdapter(
+      {
+        apiKey: "fixture-key",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-5-mini",
+      },
+      fetcher as typeof fetch,
+    );
+
+    await adapter.generateFeedback({
+      scope: "individual",
+      audience: "aluno 1a2b3c4d",
+      title: "Retorno",
+      currentContent: "Rascunho.",
+      activityTitle: null,
+      grade: null,
+      teacherComment: null,
+      answerSummaries: [],
+    });
+
+    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
+      input: Array<{ content: string }>;
+    };
+    expect(body.input[1]?.content).toContain(
+      'identificado só pelo código interno "aluno 1a2b3c4d". Não escreva esse código no texto',
+    );
+  });
+
   it("uses structured output for feedback generation", async () => {
     const suggestion = {
       strengths: ["Boa compreensão conceitual."],
