@@ -45,6 +45,7 @@ function dependencies(credential: unknown) {
     enrollStudent: vi.fn(),
     joinByCode: vi.fn(),
     setEmailDomain: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
   };
   const classroomAdapter = {
     isFixture: false,
@@ -150,6 +151,53 @@ describe("class and student removal routes", () => {
       studentId,
       "restricted",
     );
+  });
+});
+
+describe("class search route", () => {
+  const headers = { cookie: "educai_session=session-token" };
+
+  it("passes search and filters to the repository and rejects unknown status", async () => {
+    const input = dependencies(null);
+    const app = await build(input);
+
+    const filtered = await app.inject({
+      method: "GET",
+      url: "/api/classes?q=%207%C2%BA%20&status=all&component=Matem%C3%A1tica&schoolYear=ef-ano-07",
+      headers,
+    });
+    const legacy = await app.inject({
+      method: "GET",
+      url: "/api/classes?archived=true",
+      headers,
+    });
+    const invalid = await app.inject({
+      method: "GET",
+      url: "/api/classes?status=deleted",
+      headers,
+    });
+
+    expect(filtered.statusCode).toBe(200);
+    expect(legacy.statusCode).toBe(200);
+    expect(input.classesRepository.list).toHaveBeenNthCalledWith(
+      1,
+      professorId,
+      {
+        q: "7º",
+        status: "all",
+        component: "Matemática",
+        schoolYear: "ef-ano-07",
+      },
+    );
+    expect(input.classesRepository.list).toHaveBeenNthCalledWith(
+      2,
+      professorId,
+      {
+        q: undefined,
+        status: "archived",
+      },
+    );
+    expect(invalid.statusCode).toBe(400);
   });
 });
 

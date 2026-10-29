@@ -48,6 +48,20 @@ function classYearText(schoolYear: string): string {
 
 /* ----------------------------- Class list ----------------------------- */
 
+type Filters = {
+  q: string;
+  status: "active" | "archived" | "all";
+  component: string;
+  schoolYear: string;
+};
+
+const noFilters: Filters = {
+  q: "",
+  status: "active",
+  component: "",
+  schoolYear: "",
+};
+
 export function ClassListPage({
   classes,
   reload,
@@ -58,25 +72,51 @@ export function ClassListPage({
   const [details, setDetails] = useState<Record<string, ClassDetail>>({});
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
-  const [archived, setArchived] = useState<ClassSummary[] | null>(null);
+  const [filters, setFilters] = useState(noFilters);
+  const [found, setFound] = useState<ClassSummary[] | null>(null);
+  const filtering = Object.entries(filters).some(
+    ([key, value]) => value !== noFilters[key as keyof Filters],
+  );
+  const shown = filtering ? (found ?? []) : classes;
 
-  const toggleArchived = async () => {
-    if (archived) {
-      setArchived(null);
+  // The API filters; the subject and year options come from the classes
+  // already read, so the teacher only sees values that exist.
+  useEffect(() => {
+    if (!filtering) {
+      setFound(null);
       return;
     }
-    try {
-      setArchived(await request<ClassSummary[]>("/classes?archived=true"));
-    } catch (error) {
-      setFeedback({ kind: "error", text: (error as Error).message });
-    }
-  };
+    let active = true;
+    const query = new URLSearchParams({ status: filters.status });
+    if (filters.q.trim()) query.set("q", filters.q.trim());
+    if (filters.component) query.set("component", filters.component);
+    if (filters.schoolYear) query.set("schoolYear", filters.schoolYear);
+    const timer = setTimeout(() => {
+      request<ClassSummary[]>(`/classes?${query}`).then(
+        (result) => active && setFound(result),
+        (error: Error) =>
+          active && setFeedback({ kind: "error", text: error.message }),
+      );
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [filters, filtering]);
+
+  const options = Object.values(details).flatMap((detail) =>
+    detail.curriculum ? [detail.curriculum] : [],
+  );
+  const components = [
+    ...new Set(options.flatMap((item) => item.curricularComponents)),
+  ].sort();
+  const years = [...new Set(options.map((item) => item.schoolYear))].sort();
 
   useEffect(() => {
     let active = true;
     // Each class is read on its own; one failure only hides that subject.
     void Promise.all(
-      classes.slice(0, 30).map((group) =>
+      shown.slice(0, 30).map((group) =>
         request<ClassDetail>(`/classes/${group.id}`).then(
           (detail) => [group.id, detail] as const,
           () => null,
@@ -84,18 +124,21 @@ export function ClassListPage({
       ),
     ).then((entries) => {
       if (!active) return;
-      setDetails(
-        Object.fromEntries(
+      // Merged, so the subject and year options survive while filtering.
+      setDetails((current) => ({
+        ...current,
+        ...Object.fromEntries(
           entries.filter((entry): entry is NonNullable<typeof entry> =>
             Boolean(entry),
           ),
         ),
-      );
+      }));
     });
     return () => {
       active = false;
     };
-  }, [classes]);
+    // `shown` changes identity on every render; its ids are what matter.
+  }, [shown.map((group) => group.id).join()]);
 
   const syncFromGoogle = async () => {
     setBusy(true);
@@ -133,14 +176,91 @@ export function ClassListPage({
         </a>
       </div>
       <FeedbackMessage value={feedback} />
-      {classes.length === 0 ? (
+      <form
+        className="filter-bar"
+        role="search"
+        aria-label="Buscar turmas"
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <label>
+          <span>Buscar por nome ou código</span>
+          <input
+            type="search"
+            value={filters.q}
+            onChange={(event) =>
+              setFilters({ ...filters, q: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          <span>Situação</span>
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              setFilters({
+                ...filters,
+                status: event.target.value as Filters["status"],
+              })
+            }
+          >
+            <option value="active">Ativas</option>
+            <option value="archived">Arquivadas</option>
+            <option value="all">Todas</option>
+          </select>
+        </label>
+        <label>
+          <span>Disciplina</span>
+          <select
+            value={filters.component}
+            onChange={(event) =>
+              setFilters({ ...filters, component: event.target.value })
+            }
+          >
+            <option value="">Todas</option>
+            {components.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Ano</span>
+          <select
+            value={filters.schoolYear}
+            onChange={(event) =>
+              setFilters({ ...filters, schoolYear: event.target.value })
+            }
+          >
+            <option value="">Todos</option>
+            {years.map((item) => (
+              <option key={item} value={item}>
+                {schoolYearLabel(item)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {filtering && (
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => setFilters(noFilters)}
+          >
+            Limpar filtros
+          </button>
+        )}
+      </form>
+      {filtering && found === null ? (
+        <p className="empty-state">Buscando turmas…</p>
+      ) : shown.length === 0 ? (
         <p className="empty-state">
-          Você ainda não tem turmas. Traga suas turmas do Google Sala de Aula ou
-          crie uma no EDUC.AI.
+          {filtering
+            ? "Nenhuma turma encontrada com esses filtros."
+            : "Você ainda não tem turmas. Traga suas turmas do Google Sala de Aula ou crie uma no EDUC.AI."}
         </p>
       ) : (
         <ul className="card-list">
-          {classes.map((group) => {
+          {shown.map((group) => {
             const curriculum = details[group.id]?.curriculum;
             const subject = curriculum?.curricularComponents[0];
             return (
@@ -150,6 +270,7 @@ export function ClassListPage({
                   <span className="muted-line">
                     {classSourceLabel(group.source)}
                   </span>
+                  {group.archivedAt && <span className="tag">Arquivada</span>}
                   {details[group.id] &&
                     (subject && curriculum ? (
                       <span className="tag">
@@ -170,34 +291,6 @@ export function ClassListPage({
           })}
         </ul>
       )}
-      <button
-        type="button"
-        className="secondary-action"
-        onClick={() => void toggleArchived()}
-      >
-        {archived ? "Esconder turmas arquivadas" : "Ver turmas arquivadas"}
-      </button>
-      {archived &&
-        (archived.length === 0 ? (
-          <p className="empty-state">Nenhuma turma arquivada.</p>
-        ) : (
-          <ul className="card-list" aria-label="Turmas arquivadas">
-            {archived.map((group) => (
-              <li key={group.id} className="card-row">
-                <div>
-                  <strong className="card-title">{group.name}</strong>
-                  <span className="tag">Arquivada</span>
-                </div>
-                <a
-                  className="secondary-action"
-                  href={routeHref("turmas", group.id)}
-                >
-                  Abrir {group.name}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ))}
     </>
   );
 }

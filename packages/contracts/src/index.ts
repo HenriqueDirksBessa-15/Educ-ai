@@ -146,6 +146,15 @@ export const enrollmentStatusUpdateSchema = z.object({
   status: z.enum(["active", "restricted"]),
 });
 
+export const classListQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  status: z.enum(["active", "archived", "all"]).optional(),
+  component: z.string().trim().min(1).max(100).optional(),
+  schoolYear: z.string().trim().min(1).max(20).optional(),
+  // Atalho antigo para status=archived.
+  archived: z.enum(["true", "false"]).optional(),
+});
+
 export const classCreateSchema = z.object({
   name: z.string().trim().min(1).max(100),
   description: z.string().trim().max(500).nullable().optional(),
@@ -1103,6 +1112,7 @@ export type CurriculumSearchResponse = z.infer<
 export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 export type ClassRemoval = z.infer<typeof classRemovalSchema>;
+export type ClassListQuery = z.infer<typeof classListQuerySchema>;
 export type StudentJoin = z.infer<typeof studentJoinSchema>;
 export type StudentJoinResult = z.infer<typeof studentJoinResultSchema>;
 export type StudentImportRow = z.infer<typeof studentImportRowSchema>;

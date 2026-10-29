@@ -16,12 +16,32 @@ describe("classes repository boundaries", () => {
     );
 
     expect(database.query).toHaveBeenCalledWith(
-      expect.stringContaining("WHERE professor_id = $1"),
-      [professorA, false],
+      expect.stringContaining("WHERE class_group.professor_id = $1"),
+      [professorA, "active", null, null, null],
     );
-    expect(database.query).not.toHaveBeenCalledWith(expect.any(String), [
-      professorB,
-      false,
+    expect(database.query.mock.calls[0]![1]).not.toContain(professorB);
+  });
+
+  it("searches by name or code with wildcards escaped", async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    await new ClassesRepository(database as unknown as DatabaseClient).list(
+      professorA,
+      {
+        q: "7%_A",
+        status: "all",
+        component: "Matemática",
+        schoolYear: "ef-ano-07",
+      },
+    );
+
+    const [sql, values] = database.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("local_access_code::text ILIKE $3");
+    expect(values).toEqual([
+      professorA,
+      "all",
+      "%7\\%\\_A%",
+      "Matemática",
+      "ef-ano-07",
     ]);
   });
 

@@ -3,6 +3,7 @@ import type {
   ClassCurriculumInput,
   ClassCreate,
   ClassDetail,
+  ClassListQuery,
   ClassRemoval,
   ClassSummary,
   ClassUpdate,
@@ -79,13 +80,43 @@ export type GoogleCourseContext = {
 export class ClassesRepository {
   constructor(private readonly database: DatabaseClient) {}
 
-  async list(professorId: string, archived = false): Promise<ClassSummary[]> {
+  // Busca por nome ou código e filtros por status, disciplina e ano (o ano
+  // do perfil curricular vale sobre o texto livre da turma).
+  async list(
+    professorId: string,
+    filters: Pick<
+      ClassListQuery,
+      "q" | "status" | "component" | "schoolYear"
+    > = {},
+  ): Promise<ClassSummary[]> {
+    const search = filters.q
+      ? `%${filters.q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`
+      : null;
     const result = (await this.database.query(
-      `SELECT id, name, description, school_year, origin, archived_at
-       FROM class_group WHERE professor_id = $1
-         AND (archived_at IS NOT NULL) = $2
-       ORDER BY name, id`,
-      [professorId, archived],
+      `SELECT class_group.id, class_group.name, class_group.description,
+              class_group.school_year, class_group.origin, class_group.archived_at
+       FROM class_group
+       LEFT JOIN class_curriculum_profile profile
+         ON profile.class_group_id = class_group.id
+       WHERE class_group.professor_id = $1
+         AND ($2 = 'all' OR (class_group.archived_at IS NOT NULL) = ($2 = 'archived'))
+         AND ($3::text IS NULL OR class_group.name ILIKE $3
+           OR (class_group.origin = 'local'
+             AND class_group.local_access_code::text ILIKE $3))
+         AND ($4::text IS NULL OR EXISTS (
+           SELECT 1 FROM class_curriculum_component component
+           WHERE component.class_group_id = class_group.id
+             AND component.curricular_component = $4))
+         AND ($5::text IS NULL
+           OR coalesce(profile.school_year, class_group.school_year) = $5)
+       ORDER BY class_group.name, class_group.id`,
+      [
+        professorId,
+        filters.status ?? "active",
+        search,
+        filters.component ?? null,
+        filters.schoolYear ?? null,
+      ],
     )) as QueryResult<ClassRow>;
     return result.rows.map((row) => this.toSummary(row));
   }

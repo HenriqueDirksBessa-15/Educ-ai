@@ -383,7 +383,9 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       (await classes.list(professorA)).some((item) => item.id === planClass),
     ).toBe(false);
     expect(
-      (await classes.list(professorA, true)).map((item) => item.id),
+      (await classes.list(professorA, { status: "archived" })).map(
+        (item) => item.id,
+      ),
     ).toContain(planClass);
     expect(await classes.setArchived(professorA, planClass, false)).toBe(true);
     expect(
@@ -714,6 +716,87 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         email: `x-${randomUUID()}@gmail.com`,
       }),
     ).toBeNull();
+  }, 60_000);
+
+  it("searches classes by name or code and filters by status, subject and year", async () => {
+    const professors = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Busca A'), ($3, $4, 'Professor Busca B')
+       RETURNING id`,
+      [
+        `search-a-${randomUUID()}`,
+        `search-a-${randomUUID()}@example.invalid`,
+        `search-b-${randomUUID()}`,
+        `search-b-${randomUUID()}@example.invalid`,
+      ],
+    );
+    const [professorA, professorB] = professors.rows.map((row) => row.id);
+    const classes = new ClassesRepository(testPool);
+    const tag = randomUUID().slice(0, 6);
+    const create = async (
+      professorId: string,
+      name: string,
+      code: string,
+      year: string,
+      component: string,
+    ) => {
+      const id = await classes.create(professorId, {
+        name,
+        schoolYear: "texto livre",
+        localAccessCode: code,
+      });
+      await classes.setCurriculumProfile(professorId, id, {
+        educationStage: "elementary_2",
+        schoolYear: year,
+        curricularComponents: [component],
+      });
+      return id;
+    };
+    const math7 = await create(
+      professorA!,
+      `7º A ${tag}`,
+      `MAT7-${tag}`,
+      "ef-ano-07",
+      "Matemática",
+    );
+    const science7 = await create(
+      professorA!,
+      `7º B ${tag}`,
+      `CIE7-${tag}`,
+      "ef-ano-07",
+      "Ciências",
+    );
+    const math8 = await create(
+      professorA!,
+      `8º A ${tag}`,
+      `MAT8-${tag}`,
+      "ef-ano-08",
+      "Matemática",
+    );
+    await create(
+      professorB!,
+      `7º A ${tag} do B`,
+      `OUTRO-${tag}`,
+      "ef-ano-07",
+      "Matemática",
+    );
+    await classes.setArchived(professorA!, math8, true);
+    const ids = async (filters: Parameters<ClassesRepository["list"]>[1]) =>
+      (await classes.list(professorA!, filters)).map((item) => item.id).sort();
+
+    expect(await ids({ q: tag })).toEqual([math7, science7].sort());
+    expect(await ids({ q: `cie7-${tag}` })).toEqual([science7]);
+    expect(await ids({ q: tag, status: "all" })).toEqual(
+      [math7, science7, math8].sort(),
+    );
+    expect(await ids({ q: tag, status: "archived" })).toEqual([math8]);
+    expect(
+      await ids({ q: tag, status: "all", component: "Matemática" }),
+    ).toEqual([math7, math8].sort());
+    expect(await ids({ q: tag, schoolYear: "ef-ano-07" })).toEqual(
+      [math7, science7].sort(),
+    );
+    expect(await ids({ q: "%" })).toEqual([]);
   }, 60_000);
 
   it("creates materials atomically and isolates links and files by professor", async () => {

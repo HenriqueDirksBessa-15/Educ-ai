@@ -152,6 +152,69 @@ describe("class list", () => {
     ).toHaveAttribute("href", "#/nova-turma");
   });
 
+  it("searches by name or code and filters by status, subject and year", async () => {
+    const archivedClass = {
+      ...summaries[1]!,
+      id: "11111111-1111-4111-8111-111111111113",
+      name: "Turma antiga",
+      archivedAt: "2026-10-01T12:00:00.000Z",
+    };
+    const fetchMock = mockApi({
+      [`GET /classes/${googleId}`]: {
+        data: detail(googleId, {
+          curriculum: {
+            educationStage: "elementary_2",
+            schoolYear: "ef-ano-07",
+            curricularComponents: ["Matemática"],
+          },
+        }),
+      },
+      [`GET /classes/${localId}`]: { data: detail(localId) },
+      [`GET /classes/${archivedClass.id}`]: {
+        data: { ...detail(localId), ...archivedClass },
+      },
+      "GET /classes": () => ({ data: [archivedClass] }),
+    });
+    const queries = () =>
+      fetchMock.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes("/classes?"))
+        .map((url) =>
+          Object.fromEntries(new URL(url, "http://x").searchParams),
+        );
+    renderWithConfirm(<ClassListPage classes={summaries} reload={vi.fn()} />);
+
+    await screen.findByText("Matemática · 7º ano");
+    fireEvent.change(screen.getByLabelText("Situação"), {
+      target: { value: "archived" },
+    });
+    const row = (await screen.findByText("Turma antiga")).closest("li")!;
+    expect(within(row).getByText("Arquivada")).toBeInTheDocument();
+    expect(screen.queryByText("7º ano B")).not.toBeInTheDocument();
+    expect(queries().at(-1)).toEqual({ status: "archived" });
+
+    fireEvent.change(screen.getByLabelText("Buscar por nome ou código"), {
+      target: { value: "antiga" },
+    });
+    fireEvent.change(screen.getByLabelText("Disciplina"), {
+      target: { value: "Matemática" },
+    });
+    fireEvent.change(screen.getByLabelText("Ano"), {
+      target: { value: "ef-ano-07" },
+    });
+    await waitFor(() =>
+      expect(queries().at(-1)).toEqual({
+        status: "archived",
+        q: "antiga",
+        component: "Matemática",
+        schoolYear: "ef-ano-07",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(await screen.findByText("7º ano B")).toBeInTheDocument();
+  });
+
   it("brings classes from Google and reports how many", async () => {
     const reload = vi.fn().mockResolvedValue(undefined);
     mockApi({

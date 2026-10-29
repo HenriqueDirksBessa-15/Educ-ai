@@ -35,6 +35,11 @@ Atualizado em 29/10/2026.
   professor aceita, restringe ou exclui localmente na lista de alunos.
   Migração 029: `class_group.allowed_email_domain`; sem valor, vale o
   domínio do e-mail do professor. Repetir a entrada não muda a situação.
+- **DEF-26 (RF006).** `GET /api/classes` aceita `q` (nome ou código da turma
+  local, com curingas escapados), `status` (ativas, arquivadas, todas),
+  `component` e `schoolYear` (ano do perfil curricular). A lista de turmas
+  ganhou busca e filtros; as opções de disciplina e ano vêm das turmas já
+  lidas. O filtro de situação substitui o botão de turmas arquivadas.
 
 ## Correção do salvamento curricular em produção
 

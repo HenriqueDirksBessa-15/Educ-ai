@@ -2,6 +2,7 @@ import {
   classCurriculumInputSchema,
   classCreateSchema,
   classEmailDomainSchema,
+  classListQuerySchema,
   classUpdateSchema,
   enrollmentStatusUpdateSchema,
   studentEnrollmentInputSchema,
@@ -92,19 +93,20 @@ export function registerClassesRoutes(
       throw error;
     }
   });
-  app.get<{ Querystring: { archived?: string } }>(
-    "/api/classes",
-    async (request, reply) => {
-      const identity = await owner(request, reply);
-      if (!identity) return;
-      return {
-        data: await dependencies.classesRepository.list(
-          identity.professorId,
-          request.query.archived === "true",
-        ),
-      };
-    },
-  );
+  app.get<{ Querystring: unknown }>("/api/classes", async (request, reply) => {
+    const identity = await owner(request, reply);
+    if (!identity) return;
+    const parsed = classListQuerySchema.safeParse(request.query);
+    if (!parsed.success) return validationError(reply);
+    const { archived, ...filters } = parsed.data;
+    return {
+      data: await dependencies.classesRepository.list(identity.professorId, {
+        ...filters,
+        q: filters.q || undefined,
+        status: filters.status ?? (archived === "true" ? "archived" : "active"),
+      }),
+    };
+  });
 
   app.get<{ Params: { classId: string } }>(
     "/api/classes/:classId/removal",
