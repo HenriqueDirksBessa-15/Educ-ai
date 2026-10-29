@@ -32,7 +32,7 @@ export function enrollmentStatusLabel(
   return {
     active: "Ativo",
     restricted: "Restrito",
-    pending: "Aguardando confirmação",
+    pending: "Pendente de validação",
   }[status];
 }
 

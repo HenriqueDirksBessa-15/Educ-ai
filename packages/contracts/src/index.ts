@@ -251,6 +251,32 @@ export const classDetailSchema = classSummarySchema.extend({
   lastSyncedAt: z.iso.datetime().nullable(),
   students: z.array(enrolledStudentSchema),
   curriculum: classCurriculumSchema.nullable(),
+  // Só turmas locais têm código de entrada; o domínio vale para ele.
+  accessCode: z.string().nullable().optional(),
+  emailDomain: z.string().nullable().optional(),
+  effectiveEmailDomain: z.string().nullable().optional(),
+});
+
+const emailDomainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(120)
+  .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, "Domínio inválido.");
+
+export const classEmailDomainSchema = z.object({
+  domain: emailDomainSchema.nullable(),
+});
+
+export const studentJoinSchema = z.object({
+  code: z.string().trim().min(4).max(40),
+  name: z.string().trim().min(1).max(100),
+  email: z.email(),
+});
+
+export const studentJoinResultSchema = z.object({
+  status: z.enum(["active", "pending", "restricted"]),
+  className: z.string(),
 });
 
 export const milestoneTypeSchema = z.enum([
@@ -1077,6 +1103,8 @@ export type CurriculumSearchResponse = z.infer<
 export type OpenAiAvailability = z.infer<typeof openAiAvailabilitySchema>;
 export type ClassSummary = z.infer<typeof classSummarySchema>;
 export type ClassRemoval = z.infer<typeof classRemovalSchema>;
+export type StudentJoin = z.infer<typeof studentJoinSchema>;
+export type StudentJoinResult = z.infer<typeof studentJoinResultSchema>;
 export type StudentImportRow = z.infer<typeof studentImportRowSchema>;
 export type StudentImportPreview = z.infer<typeof studentImportPreviewSchema>;
 export type StudentImportResult = z.infer<typeof studentImportResultSchema>;

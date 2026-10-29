@@ -621,6 +621,71 @@ function StudentAddForm({
   );
 }
 
+function AccessCodePanel({
+  detail,
+  onSaved,
+}: {
+  detail: ClassDetail;
+  onSaved: () => Promise<void>;
+}) {
+  const id = useId();
+  const [domain, setDomain] = useState(detail.effectiveEmailDomain ?? "");
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await request(
+        `/classes/${detail.id}/email-domain`,
+        json("PUT", { domain: domain.trim() || null }),
+      );
+      await onSaved();
+      setFeedback({ kind: "ok", text: "Domínio da escola salvo." });
+    } catch (error) {
+      setFeedback({ kind: "error", text: serverText(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="timeline-panel" aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>Entrada por código</h2>
+      <p>
+        Os alunos entram em <strong>{window.location.origin}/#/entrar</strong>{" "}
+        com o código <strong>{detail.accessCode}</strong>.
+      </p>
+      <form
+        className="stacked-form"
+        onSubmit={(event) => void save(event)}
+        noValidate
+      >
+        <label>
+          <span>Domínio dos e-mails da escola</span>
+          <input
+            value={domain}
+            placeholder="escola.edu.br"
+            aria-describedby={`${id}-help`}
+            onChange={(event) => setDomain(event.target.value)}
+          />
+        </label>
+        <span className="muted-line" id={`${id}-help`}>
+          Quem entrar com e-mail de outro domínio fica pendente de validação até
+          você aceitar, restringir ou excluir. Deixe vazio para usar o domínio
+          do seu e-mail.
+        </span>
+        <FeedbackMessage value={feedback} />
+        <button type="submit" disabled={busy}>
+          {busy ? "Salvando…" : "Salvar domínio"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 /* ----------------------------- Class page ----------------------------- */
 
 export function ClassDetailPage({
@@ -769,7 +834,9 @@ export function ClassDetailPage({
         ),
       status === "restricted"
         ? `${student.name} agora está restrito.`
-        : `${student.name} está ativo de novo.`,
+        : student.status === "pending"
+          ? `${student.name} foi aceito na turma.`
+          : `${student.name} está ativo de novo.`,
     );
   };
 
@@ -920,6 +987,15 @@ export function ClassDetailPage({
                     ` · Matrícula ${student.registrationNumber}`}
                 </span>
                 <span className="inline-actions">
+                  {student.status === "pending" && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void setStudentStatus(student, "active")}
+                    >
+                      Aceitar {student.name}
+                    </button>
+                  )}
                   {student.status === "restricted" ? (
                     <button
                       type="button"
@@ -975,6 +1051,10 @@ export function ClassDetailPage({
           </details>
         )}
       </section>
+
+      {!detail.archivedAt && detail.accessCode && (
+        <AccessCodePanel detail={detail} onSaved={() => loadDetail()} />
+      )}
 
       {!detail.archivedAt && (
         <section className="timeline-panel" aria-label="Novo aluno">

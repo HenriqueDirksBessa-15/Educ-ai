@@ -226,7 +226,7 @@ describe("class page", () => {
       await screen.findByRole("heading", { level: 1, name: "7º ano B" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Carla Mendes")).toBeInTheDocument();
-    expect(screen.getByText("Aguardando confirmação")).toBeInTheDocument();
+    expect(screen.getByText("Pendente de validação")).toBeInTheDocument();
 
     fireEvent.change(await screen.findByLabelText(/^Etapa/), {
       target: { value: "elementary_2" },
@@ -583,6 +583,62 @@ describe("removing classes and students", () => {
       registrationNumber: "2026001",
       email: null,
       origin: "spreadsheet",
+    });
+  });
+
+  it("lets the teacher accept a student who joined from another domain", async () => {
+    const pending = {
+      ...students[1]!,
+      id: "22222222-2222-4222-8222-222222222223",
+      name: "Caio Externo",
+      origin: "access_code",
+      status: "pending",
+    };
+    const fetchMock = mockApi({
+      [`GET /classes/${localId}`]: {
+        data: detail(localId, {
+          students: [pending],
+          accessCode: "TURMA-1234",
+          effectiveEmailDomain: "escola.edu.br",
+        }),
+      },
+      "GET /curriculum": catalog,
+      [`PATCH /classes/${localId}/students/${pending.id}`]: {
+        data: { status: "active" },
+      },
+      [`PUT /classes/${localId}/email-domain`]: {
+        data: { domain: "colegio.edu.br" },
+      },
+    });
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={vi.fn()} />);
+
+    expect(await screen.findByText("TURMA-1234")).toBeInTheDocument();
+    expect(screen.getByText("Pendente de validação")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Marcar Caio Externo como restrito" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remover Caio Externo" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Aceitar Caio Externo" }),
+    );
+    expect(
+      await screen.findByText("Caio Externo foi aceito na turma."),
+    ).toBeInTheDocument();
+    expect(
+      bodyOf(fetchMock, `PATCH /classes/${localId}/students/${pending.id}`),
+    ).toEqual({ status: "active" });
+
+    const domain = screen.getByLabelText("Domínio dos e-mails da escola");
+    expect(domain).toHaveValue("escola.edu.br");
+    fireEvent.change(domain, { target: { value: "colegio.edu.br" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar domínio" }));
+    expect(
+      await screen.findByText("Domínio da escola salvo."),
+    ).toBeInTheDocument();
+    expect(bodyOf(fetchMock, `PUT /classes/${localId}/email-domain`)).toEqual({
+      domain: "colegio.edu.br",
     });
   });
 

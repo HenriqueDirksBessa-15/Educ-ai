@@ -83,7 +83,7 @@ describe("teacher-facing labels", () => {
       /saia e entre com Google/,
     );
     expect(enrollmentStatusLabel("active")).toBe("Ativo");
-    expect(enrollmentStatusLabel("pending")).toBe("Aguardando confirmação");
+    expect(enrollmentStatusLabel("pending")).toBe("Pendente de validação");
     expect(enrollmentStatusLabel("restricted")).toBe("Restrito");
   });
 

@@ -1,10 +1,12 @@
 import {
   classCurriculumInputSchema,
   classCreateSchema,
+  classEmailDomainSchema,
   classUpdateSchema,
   enrollmentStatusUpdateSchema,
   studentEnrollmentInputSchema,
   studentImportRequestSchema,
+  studentJoinSchema,
 } from "@educai/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -198,6 +200,46 @@ export function registerClassesRoutes(
         return { data: imported.result };
       },
     );
+
+  // Pública: o aluno entra pelo código da turma, sem sessão.
+  app.post<{ Body: unknown }>("/api/join", async (request, reply) => {
+    const parsed = studentJoinSchema.safeParse(request.body);
+    if (!parsed.success) return validationError(reply);
+    const joined = await dependencies.classesRepository.joinByCode(parsed.data);
+    if (!joined)
+      return notFound(
+        reply,
+        "Não encontramos uma turma com esse código. Confira com o professor.",
+      );
+    return reply.code(201).send({ data: joined });
+  });
+
+  app.put<{ Params: { classId: string }; Body: unknown }>(
+    "/api/classes/:classId/email-domain",
+    async (request, reply) => {
+      const identity = await owner(request, reply);
+      if (!identity) return;
+      const parsed = classEmailDomainSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply.code(400).send({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Escreva só o domínio, por exemplo escola.edu.br.",
+          },
+        });
+      const updated = await dependencies.classesRepository.setEmailDomain(
+        identity.professorId,
+        request.params.classId,
+        parsed.data.domain,
+      );
+      if (!updated)
+        return notFound(
+          reply,
+          "Turma não encontrada ou controlada pelo Google.",
+        );
+      return { data: { domain: parsed.data.domain } };
+    },
+  );
 
   app.delete<{ Params: { classId: string; studentId: string } }>(
     "/api/classes/:classId/students/:studentId",

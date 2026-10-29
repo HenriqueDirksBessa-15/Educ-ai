@@ -10,6 +10,8 @@ import type {
   StudentImportPreview,
   StudentImportResult,
   StudentImportRow,
+  StudentJoin,
+  StudentJoinResult,
 } from "@educai/contracts";
 
 import { withTransaction, type DatabaseClient } from "../database.js";
@@ -21,6 +23,21 @@ import { createHash } from "node:crypto";
 import type { ParsedStudentRow } from "./student-import.js";
 
 type QueryResult<Row> = { rows: Row[]; rowCount?: number | null };
+
+// Cadastro manual nunca troca o nome nem a origem de um aluno do Google.
+const STUDENT_UPSERT_SQL = `INSERT INTO student (name, email, origin)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO UPDATE SET
+         name = CASE
+           WHEN EXCLUDED.origin = 'google' THEN EXCLUDED.name
+           ELSE student.name
+         END,
+         origin = CASE
+           WHEN EXCLUDED.origin = 'google' OR student.origin = 'google'
+             THEN 'google'::record_origin
+           ELSE student.origin
+         END
+       RETURNING id`;
 type ClassRow = {
   id: string;
   name: string;
@@ -32,6 +49,8 @@ type ClassRow = {
   sync_status: ClassDetail["syncStatus"];
   last_synced_at: Date | null;
   archived_at: Date | null;
+  allowed_email_domain?: string | null;
+  professor_email_domain?: string | null;
 };
 type StudentRow = {
   id: string;
@@ -77,9 +96,15 @@ export class ClassesRepository {
     status?: StudentRow["status"],
   ): Promise<ClassDetail | null> {
     const classResult = (await this.database.query(
-      `SELECT id, name, description, school_year, local_access_code,
-              general_notice, origin, sync_status, last_synced_at, archived_at
-       FROM class_group WHERE id = $1 AND professor_id = $2`,
+      `SELECT class_group.id, class_group.name, class_group.description,
+              class_group.school_year, class_group.local_access_code,
+              class_group.general_notice, class_group.origin,
+              class_group.sync_status, class_group.last_synced_at,
+              class_group.archived_at,
+              class_group.allowed_email_domain::text AS allowed_email_domain,
+              split_part(professor.email::text, '@', 2) AS professor_email_domain
+       FROM class_group JOIN professor ON professor.id = class_group.professor_id
+       WHERE class_group.id = $1 AND class_group.professor_id = $2`,
       [classId, professorId],
     )) as QueryResult<ClassRow>;
     const group = classResult.rows[0];
@@ -121,6 +146,10 @@ export class ClassesRepository {
         isInconsistent: row.is_inconsistent,
         inconsistencyReason: row.inconsistency_reason,
       })),
+      accessCode: group.origin === "local" ? group.local_access_code : null,
+      emailDomain: group.allowed_email_domain ?? null,
+      effectiveEmailDomain:
+        group.allowed_email_domain ?? group.professor_email_domain ?? null,
       curriculum: curriculum.rows[0]
         ? {
             educationStage: curriculum.rows[0].education_stage,
@@ -328,22 +357,11 @@ export class ClassesRepository {
       )) as QueryResult<{ status: StudentRow["status"] }>;
       if (holder.rows[0]) return { existing: holder.rows[0].status };
     }
-    const student = (await this.database.query(
-      `INSERT INTO student (name, email, origin)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (email) DO UPDATE SET
-         name = CASE
-           WHEN EXCLUDED.origin = 'google' THEN EXCLUDED.name
-           ELSE student.name
-         END,
-         origin = CASE
-           WHEN EXCLUDED.origin = 'google' OR student.origin = 'google'
-             THEN 'google'::record_origin
-           ELSE student.origin
-         END
-       RETURNING id`,
-      [input.name, input.email ?? null, input.origin],
-    )) as QueryResult<{ id: string }>;
+    const student = (await this.database.query(STUDENT_UPSERT_SQL, [
+      input.name,
+      input.email ?? null,
+      input.origin,
+    ])) as QueryResult<{ id: string }>;
     const enrolled = (await this.database.query(
       `INSERT INTO enrollment
          (class_group_id, student_id, status, origin, registration_number)
@@ -365,6 +383,62 @@ export class ClassesRepository {
       [classId, student.rows[0]!.id],
     )) as QueryResult<{ status: StudentRow["status"] }>;
     return { existing: current.rows[0]!.status };
+  }
+
+  async setEmailDomain(
+    professorId: string,
+    classId: string,
+    domain: string | null,
+  ): Promise<boolean> {
+    const result = (await this.database.query(
+      `UPDATE class_group SET allowed_email_domain = $3
+       WHERE id = $1 AND professor_id = $2 AND origin = 'local'
+       RETURNING id`,
+      [classId, professorId, domain],
+    )) as QueryResult<{ id: string }>;
+    return result.rows.length > 0;
+  }
+
+  // Entrada do aluno pelo código da turma. E-mail fora do domínio fica
+  // pendente até o professor aceitar, restringir ou excluir. Repetir a
+  // entrada não muda a situação já registrada.
+  async joinByCode(input: StudentJoin): Promise<StudentJoinResult | null> {
+    return withTransaction(this.database, async (database) => {
+      const found = (await database.query(
+        `SELECT class_group.id, class_group.name,
+                lower(coalesce(class_group.allowed_email_domain::text,
+                  split_part(professor.email::text, '@', 2))) AS domain
+         FROM class_group JOIN professor ON professor.id = class_group.professor_id
+         WHERE class_group.local_access_code = $1
+           AND class_group.origin = 'local' AND class_group.archived_at IS NULL`,
+        [input.code],
+      )) as QueryResult<{ id: string; name: string; domain: string }>;
+      const group = found.rows[0];
+      if (!group) return null;
+      const email = input.email.toLowerCase();
+      const status =
+        email.split("@")[1] === group.domain ? "active" : "pending";
+      const student = (await database.query(STUDENT_UPSERT_SQL, [
+        input.name,
+        email,
+        "access_code",
+      ])) as QueryResult<{ id: string }>;
+      const enrollment = (await database.query(
+        `WITH inserted AS (
+           INSERT INTO enrollment (class_group_id, student_id, status, origin)
+           VALUES ($1, $2, $3, 'access_code')
+           ON CONFLICT (class_group_id, student_id) DO NOTHING
+           RETURNING status
+         )
+         SELECT status FROM inserted
+         UNION ALL
+         SELECT status FROM enrollment
+         WHERE class_group_id = $1 AND student_id = $2
+           AND NOT EXISTS (SELECT 1 FROM inserted)`,
+        [group.id, student.rows[0]!.id, status],
+      )) as QueryResult<{ status: StudentJoinResult["status"] }>;
+      return { status: enrollment.rows[0]!.status, className: group.name };
+    });
   }
 
   // Classifica cada linha da planilha sem gravar nada. A reconciliação é

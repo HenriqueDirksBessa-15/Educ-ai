@@ -29,6 +29,12 @@ Atualizado em 29/10/2026.
   matrícula, e-mail opcional). Matrícula repetida na mesma turma responde 409
   com aviso e não altera nada; se o aluno estiver restrito, o aviso diz que
   ele continua restrito e como reativá-lo.
+- **DEF-25 (RF007-FA4).** Entrada por código em `#/entrar` (pública, rota
+  `POST /api/join`), só para turma local e não arquivada. E-mail do domínio
+  da turma entra ativo; de outro domínio fica "pendente de validação" e o
+  professor aceita, restringe ou exclui localmente na lista de alunos.
+  Migração 029: `class_group.allowed_email_domain`; sem valor, vale o
+  domínio do e-mail do professor. Repetir a entrada não muda a situação.
 
 ## Correção do salvamento curricular em produção
 

@@ -43,6 +43,8 @@ function dependencies(credential: unknown) {
     previewStudentImport: vi.fn(),
     importStudents: vi.fn(),
     enrollStudent: vi.fn(),
+    joinByCode: vi.fn(),
+    setEmailDomain: vi.fn(),
   };
   const classroomAdapter = {
     isFixture: false,
@@ -147,6 +149,69 @@ describe("class and student removal routes", () => {
       classId,
       studentId,
       "restricted",
+    );
+  });
+});
+
+describe("join by access code", () => {
+  it("lets a student join without a session and reports the result", async () => {
+    const input = dependencies(null);
+    input.classesRepository.joinByCode
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ status: "pending", className: "7º A" });
+    const app = await build(input);
+    const payload = {
+      code: "TURMA-1234",
+      name: "Caio",
+      email: "caio@gmail.com",
+    };
+
+    const unknown = await app.inject({
+      method: "POST",
+      url: "/api/join",
+      payload,
+    });
+    const joined = await app.inject({
+      method: "POST",
+      url: "/api/join",
+      payload,
+    });
+
+    expect(unknown.statusCode).toBe(404);
+    expect(joined.statusCode).toBe(201);
+    expect(joined.json()).toEqual({
+      data: { status: "pending", className: "7º A" },
+    });
+    expect(input.authRepository.resolveSession).not.toHaveBeenCalled();
+  });
+
+  it("accepts only a bare domain for the class", async () => {
+    const input = dependencies(null);
+    input.classesRepository.setEmailDomain.mockResolvedValue(true);
+    const app = await build(input);
+    const url =
+      "/api/classes/8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d/email-domain";
+    const headers = { cookie: "educai_session=session-token" };
+
+    const invalid = await app.inject({
+      method: "PUT",
+      url,
+      headers,
+      payload: { domain: "@escola" },
+    });
+    const valid = await app.inject({
+      method: "PUT",
+      url,
+      headers,
+      payload: { domain: " Escola.EDU.br " },
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(valid.statusCode).toBe(200);
+    expect(input.classesRepository.setEmailDomain).toHaveBeenCalledWith(
+      professorId,
+      "8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d",
+      "escola.edu.br",
     );
   });
 });

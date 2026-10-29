@@ -118,6 +118,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "026_notification_delivery.sql",
       "027_class_archive.sql",
       "028_student_registration.sql",
+      "029_access_code_domain.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -634,6 +635,85 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     expect(
       (await classes.getDetail(professorA, target))!.students,
     ).toHaveLength(3);
+  }, 60_000);
+
+  it("keeps a student from another domain pending until the teacher decides", async () => {
+    const professor = await testPool.query<{ id: string }>(
+      `INSERT INTO professor (google_subject, email, display_name)
+       VALUES ($1, $2, 'Professor Código') RETURNING id`,
+      [`join-${randomUUID()}`, `prof-${randomUUID()}@escola.edu.br`],
+    );
+    const professorId = professor.rows[0]!.id;
+    const classes = new ClassesRepository(testPool);
+    const code = `JOIN-${randomUUID().slice(0, 8)}`;
+    const classId = await classes.create(professorId, {
+      name: "Turma por código",
+      schoolYear: "8º ano EF",
+      localAccessCode: code,
+    });
+    const insider = `dentro-${randomUUID()}@ESCOLA.edu.br`;
+    const outsider = `fora-${randomUUID()}@gmail.com`;
+
+    expect(
+      await classes.joinByCode({
+        code,
+        name: "Aluno da Escola",
+        email: insider,
+      }),
+    ).toEqual({ status: "active", className: "Turma por código" });
+    expect(
+      await classes.joinByCode({
+        code: code.toLowerCase(),
+        name: "Aluno de Fora",
+        email: outsider,
+      }),
+    ).toEqual({ status: "pending", className: "Turma por código" });
+    // Entrar de novo não muda a situação, nem depois de restringir.
+    const external = (await classes.getDetail(
+      professorId,
+      classId,
+    ))!.students.find((student) => student.email === outsider)!;
+    expect(external).toMatchObject({
+      status: "pending",
+      origin: "access_code",
+    });
+    await classes.setEnrollmentStatus(
+      professorId,
+      classId,
+      external.id,
+      "restricted",
+    );
+    expect(
+      await classes.joinByCode({
+        code,
+        name: "Aluno de Fora",
+        email: outsider,
+      }),
+    ).toEqual({ status: "restricted", className: "Turma por código" });
+
+    // Domínio configurado na turma passa a valer no lugar do do professor.
+    expect(
+      await classes.setEmailDomain(professorId, classId, "gmail.com"),
+    ).toBe(true);
+    const another = `outro-${randomUUID()}@gmail.com`;
+    expect(
+      await classes.joinByCode({ code, name: "Outro Aluno", email: another }),
+    ).toMatchObject({ status: "active" });
+    expect(await classes.getDetail(professorId, classId)).toMatchObject({
+      accessCode: code,
+      emailDomain: "gmail.com",
+      effectiveEmailDomain: "gmail.com",
+    });
+
+    // Turma arquivada não aceita entrada por código.
+    await classes.setArchived(professorId, classId, true);
+    expect(
+      await classes.joinByCode({
+        code,
+        name: "Atrasado",
+        email: `x-${randomUUID()}@gmail.com`,
+      }),
+    ).toBeNull();
   }, 60_000);
 
   it("creates materials atomically and isolates links and files by professor", async () => {

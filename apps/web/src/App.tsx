@@ -22,6 +22,7 @@ import { AccountPage } from "./AccountPage";
 import { AppShell, Page } from "./AppShell";
 import { BulletinsPage } from "./BulletinsPage";
 import { ClassDetailPage, ClassListPage, NewClassPage } from "./ClassesPages";
+import { JoinPage, useJoinRoute } from "./JoinPage";
 import { ConfirmProvider } from "./ConfirmDialog";
 import { CorrectionListPage, CorrectionQueuePage } from "./CorrectionsPages";
 import {
@@ -130,6 +131,7 @@ export function App() {
 
   const authError = readAuthError();
   const { route, param } = useLocation();
+  const joining = useJoinRoute();
 
   useEffect(() => {
     document.title =
@@ -147,6 +149,24 @@ export function App() {
       Ir para o conteúdo principal
     </a>
   );
+
+  if (joining)
+    return (
+      <>
+        {skipLink}
+        <main className="page-shell" id="conteudo" tabIndex={-1}>
+          <header className="app-header">
+            <span className="brand">
+              <span className="brand-mark" aria-hidden="true">
+                E
+              </span>
+              EDUC.AI
+            </span>
+          </header>
+          <JoinPage />
+        </main>
+      </>
+    );
 
   if (state.kind === "authenticated")
     return (
