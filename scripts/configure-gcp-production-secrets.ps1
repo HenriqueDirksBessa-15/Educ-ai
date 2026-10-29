@@ -1,9 +1,9 @@
 param(
-  [string]$Project = "educai-511017",
+  [string]$Project = "educai-nova-versao-20261026",
   [string]$Region = "southamerica-east1",
-  [string]$Instance = "educai-dev",
+  [string]$Instance = "educai-db",
   [string]$RuntimeServiceAccount = "educai-runner",
-  [string]$Bucket = "educai-511017-test-artifacts",
+  [string]$Bucket = "educai-nova-versao-20261026-materials",
   [string]$EnvironmentFile = (Join-Path $PSScriptRoot "..\.env")
 )
 

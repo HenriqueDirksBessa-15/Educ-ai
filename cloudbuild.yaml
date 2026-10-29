@@ -7,12 +7,13 @@
 # - All secrets configured in Secret Manager
 
 substitutions:
-  _PROJECT_ID: educai-511017
+  _PROJECT_ID: educai-nova-versao-20261026
   _REGION: southamerica-east1
   _SERVICE_NAME: educai
-  _REPOSITORY: educai-test
-  _SQL_INSTANCE: educai-dev
+  _REPOSITORY: educai
+  _SQL_INSTANCE: educai-db
   _IMAGE_TAG: ${SHORT_SHA}
+  _SMOKE_BASE_URL: https://educai.dev.br
 
 options:
   # Use higher machine for faster builds
@@ -28,7 +29,7 @@ steps:
     id: verify-migrations
     entrypoint: bash
     args:
-      - '-c'
+      - "-c"
       - |
         set -e
         echo "Verifying migration line endings..."
@@ -45,19 +46,19 @@ steps:
     id: build-image
     args:
       - build
-      - '-t'
-      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}'
-      - '-t'
-      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
-      - '.'
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest"
+      - "."
 
   # Step 3: Push Docker image to Artifact Registry
   - name: gcr.io/cloud-builders/docker
     id: push-image
     args:
       - push
-      - '--all-tags'
-      - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}'
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}"
     waitFor:
       - build-image
 
@@ -68,9 +69,9 @@ steps:
       - sql
       - backups
       - create
-      - '--instance=${_SQL_INSTANCE}'
-      - '--project=${_PROJECT_ID}'
-      - '--description=pre-deploy-${SHORT_SHA}'
+      - "--instance=${_SQL_INSTANCE}"
+      - "--project=${_PROJECT_ID}"
+      - "--description=pre-deploy-${SHORT_SHA}"
     waitFor:
       - push-image
 
@@ -82,9 +83,9 @@ steps:
       - jobs
       - update
       - educai-migrate
-      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}'
-      - '--region=${_REGION}'
-      - '--project=${_PROJECT_ID}'
+      - "--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "--region=${_REGION}"
+      - "--project=${_PROJECT_ID}"
     waitFor:
       - backup-database
 
@@ -96,9 +97,9 @@ steps:
       - jobs
       - update
       - educai-workers
-      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}'
-      - '--region=${_REGION}'
-      - '--project=${_PROJECT_ID}'
+      - "--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "--region=${_REGION}"
+      - "--project=${_PROJECT_ID}"
     waitFor:
       - update-migrate-job
 
@@ -110,9 +111,9 @@ steps:
       - jobs
       - update
       - educai-retention
-      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}'
-      - '--region=${_REGION}'
-      - '--project=${_PROJECT_ID}'
+      - "--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "--region=${_REGION}"
+      - "--project=${_PROJECT_ID}"
     waitFor:
       - update-workers-job
 
@@ -124,9 +125,9 @@ steps:
       - jobs
       - execute
       - educai-migrate
-      - '--region=${_REGION}'
-      - '--project=${_PROJECT_ID}'
-      - '--wait'
+      - "--region=${_REGION}"
+      - "--project=${_PROJECT_ID}"
+      - "--wait"
     waitFor:
       - update-retention-job
 
@@ -137,10 +138,10 @@ steps:
       - run
       - services
       - update
-      - '${_SERVICE_NAME}'
-      - '--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}'
-      - '--region=${_REGION}'
-      - '--project=${_PROJECT_ID}'
+      - "${_SERVICE_NAME}"
+      - "--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "--region=${_REGION}"
+      - "--project=${_PROJECT_ID}"
     waitFor:
       - run-migrations
 
@@ -148,9 +149,9 @@ steps:
   - name: gcr.io/cloud-builders/curl
     id: smoke-test
     args:
-      - '-f'
-      - '-s'
-      - 'https://educai.dev.br/api/health/live'
+      - "-f"
+      - "-s"
+      - "${_SMOKE_BASE_URL}/api/health/live"
     waitFor:
       - deploy-service
 
@@ -158,16 +159,16 @@ steps:
   - name: gcr.io/cloud-builders/curl
     id: smoke-test-ready
     args:
-      - '-f'
-      - '-s'
-      - 'https://educai.dev.br/api/health/ready'
+      - "-f"
+      - "-s"
+      - "${_SMOKE_BASE_URL}/api/health/ready"
     waitFor:
       - smoke-test
 
 # Store built image in Artifact Registry
 images:
-  - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}'
-  - '${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+  - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+  - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest"
 
 # Build timeout: 20 minutes
 timeout: 1200s

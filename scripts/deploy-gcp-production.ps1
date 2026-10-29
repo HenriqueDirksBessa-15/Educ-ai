@@ -1,8 +1,9 @@
 param(
-  [string]$Project = "educai-511017",
+  [string]$Project = "educai-nova-versao-20261026",
   [string]$Region = "southamerica-east1",
   [string]$Service = "educai",
-  [string]$Repository = "educai-test",
+  [string]$Repository = "educai",
+  [string]$Instance = "educai-db",
   [string]$Tag = (git rev-parse --short HEAD),
   [string]$SmokeBaseUrl = "https://educai.dev.br",
   [switch]$SkipBackup
@@ -32,7 +33,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "Cloud Build falhou." }
 
   if (-not $SkipBackup) {
-    gcloud sql backups create --instance educai-dev --project $Project `
+    gcloud sql backups create --instance $Instance --project $Project `
       --description "pre-deploy-$Tag" --quiet
     if ($LASTEXITCODE -ne 0) { throw "Backup pré-deploy falhou." }
   }
