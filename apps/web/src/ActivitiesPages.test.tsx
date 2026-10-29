@@ -400,6 +400,27 @@ describe("creating an activity", () => {
     ).toBeEnabled();
   });
 
+  it("explains a business rule refusal instead of blaming the AI", async () => {
+    const message = "Aprove novamente o plano antes de gerar a atividade.";
+    mockApi({
+      "POST /activities": { data: activity() },
+      [`POST /activities/${activityId}/generate`]: () => ({
+        status: 409,
+        body: { error: { code: "VALIDATION_ERROR", message } },
+      }),
+    });
+    withConfirm(<ActivityWizard plans={plans} />);
+
+    await fillStepOne();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pedir questões à IA" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/IA não conseguiu/);
+    expect(currentStep()).toContain("Passo 2 de 4");
+  });
+
   it("shows what is wrong next to the question instead of saving", async () => {
     const fetchMock = mockApi({});
     withConfirm(<ActivityWizard plans={plans} />);

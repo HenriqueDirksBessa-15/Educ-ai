@@ -654,6 +654,7 @@ export function LessonPlansPanel({
   const [bnccSkillIds, setBnccSkillIds] = useState<string[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>([]);
   const [components, setComponents] = useState<string[]>([]);
+  const [profileMissing, setProfileMissing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -678,6 +679,7 @@ export function LessonPlansPanel({
         if (!response.ok) throw new Error();
         const body = (await response.json()) as DataEnvelope<ClassDetail>;
         const profile = body.data.curriculum;
+        setProfileMissing(!profile?.curricularComponents.length);
         setSchoolYear(profile?.schoolYear ?? body.data.schoolYear);
         setComponents(profile?.curricularComponents ?? []);
         setComponent((current) =>
@@ -956,6 +958,13 @@ export function LessonPlansPanel({
               ))}
             </select>
           </label>
+          {profileMissing && (
+            <small className="form-message" role="status">
+              Esta turma ainda não tem perfil curricular. Abra a{" "}
+              <a href={routeHref("turmas", classId)}>tela da turma</a>, defina o
+              ano/série e o componente curricular e volte aqui.
+            </small>
+          )}
           <label>
             Ano/série
             <input

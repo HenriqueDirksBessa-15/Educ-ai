@@ -1500,6 +1500,66 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         await repository.consumeAuthorizationState(issuedState),
       ).toBeNull();
 
+      // A BNCC importada em produção usa IDs derivados de hash, sem versão RFC.
+      const hashId = () => {
+        const id = randomUUID();
+        return `${id.slice(0, 14)}d${id.slice(15, 19)}6${id.slice(20)}`;
+      };
+      const hashArea = await testPool.query<{ id: string }>(
+        `INSERT INTO curriculum_area (name, source_label)
+         VALUES ($1, 'BNCC') RETURNING id`,
+        [`Ciências ${randomUUID()}`],
+      );
+      const hashSyllabusId = hashId();
+      const hashSkillId = hashId();
+      await testPool.query(
+        `INSERT INTO syllabus
+         (id, curriculum_area_id, curricular_component, school_year, description, source_label)
+         VALUES ($1, $2, 'Ciências', 'ef-ano-06', 'Matéria e energia.', 'BNCC')`,
+        [hashSyllabusId, hashArea.rows[0]!.id],
+      );
+      await testPool.query(
+        `INSERT INTO bncc_skill
+         (id, syllabus_id, code, knowledge_object, description, source_label, is_official)
+         VALUES ($1, $2, $3, 'Misturas', 'Classificar misturas.', 'BNCC', true)`,
+        [
+          hashSkillId,
+          hashSyllabusId,
+          `H${randomUUID().replaceAll("-", "").slice(0, 20)}`,
+        ],
+      );
+      const createdClass = await app.inject({
+        method: "POST",
+        url: "/api/classes",
+        headers: { cookie: cookie! },
+        payload: {
+          name: "Turma com BNCC importada",
+          schoolYear: "ef-ano-06",
+          localAccessCode: `HASH${randomUUID().slice(0, 8)}`,
+        },
+      });
+      expect(createdClass.statusCode).toBe(201);
+      const createdPlan = await app.inject({
+        method: "POST",
+        url: "/api/lesson-plans",
+        headers: { cookie: cookie! },
+        payload: {
+          title: "Misturas no cotidiano",
+          curricularComponent: "Ciências",
+          schoolYear: "ef-ano-06",
+          objectives: "Classificar misturas.",
+          contents: "Misturas homogêneas e heterogêneas.",
+          methodology: "Experimentos em grupo.",
+          evaluationStrategy: "Relatório da experiência.",
+          durationMinutes: 50,
+          classIds: [createdClass.json().data.id],
+          syllabusId: hashSyllabusId,
+          bnccSkillIds: [hashSkillId],
+          materialIds: [],
+        },
+      });
+      expect(createdPlan.statusCode).toBe(201);
+
       const exported = await app.inject({
         method: "GET",
         url: "/api/privacy/export",

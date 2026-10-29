@@ -5,7 +5,11 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 // Error whose message is already safe to show to the teacher; `code` keeps
 // the API code for callers that need a more specific message.
 export class ApiError extends Error {
-  constructor(readonly code: string | undefined) {
+  constructor(
+    readonly code: string | undefined,
+    // Mensagem da API, para recusas de regra de negócio que já dizem o que fazer.
+    readonly serverMessage?: string,
+  ) {
     super(errorMessage(code));
     this.name = "ApiError";
   }
@@ -21,9 +25,9 @@ export async function request<T>(
   });
   const body = (await response.json().catch(() => null)) as {
     data?: T;
-    error?: { code?: string };
+    error?: { code?: string; message?: string };
   } | null;
-  if (!response.ok) throw new ApiError(body?.error?.code);
+  if (!response.ok) throw new ApiError(body?.error?.code, body?.error?.message);
   return body?.data as T;
 }
 

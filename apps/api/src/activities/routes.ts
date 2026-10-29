@@ -189,7 +189,8 @@ export function registerActivitiesRoutes(
           return reply.code(409).send({
             error: {
               code: "VALIDATION_ERROR",
-              message: "O plano precisa de uma ementa antes da geração.",
+              message:
+                "O plano ainda não tem ementa da BNCC. Edite o plano, escolha a ementa e as habilidades, aprove de novo e volte aqui.",
             },
           });
         throw error;

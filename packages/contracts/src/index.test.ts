@@ -47,6 +47,32 @@ describe("shared contracts", () => {
     ).toThrow();
   });
 
+  it("accepts curriculum ids derived from hashes, as stored in PostgreSQL", () => {
+    // IDs reais da BNCC importada em produção: formato 8-4-4-4-12 sem versão RFC.
+    const input = {
+      title: "Frações na prática",
+      curricularComponent: "Matemática",
+      schoolYear: "ef-ano-06",
+      objectives: "Resolver problemas com frações.",
+      contents: "Frações equivalentes.",
+      methodology: "Investigação em grupos.",
+      evaluationStrategy: "Registro e discussão coletiva.",
+      classIds: ["dbcb1b70-6091-4e58-9b23-be4136f0e3c3"],
+      syllabusId: "077f455a-1a5f-d7a2-6e0e-8c4899e06d41",
+      bnccSkillIds: ["52531744-722f-08a4-ba65-fbd06fbc2c5c"],
+    };
+
+    expect(lessonPlanInputSchema.parse(input).syllabusId).toBe(
+      "077f455a-1a5f-d7a2-6e0e-8c4899e06d41",
+    );
+    expect(() =>
+      lessonPlanInputSchema.parse({ ...input, syllabusId: "077f455a" }),
+    ).toThrow();
+    expect(() =>
+      lessonPlanInputSchema.parse({ ...input, bnccSkillIds: ["não-é-id"] }),
+    ).toThrow();
+  });
+
   it("accepts only unique HTTP(S) links bound to classes", () => {
     const valid = {
       title: "Guia de frações",

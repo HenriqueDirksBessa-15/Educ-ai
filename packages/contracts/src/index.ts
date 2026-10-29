@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// IDs usam z.guid(): aceita qualquer UUID 8-4-4-4-12, como o PostgreSQL. As
+// ementas e habilidades da BNCC importada têm IDs derivados de hash, sem a
+// versão RFC que z.uuid() exige.
+
 export const errorCodeSchema = z.enum([
   "CONFIGURATION_ERROR",
   "DATABASE_UNAVAILABLE",
@@ -27,7 +31,7 @@ export const paginationSchema = z.object({
 });
 
 export const identitySchema = z.object({
-  professorId: z.uuid(),
+  professorId: z.guid(),
   email: z.email(),
   displayName: z.string().min(1),
   provider: z.literal("google"),
@@ -55,7 +59,7 @@ export const integrationStatusSchema = z.object({
 export const notificationPreferenceSchema = z.enum(["visual", "email", "both"]);
 
 export const professorProfileSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   displayName: z.string().min(1),
   email: z.email(),
   profileImageUrl: z.url().nullable(),
@@ -73,7 +77,7 @@ export const professorProfileUpdateSchema = z
   });
 
 export const curriculumReferenceSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   curricularComponent: z.string().min(1),
   schoolYear: z.string().min(1),
   sourceLabel: z.string().min(1),
@@ -81,7 +85,7 @@ export const curriculumReferenceSchema = z.object({
 });
 
 export const curriculumSkillSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   code: z.string().min(1),
   thematicUnit: z.string().nullable(),
   knowledgeObject: z.string().min(1),
@@ -92,7 +96,7 @@ export const curriculumSkillSchema = z.object({
 });
 
 export const curriculumSyllabusSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   areaName: z.string().min(1),
   curricularComponent: z.string().min(1),
   schoolYear: z.string().min(1),
@@ -120,7 +124,7 @@ export const openAiAvailabilitySchema = z.object({
 });
 
 export const classSummarySchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   name: z.string().min(1),
   description: z.string().nullable(),
   schoolYear: z.string().min(1),
@@ -173,7 +177,7 @@ export const enrollmentStatusSchema = z.enum([
 ]);
 
 export const studentSummarySchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   name: z.string().min(1),
   email: z.email(),
   origin: z.enum(["google", "spreadsheet", "access_code"]),
@@ -188,7 +192,7 @@ export const studentEnrollmentInputSchema = z.object({
 });
 
 export const enrolledStudentSchema = studentSummarySchema.extend({
-  id: z.uuid(),
+  id: z.guid(),
   isInconsistent: z.boolean(),
   inconsistencyReason: z.string().nullable(),
 });
@@ -210,7 +214,7 @@ export const milestoneTypeSchema = z.enum([
 ]);
 
 export const milestoneCreateSchema = z.object({
-  classId: z.uuid(),
+  classId: z.guid(),
   date: z.iso.date(),
   type: milestoneTypeSchema,
   description: z.string().trim().min(1).max(500),
@@ -224,7 +228,7 @@ export const milestoneUpdateSchema = milestoneCreateSchema
   });
 
 export const milestoneSchema = milestoneCreateSchema.extend({
-  id: z.uuid(),
+  id: z.guid(),
   className: z.string().min(1),
   isPast: z.boolean(),
   isArchived: z.boolean(),
@@ -244,8 +248,8 @@ export const materialInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().max(2_000).nullable().optional(),
   category: materialCategorySchema,
-  classIds: z.array(z.uuid()).min(1),
-  bnccSkillIds: z.array(z.uuid()).default([]),
+  classIds: z.array(z.guid()).min(1),
+  bnccSkillIds: z.array(z.guid()).default([]),
   url: z.url().nullable().optional(),
   fileName: z.string().trim().max(255).nullable().optional(),
   mimeType: z.string().trim().max(120).nullable().optional(),
@@ -258,8 +262,8 @@ export const materialLinkInputSchema = z
     title: z.string().trim().min(1).max(160),
     description: z.string().trim().max(2_000).nullable().optional(),
     category: materialCategorySchema,
-    classIds: z.array(z.uuid()).min(1),
-    bnccSkillIds: z.array(z.uuid()).default([]),
+    classIds: z.array(z.guid()).min(1),
+    bnccSkillIds: z.array(z.guid()).default([]),
     url: z
       .url()
       .refine(
@@ -290,8 +294,8 @@ export const materialFileMetadataSchema = z
     title: z.string().trim().min(1).max(160),
     description: z.string().trim().max(2_000).nullable().optional(),
     category: materialCategorySchema.exclude(["link"]),
-    classIds: z.array(z.uuid()).min(1),
-    bnccSkillIds: z.array(z.uuid()).default([]),
+    classIds: z.array(z.guid()).min(1),
+    bnccSkillIds: z.array(z.guid()).default([]),
   })
   .strict()
   .superRefine((value, context) => {
@@ -312,7 +316,7 @@ export const materialFileMetadataSchema = z
 export const materialSchema = materialInputSchema
   .omit({ storageKey: true })
   .extend({
-    id: z.uuid(),
+    id: z.guid(),
     classNames: z.array(z.string().min(1)),
     isArchived: z.boolean(),
     hasPublishedContent: z.boolean(),
@@ -334,10 +338,10 @@ export const lessonPlanInputSchema = z.object({
   evaluationStrategy: z.string().trim().min(1).max(4_000),
   durationMinutes: z.number().int().min(1).max(600).nullable().optional(),
   references: z.string().trim().max(4_000).nullable().optional(),
-  classIds: z.array(z.uuid()).min(1),
-  syllabusId: z.uuid().nullable().optional(),
-  bnccSkillIds: z.array(z.uuid()).default([]),
-  materialIds: z.array(z.uuid()).default([]),
+  classIds: z.array(z.guid()).min(1),
+  syllabusId: z.guid().nullable().optional(),
+  bnccSkillIds: z.array(z.guid()).default([]),
+  materialIds: z.array(z.guid()).default([]),
 });
 
 export const lessonPlanUpdateSchema = lessonPlanInputSchema
@@ -362,8 +366,8 @@ export const lessonPlanSuggestionSchema = z.object({
 });
 
 export const lessonPlanGenerationSchema = z.object({
-  id: z.uuid(),
-  planId: z.uuid(),
+  id: z.guid(),
+  planId: z.guid(),
   version: z.number().int().positive(),
   model: z.string().min(1),
   origin: z.enum(["fixture", "openai"]),
@@ -375,12 +379,12 @@ export const lessonPlanGenerationSchema = z.object({
 
 export const lessonPlanReviewSchema = z.object({
   suggestion: lessonPlanSuggestionSchema,
-  generationId: z.uuid(),
+  generationId: z.guid(),
 });
 
 export const lessonPlanSchema = lessonPlanInputSchema.extend({
-  id: z.uuid(),
-  professorId: z.uuid(),
+  id: z.guid(),
+  professorId: z.guid(),
   classNames: z.array(z.string().min(1)),
   syllabusDescription: z.string().nullable(),
   bnccCodes: z.array(z.string().min(1)),
@@ -444,7 +448,7 @@ export const activityQuestionInputSchema = z
   );
 
 const activityInputBaseSchema = z.object({
-  lessonPlanId: z.uuid(),
+  lessonPlanId: z.guid(),
   title: z.string().trim().min(1).max(160),
   description: z.string().trim().min(1).max(6_000),
   type: activityTypeSchema,
@@ -485,14 +489,14 @@ export const activityUpdateSchema = activityInputBaseSchema
   });
 
 export const activityQuestionSchema = activityQuestionInputSchema.and(
-  z.object({ id: z.uuid(), position: z.number().int().nonnegative() }),
+  z.object({ id: z.guid(), position: z.number().int().nonnegative() }),
 );
 
 export const activitySchema = activityInputBaseSchema
   .omit({ questions: true })
   .extend({
-    id: z.uuid(),
-    professorId: z.uuid(),
+    id: z.guid(),
+    professorId: z.guid(),
     lessonPlanTitle: z.string().min(1),
     status: activityStatusSchema,
     questions: z.array(activityQuestionSchema),
@@ -550,8 +554,8 @@ export const activityReviewStatusSchema = z.enum([
 ]);
 
 export const activityGenerationSchema = z.object({
-  id: z.uuid(),
-  activityId: z.uuid(),
+  id: z.guid(),
+  activityId: z.guid(),
   version: z.number().int().positive(),
   model: z.string().min(1),
   origin: z.enum(["fixture", "openai"]),
@@ -565,12 +569,12 @@ export const activityGenerationSchema = z.object({
 });
 
 export const activityReviewSchema = z.object({
-  generationId: z.uuid(),
+  generationId: z.guid(),
   suggestion: activitySuggestionSchema,
 });
 
 export const activityApprovalSchema = z.object({
-  generationId: z.uuid(),
+  generationId: z.guid(),
 });
 
 export const activityPublicationStatusSchema = z.enum([
@@ -589,7 +593,7 @@ export const activityDistributionStatusSchema = z.enum([
 ]);
 
 export const activityDistributionSchema = z.object({
-  classId: z.uuid(),
+  classId: z.guid(),
   className: z.string().min(1),
   googleClassroomId: z.string().nullable(),
   googleCourseWorkId: z.string().nullable(),
@@ -600,7 +604,7 @@ export const activityDistributionSchema = z.object({
 });
 
 export const activityPublicationSchema = z.object({
-  activityId: z.uuid(),
+  activityId: z.guid(),
   status: activityPublicationStatusSchema,
   googleFormId: z.string().nullable(),
   responderUri: z.url().nullable(),
@@ -653,12 +657,12 @@ export const discursiveCorrectionSuggestionSchema = z.object({
 });
 
 export const discursiveCorrectionGenerateSchema = z.object({
-  answerId: z.uuid(),
+  answerId: z.guid(),
   rigour: correctionRigourSchema,
 });
 
 export const discursiveAnswerReviewSchema = z.object({
-  answerId: z.uuid(),
+  answerId: z.guid(),
   pointsAwarded: z.number().nonnegative(),
   comment: z.string().trim().min(1).max(4_000),
 });
@@ -679,9 +683,9 @@ export const submissionCorrectionReviewSchema = z
   );
 
 export const correctionHistorySchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   version: z.number().int().positive(),
-  answerId: z.uuid().nullable(),
+  answerId: z.guid().nullable(),
   action: z.enum([
     "ai_suggestion",
     "ai_failure",
@@ -701,8 +705,8 @@ export const correctionHistorySchema = z.object({
 });
 
 export const activitySubmissionAnswerSchema = z.object({
-  id: z.uuid(),
-  questionId: z.uuid().nullable(),
+  id: z.guid(),
+  questionId: z.guid().nullable(),
   externalQuestionId: z.string().min(1),
   questionPosition: z.number().int().nonnegative().nullable(),
   kind: activityQuestionKindSchema.nullable(),
@@ -720,9 +724,9 @@ export const activitySubmissionAnswerSchema = z.object({
 });
 
 export const activitySubmissionSchema = z.object({
-  id: z.uuid(),
-  activityId: z.uuid(),
-  studentId: z.uuid().nullable(),
+  id: z.guid(),
+  activityId: z.guid(),
+  studentId: z.guid().nullable(),
   studentName: z.string().nullable(),
   externalResponseId: z.string().min(1),
   respondentEmail: z.email().nullable(),
@@ -743,7 +747,7 @@ export const activitySubmissionSchema = z.object({
 });
 
 export const activityCollectionSummarySchema = z.object({
-  activityId: z.uuid(),
+  activityId: z.guid(),
   status: z.enum(["pending", "running", "completed", "failed"]),
   scheduledAt: z.iso.datetime(),
   attemptCount: z.number().int().nonnegative(),
@@ -775,7 +779,7 @@ const feedbackInputBaseSchema = z.object({
   teacherObservation: z.string().trim().max(8_000).nullable().optional(),
   links: z.array(feedbackLinkInputSchema).max(20).default([]),
   materialIds: z
-    .array(z.uuid())
+    .array(z.guid())
     .max(20)
     .default([])
     .refine((ids) => new Set(ids).size === ids.length, {
@@ -786,11 +790,11 @@ const feedbackInputBaseSchema = z.object({
 export const feedbackCreateSchema = z.discriminatedUnion("scope", [
   feedbackInputBaseSchema.extend({
     scope: z.literal("individual"),
-    submissionId: z.uuid(),
+    submissionId: z.guid(),
   }),
   feedbackInputBaseSchema.extend({
     scope: z.literal("global"),
-    classId: z.uuid(),
+    classId: z.guid(),
   }),
 ]);
 
@@ -807,13 +811,13 @@ export const feedbackSuggestionSchema = z.object({
 });
 
 export const feedbackReviewSchema = z.object({
-  generationId: z.uuid(),
+  generationId: z.guid(),
   content: z.string().trim().min(1).max(8_000),
   teacherObservation: z.string().trim().min(1).max(8_000),
 });
 
 export const feedbackGenerationSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   version: z.number().int().positive(),
   model: z.string().min(1),
   origin: z.enum(["fixture", "openai"]),
@@ -824,7 +828,7 @@ export const feedbackGenerationSchema = z.object({
 });
 
 export const feedbackHistorySchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   version: z.number().int().positive(),
   action: z.enum([
     "created",
@@ -840,14 +844,14 @@ export const feedbackHistorySchema = z.object({
 });
 
 export const feedbackSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   scope: feedbackScopeSchema,
-  submissionId: z.uuid().nullable(),
-  studentId: z.uuid().nullable(),
+  submissionId: z.guid().nullable(),
+  studentId: z.guid().nullable(),
   studentName: z.string().nullable(),
-  activityId: z.uuid().nullable(),
+  activityId: z.guid().nullable(),
   activityTitle: z.string().nullable(),
-  classId: z.uuid().nullable(),
+  classId: z.guid().nullable(),
   className: z.string().nullable(),
   title: z.string().min(1),
   content: z.string().min(1),
@@ -859,10 +863,10 @@ export const feedbackSchema = z.object({
   sentAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
-  links: z.array(feedbackLinkInputSchema.extend({ id: z.uuid() })),
+  links: z.array(feedbackLinkInputSchema.extend({ id: z.guid() })),
   attachments: z.array(
     z.object({
-      id: z.uuid(),
+      id: z.guid(),
       title: z.string().min(1),
       category: materialCategorySchema,
     }),
@@ -879,7 +883,7 @@ export const feedbackSchema = z.object({
 });
 
 export const eligibleFeedbackSubmissionSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   studentName: z.string().min(1),
   activityTitle: z.string().min(1),
   grade: z.number().min(0).max(10),
@@ -903,8 +907,8 @@ export const bulletinStatusSchema = z.enum([
 
 export const bulletinCreateSchema = z
   .object({
-    classId: z.uuid(),
-    studentIds: z.array(z.uuid()).min(1).max(200),
+    classId: z.guid(),
+    studentIds: z.array(z.guid()).min(1).max(200),
     periodType: bulletinPeriodTypeSchema,
     periodStart: z.iso.date(),
     periodEnd: z.iso.date(),
@@ -933,21 +937,21 @@ export const bulletinCreateSchema = z
   );
 
 export const bulletinActivitySnapshotSchema = z.object({
-  activityId: z.uuid(),
+  activityId: z.guid(),
   title: z.string().min(1),
   dueAt: z.iso.datetime(),
   grade: z.number().min(0).max(10),
 });
 
 export const bulletinFeedbackSnapshotSchema = z.object({
-  feedbackId: z.uuid(),
+  feedbackId: z.guid(),
   title: z.string().min(1),
   content: z.string().min(1),
   sentAt: z.iso.datetime(),
 });
 
 export const bulletinDeliverySchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   attemptNumber: z.number().int().positive(),
   recipientEmail: z.email(),
   status: z.enum(["pending", "sent", "failed"]),
@@ -957,10 +961,10 @@ export const bulletinDeliverySchema = z.object({
 });
 
 export const bulletinSchema = z.object({
-  id: z.uuid(),
-  classId: z.uuid(),
+  id: z.guid(),
+  classId: z.guid(),
   className: z.string().min(1),
-  studentId: z.uuid(),
+  studentId: z.guid(),
   studentName: z.string().min(1),
   studentEmail: z.email(),
   periodType: bulletinPeriodTypeSchema,
@@ -980,10 +984,10 @@ export const bulletinSchema = z.object({
 });
 
 export const eligibleBulletinStudentSchema = z.object({
-  id: z.uuid(),
+  id: z.guid(),
   name: z.string().min(1),
   email: z.email(),
-  classId: z.uuid(),
+  classId: z.guid(),
   className: z.string().min(1),
 });
 

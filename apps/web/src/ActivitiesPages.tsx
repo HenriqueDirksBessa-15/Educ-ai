@@ -556,10 +556,15 @@ export function ActivityWizard({
       setQuestions(created.suggestion.questions);
       setErrors([]);
       goTo(3);
-    } catch {
+    } catch (error) {
       setFeedback({
         kind: "error",
-        text: errorMessage("OPENAI_GENERATION_FAILED"),
+        text:
+          error instanceof ApiError &&
+          error.code === "VALIDATION_ERROR" &&
+          error.serverMessage
+            ? error.serverMessage
+            : errorMessage("OPENAI_GENERATION_FAILED"),
       });
     } finally {
       setBusy(false);

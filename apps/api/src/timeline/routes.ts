@@ -225,7 +225,7 @@ export function registerTimelineRoutes(
     async (request, reply) => {
       const user = await identity(request, reply);
       if (!user) return;
-      if (!z.uuid().safeParse(request.params.materialId).success)
+      if (!z.guid().safeParse(request.params.materialId).success)
         return validationError(reply);
       const file = await dependencies.materialService.download(
         user.professorId,

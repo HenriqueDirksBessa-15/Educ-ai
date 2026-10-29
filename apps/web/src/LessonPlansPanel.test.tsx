@@ -127,6 +127,48 @@ describe("complete lesson plan flow", () => {
     });
   });
 
+  it("explains why a class without curriculum profile cannot get a plan", async () => {
+    const withoutProfile = {
+      ...group,
+      id: "dbcb1b70-6091-4e58-9b23-be4136f0e3c3",
+      name: "Sem perfil",
+    };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith(`/classes/${withoutProfile.id}`))
+        return Response.json({
+          data: {
+            ...withoutProfile,
+            generalNotice: null,
+            syncStatus: "never",
+            lastSyncedAt: null,
+            students: [],
+            curriculum: null,
+          },
+        });
+      throw new Error(`unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <LessonPlansPanel
+        plans={[]}
+        classes={[withoutProfile]}
+        materials={[]}
+        reload={vi.fn()}
+      />,
+    );
+
+    expect(
+      await screen.findByText(/Esta turma ainda não tem perfil curricular/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "tela da turma" })).toHaveAttribute(
+      "href",
+      `#/turmas/${withoutProfile.id}`,
+    );
+    expect(
+      screen.getByRole("button", { name: "Salvar rascunho" }),
+    ).toBeDisabled();
+  });
+
   it("requires an explicit teacher action to approve a manual draft", async () => {
     const plan = {
       id: "51111111-1111-4111-8111-111111111111",
