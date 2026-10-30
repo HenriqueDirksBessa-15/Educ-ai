@@ -52,6 +52,7 @@ type ClassRow = {
   archived_at: Date | null;
   allowed_email_domain?: string | null;
   professor_email_domain?: string | null;
+  auto_accept_domain?: boolean;
 };
 type StudentRow = {
   id: string;
@@ -133,6 +134,7 @@ export class ClassesRepository {
               class_group.sync_status, class_group.last_synced_at,
               class_group.archived_at,
               class_group.allowed_email_domain::text AS allowed_email_domain,
+              class_group.auto_accept_domain,
               split_part(professor.email::text, '@', 2) AS professor_email_domain
        FROM class_group JOIN professor ON professor.id = class_group.professor_id
        WHERE class_group.id = $1 AND class_group.professor_id = $2`,
@@ -181,6 +183,7 @@ export class ClassesRepository {
       emailDomain: group.allowed_email_domain ?? null,
       effectiveEmailDomain:
         group.allowed_email_domain ?? group.professor_email_domain ?? null,
+      autoAcceptDomain: group.auto_accept_domain ?? false,
       curriculum: curriculum.rows[0]
         ? {
             educationStage: curriculum.rows[0].education_stage,
@@ -420,35 +423,43 @@ export class ClassesRepository {
     professorId: string,
     classId: string,
     domain: string | null,
+    autoAccept: boolean,
   ): Promise<boolean> {
     const result = (await this.database.query(
-      `UPDATE class_group SET allowed_email_domain = $3
+      `UPDATE class_group SET allowed_email_domain = $3, auto_accept_domain = $4
        WHERE id = $1 AND professor_id = $2 AND origin = 'local'
        RETURNING id`,
-      [classId, professorId, domain],
+      [classId, professorId, domain, autoAccept],
     )) as QueryResult<{ id: string }>;
     return result.rows.length > 0;
   }
 
-  // Entrada do aluno pelo código da turma. E-mail fora do domínio fica
-  // pendente até o professor aceitar, restringir ou excluir. Repetir a
-  // entrada não muda a situação já registrada.
+  // Entrada do aluno pelo código da turma. Toda entrada fica pendente até o
+  // professor aceitar, restringir ou excluir, salvo e-mail do domínio numa
+  // turma com aceite automático. Repetir a entrada não muda a situação.
   async joinByCode(input: StudentJoin): Promise<StudentJoinResult | null> {
     return withTransaction(this.database, async (database) => {
       const found = (await database.query(
-        `SELECT class_group.id, class_group.name,
+        `SELECT class_group.id, class_group.name, class_group.auto_accept_domain,
                 lower(coalesce(class_group.allowed_email_domain::text,
                   split_part(professor.email::text, '@', 2))) AS domain
          FROM class_group JOIN professor ON professor.id = class_group.professor_id
          WHERE class_group.local_access_code = $1
            AND class_group.origin = 'local' AND class_group.archived_at IS NULL`,
         [input.code],
-      )) as QueryResult<{ id: string; name: string; domain: string }>;
+      )) as QueryResult<{
+        id: string;
+        name: string;
+        domain: string;
+        auto_accept_domain: boolean;
+      }>;
       const group = found.rows[0];
       if (!group) return null;
       const email = input.email.toLowerCase();
       const status =
-        email.split("@")[1] === group.domain ? "active" : "pending";
+        group.auto_accept_domain && email.split("@")[1] === group.domain
+          ? "active"
+          : "pending";
       const student = (await database.query(STUDENT_UPSERT_SQL, [
         input.name,
         email,

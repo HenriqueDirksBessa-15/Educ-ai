@@ -721,12 +721,20 @@ describe("removing classes and students", () => {
     const domain = screen.getByLabelText("Domínio dos e-mails da escola");
     expect(domain).toHaveValue("escola.edu.br");
     fireEvent.change(domain, { target: { value: "colegio.edu.br" } });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar domínio" }));
+    const autoAccept = screen.getByLabelText(
+      "Aceitar automaticamente e-mails deste domínio",
+    );
+    expect(autoAccept).not.toBeChecked();
+    fireEvent.click(autoAccept);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Salvar regras de entrada" }),
+    );
     expect(
-      await screen.findByText("Domínio da escola salvo."),
+      await screen.findByText("Regras de entrada salvas."),
     ).toBeInTheDocument();
     expect(bodyOf(fetchMock, `PUT /classes/${localId}/email-domain`)).toEqual({
       domain: "colegio.edu.br",
+      autoAccept: true,
     });
   });
 

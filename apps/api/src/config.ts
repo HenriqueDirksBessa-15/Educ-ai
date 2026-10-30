@@ -128,6 +128,12 @@ const configSchema = z
     // Entrada pública do aluno por código (DEF-25); desligada até o ajuste
     // de segurança.
     ENABLE_PUBLIC_JOIN: booleanString("false"),
+    PUBLIC_JOIN_RATE_LIMIT_MAX: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(5),
     BACKGROUND_WORKERS_ENABLED: booleanString("true"),
     RATE_LIMIT_MAX: z.coerce.number().int().min(10).max(10_000).default(300),
     DATA_RETENTION_DAYS: z.coerce
@@ -218,6 +224,7 @@ export type AppConfig = {
   materialUploadMaxBytes: number;
   enableDevAuth: boolean;
   enablePublicJoin: boolean;
+  publicJoinRateLimitMax: number;
   backgroundWorkersEnabled: boolean;
   rateLimitMax: number;
   dataRetentionDays: number;
@@ -298,6 +305,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv): AppConfig {
     materialUploadMaxBytes: result.data.MATERIAL_UPLOAD_MAX_BYTES,
     enableDevAuth: result.data.ENABLE_DEV_AUTH,
     enablePublicJoin: result.data.ENABLE_PUBLIC_JOIN,
+    publicJoinRateLimitMax: result.data.PUBLIC_JOIN_RATE_LIMIT_MAX,
     backgroundWorkersEnabled: result.data.BACKGROUND_WORKERS_ENABLED,
     rateLimitMax: result.data.RATE_LIMIT_MAX,
     dataRetentionDays: result.data.DATA_RETENTION_DAYS,

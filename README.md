@@ -163,6 +163,7 @@ npm run check
 | `ENABLE_DEV_AUTH`                 | Habilita sessão fixture só em development |
 | `VITE_ENABLE_DEV_AUTH`            | Exibe o botão local em desenvolvimento    |
 | `ENABLE_PUBLIC_JOIN`              | Liga `POST /api/join` (padrão desligado)  |
+| `PUBLIC_JOIN_RATE_LIMIT_MAX`      | Entradas por código a cada 15 min por IP  |
 | `VITE_ENABLE_PUBLIC_JOIN`         | Exibe `#/entrar` e o código da turma      |
 | `RATE_LIMIT_MAX`                  | Requisições máximas por minuto/IP         |
 | `DATA_RETENTION_DAYS`             | Retenção de dados técnicos revogados      |

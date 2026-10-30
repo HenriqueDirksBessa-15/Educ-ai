@@ -215,6 +215,7 @@ describe("join by access code", () => {
       code: "TURMA-1234",
       name: "Caio",
       email: "caio@gmail.com",
+      privacyAccepted: true,
     };
 
     const unknown = await app.inject({
@@ -228,6 +229,13 @@ describe("join by access code", () => {
       payload,
     });
 
+    const withoutConsent = await app.inject({
+      method: "POST",
+      url: "/api/join",
+      payload: { ...payload, privacyAccepted: false },
+    });
+
+    expect(withoutConsent.statusCode).toBe(400);
     expect(unknown.statusCode).toBe(404);
     expect(joined.statusCode).toBe(201);
     expect(joined.json()).toEqual({
@@ -268,7 +276,7 @@ describe("join by access code", () => {
       method: "PUT",
       url,
       headers,
-      payload: { domain: " Escola.EDU.br " },
+      payload: { domain: " Escola.EDU.br ", autoAccept: true },
     });
 
     expect(invalid.statusCode).toBe(400);
@@ -277,6 +285,7 @@ describe("join by access code", () => {
       professorId,
       "8b7f2c1e-5d4a-4f3b-9c2d-1e0f9a8b7c6d",
       "escola.edu.br",
+      true,
     );
   });
 });

@@ -41,6 +41,7 @@ describe("loadConfig", () => {
     expect(loadConfig(validEnvironment).notificationMaxAttempts).toBe(5);
     expect(loadConfig(validEnvironment).enableDevAuth).toBe(false);
     expect(loadConfig(validEnvironment).enablePublicJoin).toBe(false);
+    expect(loadConfig(validEnvironment).publicJoinRateLimitMax).toBe(5);
     expect(loadConfig(validEnvironment).backgroundWorkersEnabled).toBe(true);
     expect(loadConfig(validEnvironment).rateLimitMax).toBe(300);
     expect(loadConfig(validEnvironment).dataRetentionDays).toBe(365);

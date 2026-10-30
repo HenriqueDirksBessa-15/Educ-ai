@@ -28,7 +28,7 @@ export function useJoinRoute(): boolean {
 const resultText: Record<StudentJoinResult["status"], string> = {
   active: "Pronto! Você entrou na turma.",
   pending:
-    "Recebemos seu pedido. Como seu e-mail é de fora da escola, o professor precisa confirmar sua entrada.",
+    "Recebemos seu pedido. O professor precisa confirmar sua entrada na turma.",
   restricted:
     "Você já está nesta turma, mas o professor restringiu seu acesso. Fale com ele.",
 };
@@ -38,6 +38,7 @@ export function JoinPage() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<StudentJoinResult | null>(null);
@@ -46,6 +47,10 @@ export function JoinPage() {
     event.preventDefault();
     if (!code.trim() || !name.trim() || !email.trim()) {
       setError("Preencha o código da turma, seu nome e seu e-mail.");
+      return;
+    }
+    if (!privacyAccepted) {
+      setError("Leia o aviso de privacidade e marque que está de acordo.");
       return;
     }
     setBusy(true);
@@ -58,6 +63,7 @@ export function JoinPage() {
             code: code.trim(),
             name: name.trim(),
             email: email.trim(),
+            privacyAccepted: true,
           }),
         ),
       );
@@ -114,6 +120,23 @@ export function JoinPage() {
             autoComplete="email"
             onChange={(event) => setEmail(event.target.value)}
           />
+        </label>
+        <section aria-labelledby={`${id}-privacy`} className="notice">
+          <strong id={`${id}-privacy`}>Aviso de privacidade</strong>
+          <span>
+            Usamos seu nome e seu e-mail só para o professor identificar você
+            nesta turma e enviar atividades, notas e recados. Só o professor da
+            turma vê esses dados, e eles não são compartilhados com outras
+            pessoas. Para corrigir ou apagar seus dados, fale com o professor.
+          </span>
+        </section>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={privacyAccepted}
+            onChange={(event) => setPrivacyAccepted(event.target.checked)}
+          />
+          Li o aviso de privacidade e estou de acordo
         </label>
         {error && (
           <p className="notice error" role="alert">

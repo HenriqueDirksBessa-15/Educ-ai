@@ -120,6 +120,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       "028_student_registration.sql",
       "029_access_code_domain.sql",
       "030_milestone_title.sql",
+      "031_join_auto_accept.sql",
     ]);
     expect(await runMigrations(testPool, migrationsDirectory)).toEqual([]);
 
@@ -641,7 +642,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     ).toHaveLength(3);
   }, 60_000);
 
-  it("keeps a student from another domain pending until the teacher decides", async () => {
+  it("keeps every code entry pending unless the class auto-accepts its domain", async () => {
     const professor = await testPool.query<{ id: string }>(
       `INSERT INTO professor (google_subject, email, display_name)
        VALUES ($1, $2, 'Professor Código') RETURNING id`,
@@ -663,6 +664,19 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         code,
         name: "Aluno da Escola",
         email: insider,
+        privacyAccepted: true,
+      }),
+    ).toEqual({ status: "pending", className: "Turma por código" });
+    // Com aceite automático, só o e-mail do domínio entra direto.
+    expect(await classes.setEmailDomain(professorId, classId, null, true)).toBe(
+      true,
+    );
+    expect(
+      await classes.joinByCode({
+        code,
+        name: "Outra da Escola",
+        email: `dentro2-${randomUUID()}@escola.edu.br`,
+        privacyAccepted: true,
       }),
     ).toEqual({ status: "active", className: "Turma por código" });
     expect(
@@ -670,6 +684,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         code: code.toLowerCase(),
         name: "Aluno de Fora",
         email: outsider,
+        privacyAccepted: true,
       }),
     ).toEqual({ status: "pending", className: "Turma por código" });
     // Entrar de novo não muda a situação, nem depois de restringir.
@@ -692,21 +707,28 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         code,
         name: "Aluno de Fora",
         email: outsider,
+        privacyAccepted: true,
       }),
     ).toEqual({ status: "restricted", className: "Turma por código" });
 
     // Domínio configurado na turma passa a valer no lugar do do professor.
     expect(
-      await classes.setEmailDomain(professorId, classId, "gmail.com"),
+      await classes.setEmailDomain(professorId, classId, "gmail.com", true),
     ).toBe(true);
     const another = `outro-${randomUUID()}@gmail.com`;
     expect(
-      await classes.joinByCode({ code, name: "Outro Aluno", email: another }),
+      await classes.joinByCode({
+        code,
+        name: "Outro Aluno",
+        email: another,
+        privacyAccepted: true,
+      }),
     ).toMatchObject({ status: "active" });
     expect(await classes.getDetail(professorId, classId)).toMatchObject({
       accessCode: code,
       emailDomain: "gmail.com",
       effectiveEmailDomain: "gmail.com",
+      autoAcceptDomain: true,
     });
 
     // Turma arquivada não aceita entrada por código.
@@ -716,6 +738,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
         code,
         name: "Atrasado",
         email: `x-${randomUUID()}@gmail.com`,
+        privacyAccepted: true,
       }),
     ).toBeNull();
   }, 60_000);
@@ -1995,6 +2018,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       materialUploadMaxBytes: 104_857_600,
       enableDevAuth: false,
       enablePublicJoin: false,
+      publicJoinRateLimitMax: 5,
       rateLimitMax: 300,
       dataRetentionDays: 365,
     };

@@ -264,6 +264,7 @@ export const classDetailSchema = classSummarySchema.extend({
   accessCode: z.string().nullable().optional(),
   emailDomain: z.string().nullable().optional(),
   effectiveEmailDomain: z.string().nullable().optional(),
+  autoAcceptDomain: z.boolean().optional(),
 });
 
 const emailDomainSchema = z
@@ -275,12 +276,16 @@ const emailDomainSchema = z
 
 export const classEmailDomainSchema = z.object({
   domain: emailDomainSchema.nullable(),
+  // Sem aceite automático, toda entrada por código fica pendente.
+  autoAccept: z.boolean().default(false),
 });
 
 export const studentJoinSchema = z.object({
   code: z.string().trim().min(4).max(40),
   name: z.string().trim().min(1).max(100),
   email: z.email(),
+  // O aluno precisa ter lido o aviso de privacidade.
+  privacyAccepted: z.literal(true),
 });
 
 export const studentJoinResultSchema = z.object({

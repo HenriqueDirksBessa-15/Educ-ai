@@ -38,6 +38,12 @@ Atualizado em 29/10/2026.
   Fica desligada por padrão (`ENABLE_PUBLIC_JOIN` e `VITE_ENABLE_PUBLIC_JOIN`):
   sem elas, `POST /api/join` responde 404 e a tela não mostra `#/entrar` nem
   o código da turma, até o ajuste de segurança.
+  Ajuste de segurança (não implantado): toda entrada começa pendente; o
+  professor pode ligar, por turma, o aceite automático de e-mails do domínio
+  (migração 031, `auto_accept_domain`). A página de entrada mostra um aviso de
+  privacidade e exige concordância (`privacyAccepted`), e `POST /api/join`
+  tem limite próprio de `PUBLIC_JOIN_RATE_LIMIT_MAX` (padrão 5) por IP a cada
+  15 minutos.
 - **DEF-26 (RF006).** `GET /api/classes` aceita `q` (nome ou código da turma
   local, com curingas escapados), `status` (ativas, arquivadas, todas),
   `component` e `schoolYear` (ano do perfil curricular). A lista de turmas

@@ -731,6 +731,9 @@ function AccessCodePanel({
 }) {
   const id = useId();
   const [domain, setDomain] = useState(detail.effectiveEmailDomain ?? "");
+  const [autoAccept, setAutoAccept] = useState(
+    detail.autoAcceptDomain ?? false,
+  );
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -741,10 +744,10 @@ function AccessCodePanel({
     try {
       await request(
         `/classes/${detail.id}/email-domain`,
-        json("PUT", { domain: domain.trim() || null }),
+        json("PUT", { domain: domain.trim() || null, autoAccept }),
       );
       await onSaved();
-      setFeedback({ kind: "ok", text: "Domínio da escola salvo." });
+      setFeedback({ kind: "ok", text: "Regras de entrada salvas." });
     } catch (error) {
       setFeedback({ kind: "error", text: serverText(error) });
     } finally {
@@ -774,13 +777,21 @@ function AccessCodePanel({
           />
         </label>
         <span className="muted-line" id={`${id}-help`}>
-          Quem entrar com e-mail de outro domínio fica pendente de validação até
-          você aceitar, restringir ou excluir. Deixe vazio para usar o domínio
-          do seu e-mail.
+          Toda entrada por código fica pendente de validação até você aceitar,
+          restringir ou excluir. Deixe o domínio vazio para usar o do seu
+          e-mail.
         </span>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={autoAccept}
+            onChange={(event) => setAutoAccept(event.target.checked)}
+          />
+          Aceitar automaticamente e-mails deste domínio
+        </label>
         <FeedbackMessage value={feedback} />
         <button type="submit" disabled={busy}>
-          {busy ? "Salvando…" : "Salvar domínio"}
+          {busy ? "Salvando…" : "Salvar regras de entrada"}
         </button>
       </form>
     </section>

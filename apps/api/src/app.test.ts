@@ -35,6 +35,7 @@ const config: AppConfig = {
   materialUploadMaxBytes: 104_857_600,
   enableDevAuth: false,
   enablePublicJoin: false,
+  publicJoinRateLimitMax: 5,
   backgroundWorkersEnabled: true,
   rateLimitMax: 300,
   dataRetentionDays: 365,
@@ -44,6 +45,36 @@ const apps: Awaited<ReturnType<typeof createApp>>[] = [];
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
+});
+
+describe("public join by code", () => {
+  it("answers 404 while switched off and has its own low request limit when on", async () => {
+    const database = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const off = await createApp({ config, database });
+    apps.push(off);
+    const on = await createApp({
+      config: { ...config, enablePublicJoin: true, publicJoinRateLimitMax: 2 },
+      database,
+    });
+    apps.push(on);
+    const join = (app: typeof on) =>
+      app.inject({
+        method: "POST",
+        url: "/api/join",
+        payload: {
+          code: "TURMA-1234",
+          name: "Caio",
+          email: "caio@gmail.com",
+          privacyAccepted: true,
+        },
+      });
+
+    expect((await join(off)).statusCode).toBe(404);
+    const statuses = [];
+    for (let attempt = 0; attempt < 3; attempt += 1)
+      statuses.push((await join(on)).statusCode);
+    expect(statuses).toEqual([404, 404, 429]);
+  });
 });
 
 describe("technical health endpoints", () => {

@@ -15,6 +15,9 @@ function fill(code: string) {
   fireEvent.change(screen.getByLabelText("Seu e-mail"), {
     target: { value: "caio@gmail.com" },
   });
+  fireEvent.click(
+    screen.getByLabelText("Li o aviso de privacidade e estou de acordo"),
+  );
   fireEvent.click(screen.getByRole("button", { name: "Entrar na turma" }));
 }
 
@@ -32,7 +35,7 @@ describe("student join page", () => {
     fill(" TURMA-1234 ");
 
     expect(
-      await screen.findByText(/o professor precisa confirmar sua entrada/),
+      await screen.findByText(/O professor precisa confirmar sua entrada/),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "7º A" })).toBeInTheDocument();
     const [url, init] = fetchMock.mock.calls[0] as unknown as [
@@ -44,7 +47,31 @@ describe("student join page", () => {
       code: "TURMA-1234",
       name: "Caio",
       email: "caio@gmail.com",
+      privacyAccepted: true,
     });
+  });
+
+  it("does not send anything before the privacy notice is accepted", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<JoinPage />);
+
+    expect(screen.getByText("Aviso de privacidade")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Código da turma"), {
+      target: { value: "TURMA-1234" },
+    });
+    fireEvent.change(screen.getByLabelText("Seu nome"), {
+      target: { value: "Caio" },
+    });
+    fireEvent.change(screen.getByLabelText("Seu e-mail"), {
+      target: { value: "caio@gmail.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Entrar na turma" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Leia o aviso de privacidade",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("explains an unknown code", async () => {
