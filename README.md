@@ -162,6 +162,8 @@ npm run check
 | `RUN_OPENAI_INTEGRATION`          | Habilita o smoke test real, com custo     |
 | `ENABLE_DEV_AUTH`                 | Habilita sessão fixture só em development |
 | `VITE_ENABLE_DEV_AUTH`            | Exibe o botão local em desenvolvimento    |
+| `ENABLE_PUBLIC_JOIN`              | Liga `POST /api/join` (padrão desligado)  |
+| `VITE_ENABLE_PUBLIC_JOIN`         | Exibe `#/entrar` e o código da turma      |
 | `RATE_LIMIT_MAX`                  | Requisições máximas por minuto/IP         |
 | `DATA_RETENTION_DAYS`             | Retenção de dados técnicos revogados      |
 | `FEEDBACK_EDIT_WINDOW_MINUTES`    | Janela de edição/exclusão de feedback     |

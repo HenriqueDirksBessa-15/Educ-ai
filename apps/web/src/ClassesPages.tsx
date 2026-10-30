@@ -25,6 +25,7 @@ import {
   formatDate,
   milestoneTypeLabel,
 } from "./labels.js";
+import { publicJoinEnabled } from "./JoinPage.js";
 import { routeHref } from "./router.js";
 
 type Feedback = { kind: "ok" | "error"; text: string } | null;
@@ -1435,7 +1436,7 @@ export function ClassDetailPage({
 
       {!detail.archivedAt && <ClassTimeline classId={classId} />}
 
-      {!detail.archivedAt && detail.accessCode && (
+      {!detail.archivedAt && detail.accessCode && publicJoinEnabled() && (
         <AccessCodePanel detail={detail} onSaved={() => loadDetail()} />
       )}
 

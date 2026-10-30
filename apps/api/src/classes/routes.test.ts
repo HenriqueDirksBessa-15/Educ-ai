@@ -56,12 +56,15 @@ function dependencies(credential: unknown) {
   return { authRepository, classesRepository, classroomAdapter };
 }
 
-async function build(input: ReturnType<typeof dependencies>) {
+async function build(
+  input: ReturnType<typeof dependencies>,
+  overrides: Partial<AppConfig> = {},
+) {
   const app = Fastify({ logger: false });
   apps.push(app);
   await app.register(cookie);
   registerClassesRoutes(app, {
-    config,
+    config: { ...config, ...overrides },
     authRepository: input.authRepository as unknown as AuthRepository,
     classesRepository: input.classesRepository as unknown as ClassesRepository,
     classroomAdapter: input.classroomAdapter as ClassroomAdapter,
@@ -207,7 +210,7 @@ describe("join by access code", () => {
     input.classesRepository.joinByCode
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ status: "pending", className: "7º A" });
-    const app = await build(input);
+    const app = await build(input, { enablePublicJoin: true });
     const payload = {
       code: "TURMA-1234",
       name: "Caio",
@@ -231,6 +234,20 @@ describe("join by access code", () => {
       data: { status: "pending", className: "7º A" },
     });
     expect(input.authRepository.resolveSession).not.toHaveBeenCalled();
+  });
+
+  it("does not exist while the public join is switched off", async () => {
+    const input = dependencies(null);
+    const app = await build(input);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/join",
+      payload: { code: "TURMA-1234", name: "Caio", email: "caio@gmail.com" },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(input.classesRepository.joinByCode).not.toHaveBeenCalled();
   });
 
   it("accepts only a bare domain for the class", async () => {

@@ -6,13 +6,19 @@ import { ApiError, json, request } from "./api.js";
 
 export const JOIN_HASH = "#/entrar";
 
+// Off unless the build sets VITE_ENABLE_PUBLIC_JOIN=true (the API needs
+// ENABLE_PUBLIC_JOIN=true too).
+export function publicJoinEnabled(): boolean {
+  return import.meta.env.VITE_ENABLE_PUBLIC_JOIN === "true";
+}
+
 // The join page is public: it renders without a professor session.
 export function useJoinRoute(): boolean {
-  const [joining, setJoining] = useState(
-    () => window.location.hash === JOIN_HASH,
-  );
+  const isJoin = () =>
+    publicJoinEnabled() && window.location.hash === JOIN_HASH;
+  const [joining, setJoining] = useState(isJoin);
   useEffect(() => {
-    const update = () => setJoining(window.location.hash === JOIN_HASH);
+    const update = () => setJoining(isJoin());
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, []);

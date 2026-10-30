@@ -34,6 +34,7 @@ const config: AppConfig = {
   materialStoragePrefix: "materials-test",
   materialUploadMaxBytes: 104_857_600,
   enableDevAuth: false,
+  enablePublicJoin: false,
   backgroundWorkersEnabled: true,
   rateLimitMax: 300,
   dataRetentionDays: 365,

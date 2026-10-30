@@ -18,6 +18,7 @@ import { resetCatalogCache } from "./curriculumCatalog.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   resetCatalogCache();
   window.history.replaceState({}, "", "/");
 });
@@ -656,7 +657,24 @@ describe("removing classes and students", () => {
     });
   });
 
+  it("hides the access code panel while the public join is off", async () => {
+    mockApi({
+      [`GET /classes/${localId}`]: {
+        data: detail(localId, { accessCode: "TURMA-1234" }),
+      },
+      "GET /curriculum": catalog,
+    });
+    renderWithConfirm(<ClassDetailPage classId={localId} reload={vi.fn()} />);
+
+    await screen.findByRole("heading", { name: "Reforço de leitura" });
+    expect(screen.queryByText("TURMA-1234")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Domínio dos e-mails da escola"),
+    ).not.toBeInTheDocument();
+  });
+
   it("lets the teacher accept a student who joined from another domain", async () => {
+    vi.stubEnv("VITE_ENABLE_PUBLIC_JOIN", "true");
     const pending = {
       ...students[1]!,
       id: "22222222-2222-4222-8222-222222222223",

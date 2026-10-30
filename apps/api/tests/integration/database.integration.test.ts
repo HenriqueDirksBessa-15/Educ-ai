@@ -1994,6 +1994,7 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
       materialStoragePrefix: "materials-test",
       materialUploadMaxBytes: 104_857_600,
       enableDevAuth: false,
+      enablePublicJoin: false,
       rateLimitMax: 300,
       dataRetentionDays: 365,
     };

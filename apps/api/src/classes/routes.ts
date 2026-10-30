@@ -203,18 +203,22 @@ export function registerClassesRoutes(
       },
     );
 
-  // Pública: o aluno entra pelo código da turma, sem sessão.
-  app.post<{ Body: unknown }>("/api/join", async (request, reply) => {
-    const parsed = studentJoinSchema.safeParse(request.body);
-    if (!parsed.success) return validationError(reply);
-    const joined = await dependencies.classesRepository.joinByCode(parsed.data);
-    if (!joined)
-      return notFound(
-        reply,
-        "Não encontramos uma turma com esse código. Confira com o professor.",
+  // Pública: o aluno entra pelo código da turma, sem sessão. Só existe com
+  // ENABLE_PUBLIC_JOIN; desligada, a rota responde 404.
+  if (dependencies.config.enablePublicJoin)
+    app.post<{ Body: unknown }>("/api/join", async (request, reply) => {
+      const parsed = studentJoinSchema.safeParse(request.body);
+      if (!parsed.success) return validationError(reply);
+      const joined = await dependencies.classesRepository.joinByCode(
+        parsed.data,
       );
-    return reply.code(201).send({ data: joined });
-  });
+      if (!joined)
+        return notFound(
+          reply,
+          "Não encontramos uma turma com esse código. Confira com o professor.",
+        );
+      return reply.code(201).send({ data: joined });
+    });
 
   app.put<{ Params: { classId: string }; Body: unknown }>(
     "/api/classes/:classId/email-domain",

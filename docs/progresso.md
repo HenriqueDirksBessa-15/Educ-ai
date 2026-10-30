@@ -35,6 +35,9 @@ Atualizado em 29/10/2026.
   professor aceita, restringe ou exclui localmente na lista de alunos.
   Migração 029: `class_group.allowed_email_domain`; sem valor, vale o
   domínio do e-mail do professor. Repetir a entrada não muda a situação.
+  Fica desligada por padrão (`ENABLE_PUBLIC_JOIN` e `VITE_ENABLE_PUBLIC_JOIN`):
+  sem elas, `POST /api/join` responde 404 e a tela não mostra `#/entrar` nem
+  o código da turma, até o ajuste de segurança.
 - **DEF-26 (RF006).** `GET /api/classes` aceita `q` (nome ou código da turma
   local, com curingas escapados), `status` (ativas, arquivadas, todas),
   `component` e `schoolYear` (ano do perfil curricular). A lista de turmas
