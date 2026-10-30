@@ -267,6 +267,30 @@ describe("teacher shell", () => {
     );
   });
 
+  it("asks to reconnect once when Google rejects the account", async () => {
+    signedIn(
+      (["google_oauth", "google_classroom", "google_forms"] as const).map(
+        (service) => ({
+          service,
+          status: "inactive" as const,
+          checkedAt: new Date().toISOString(),
+          errorCode: "GOOGLE_AUTH_INVALID",
+        }),
+      ),
+    );
+    render(<App />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "O Google não aceitou mais o acesso da sua conta.",
+    );
+    expect(
+      within(alert).getByRole("link", {
+        name: "Conecte a conta Google de novo",
+      }),
+    ).toHaveAttribute("href", "#/conta");
+    expect(alert).not.toHaveTextContent(/fora do ar/);
+  });
+
   it("stays quiet when Google services are working or unchecked", async () => {
     signedIn([
       {

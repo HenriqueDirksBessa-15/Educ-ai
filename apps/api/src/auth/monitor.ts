@@ -139,23 +139,85 @@ export class IntegrationMonitor {
           errorCode: normalized.code,
           errorMessage: normalized.message,
         });
+        if (attempt === 4) {
+          this.logger.error(
+            {
+              service,
+              professorId: stored?.professorId ?? null,
+              errorCode: normalized.code,
+              detail: normalized.message,
+            },
+            "google integration check failed",
+          );
+        }
         if (attempt < 4) await this.wait(250 * attempt);
       }
     }
   }
 }
 
-function normalizeGoogleError(error: unknown): {
+// Only the HTTP status and Google's own reason are kept: never tokens or
+// request headers.
+export function normalizeGoogleError(error: unknown): {
   code: string;
   message: string;
 } {
   if (error instanceof GoogleGatewayError) {
     return { code: error.code, message: error.message };
   }
-  return {
-    code: "GOOGLE_SERVICE_UNAVAILABLE",
-    message: "Serviço Google temporariamente indisponível.",
+  const response = (
+    error as { response?: { status?: unknown; data?: unknown } } | null
+  )?.response;
+  const status = typeof response?.status === "number" ? response.status : null;
+  if (status === null) {
+    const cause = error instanceof Error ? error.message : String(error);
+    return {
+      code: "GOOGLE_SERVICE_UNAVAILABLE",
+      message: `Serviço Google temporariamente indisponível: ${cause}`.slice(
+        0,
+        300,
+      ),
+    };
+  }
+  const reason = googleReason(response?.data);
+  const message = `HTTP ${status}${reason ? ` ${reason}` : ""}`.slice(0, 300);
+  if (status === 400 && /invalid_grant|unauthorized_client/.test(reason)) {
+    return { code: "GOOGLE_AUTH_INVALID", message };
+  }
+  if (status === 401) return { code: "GOOGLE_AUTH_INVALID", message };
+  if (status === 403) return { code: "GOOGLE_PERMISSION_DENIED", message };
+  if (status === 404) return { code: "GOOGLE_RESOURCE_NOT_FOUND", message };
+  if (status === 429 || status >= 500) {
+    return { code: "GOOGLE_SERVICE_UNAVAILABLE", message };
+  }
+  return { code: "GOOGLE_REQUEST_REJECTED", message };
+}
+
+function googleReason(data: unknown): string {
+  if (!data || typeof data !== "object") return "";
+  const body = data as {
+    error?: unknown;
+    error_description?: unknown;
   };
+  if (typeof body.error === "string") {
+    return [body.error, body.error_description]
+      .filter((part) => typeof part === "string")
+      .join(": ");
+  }
+  if (body.error && typeof body.error === "object") {
+    const detail = body.error as {
+      status?: unknown;
+      message?: unknown;
+      details?: Array<{ reason?: unknown }>;
+    };
+    const reasons = (Array.isArray(detail.details) ? detail.details : [])
+      .map((item) => item?.reason)
+      .filter((item) => typeof item === "string");
+    return [detail.status, ...reasons, detail.message]
+      .filter((part) => typeof part === "string" && part.length > 0)
+      .join(": ");
+  }
+  return "";
 }
 
 function defaultWait(milliseconds: number): Promise<void> {

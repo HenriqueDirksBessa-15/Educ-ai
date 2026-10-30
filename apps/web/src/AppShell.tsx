@@ -163,13 +163,22 @@ export function AppShell({
         {down.length > 0 && (
           <div className="notice warning" role="alert">
             <strong>Atenção</strong>
-            {down.map((item) => (
-              <span key={item.service}>
-                {GOOGLE_SERVICE_NAMES[item.service]} está fora do ar agora. Você
-                pode continuar planejando; os envios para a turma ficam para
-                quando ele voltar.
+            {down.some((item) => item.errorCode === "GOOGLE_AUTH_INVALID") && (
+              <span>
+                O Google não aceitou mais o acesso da sua conta.{" "}
+                <a href={routeHref("conta")}>Conecte a conta Google de novo</a>{" "}
+                para voltar a enviar para a turma.
               </span>
-            ))}
+            )}
+            {down
+              .filter((item) => item.errorCode !== "GOOGLE_AUTH_INVALID")
+              .map((item) => (
+                <span key={item.service}>
+                  {item.errorCode === "GOOGLE_SERVICE_UNAVAILABLE"
+                    ? `${GOOGLE_SERVICE_NAMES[item.service]} está fora do ar agora. Você pode continuar planejando; os envios para a turma ficam para quando ele voltar.`
+                    : `${GOOGLE_SERVICE_NAMES[item.service]} não está respondendo como esperado. Você pode continuar planejando; os envios para a turma ficam para depois.`}
+                </span>
+              ))}
           </div>
         )}
         {children}
