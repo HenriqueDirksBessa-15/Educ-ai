@@ -125,6 +125,10 @@ export class AuthRepository {
     professorId: string,
     credential: Partial<GoogleCredential>,
   ): Promise<void> {
+    // Google calls that did not refresh the token return no new token. The
+    // stored credential stays as it is; inserting a row without any token
+    // would also break the table check before ON CONFLICT is considered.
+    if (!credential.accessToken && !credential.refreshToken) return;
     const accessToken = credential.accessToken
       ? this.cipher.encrypt(credential.accessToken)
       : null;
