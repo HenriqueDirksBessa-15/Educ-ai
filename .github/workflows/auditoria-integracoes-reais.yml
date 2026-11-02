@@ -1,0 +1,86 @@
+name: Auditoria TFC - integracoes externas reais
+on:
+  push:
+    branches:
+      - audit/cloud-tests-2026-11-02
+    paths:
+      - .github/workflows/auditoria-integracoes-reais.yml
+      - scripts/test-google-live-readonly.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  openai_real:
+    name: OpenAI Responses - smoke real
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-5-mini
+      RUN_OPENAI_INTEGRATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.20.0"
+          cache: npm
+      - name: Exigir chave de homologacao (sem registrar o segredo)
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::BLOQUEADO: secret OPENAI_API_KEY nao foi configurado no GitHub Actions."
+            exit 2
+          fi
+      - name: Instalar dependencias e compilar contratos
+        run: npm ci && npm run build -w @educai/contracts
+      - name: Validar chave e gerar plano estruturado com OpenAI real
+        run: npm run test:integration:openai
+
+  google_real:
+    name: Google Classroom + Forms - leitura real
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GOOGLE_TEST_CLIENT_ID: ${{ secrets.GOOGLE_TEST_CLIENT_ID }}
+      GOOGLE_TEST_CLIENT_SECRET: ${{ secrets.GOOGLE_TEST_CLIENT_SECRET }}
+      GOOGLE_TEST_REFRESH_TOKEN: ${{ secrets.GOOGLE_TEST_REFRESH_TOKEN }}
+      GOOGLE_TEST_FORM_ID: ${{ secrets.GOOGLE_TEST_FORM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.20.0"
+      - name: Verificar OAuth docente e Classroom/Forms somente leitura
+        run: node scripts/test-google-live-readonly.mjs
+
+  gcs_real:
+    name: Google Cloud Storage - objeto de teste
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_TEST_SERVICE_ACCOUNT: ${{ secrets.GCP_TEST_SERVICE_ACCOUNT }}
+      MATERIAL_STORAGE_BUCKET: ${{ vars.GCS_TEST_BUCKET }}
+      RUN_GCS_INTEGRATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exigir identidade de federacao e bucket de homologacao
+        run: |
+          if [ -z "$GCP_WIF_PROVIDER" ] || [ -z "$GCP_TEST_SERVICE_ACCOUNT" ] || [ -z "$MATERIAL_STORAGE_BUCKET" ]; then
+            echo "::error::BLOQUEADO: configure GCP_WIF_PROVIDER e GCP_TEST_SERVICE_ACCOUNT como secrets e GCS_TEST_BUCKET como variable."
+            exit 2
+          fi
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TEST_SERVICE_ACCOUNT }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.20.0"
+          cache: npm
+      - name: Instalar dependencias e compilar contratos
+        run: npm ci && npm run build -w @educai/contracts
+      - name: Gravar, ler e excluir somente objeto temporario no bucket de teste
+        run: npm run test:integration:gcs
