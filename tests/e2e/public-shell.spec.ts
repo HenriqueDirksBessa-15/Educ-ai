@@ -68,5 +68,5 @@ test("opens the authenticated local demonstration when explicitly enabled", asyn
   ).toBeVisible();
   await expect(page).toHaveTitle("Boletins · EDUC.AI");
   await menu.getByRole("link", { name: /Minha conta/ }).click();
-  await expect(page.getByRole("heading", { name: "Seus dados" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Seus dados", exact: true })).toBeVisible();
 });
