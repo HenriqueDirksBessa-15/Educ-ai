@@ -1682,6 +1682,12 @@ describeWithDatabase("PostgreSQL migrations and seeds", () => {
     ).toBe("reviewed");
     expect(await feedbacks.send(professorId, feedbackId)).toBe("sent");
     expect(await feedbacks.send(professorId, feedbackId)).toBe("sent");
+    // O boletim abaixo representa outubro/2026. Fixar a data do feedback
+    // sintético nesse período evita depender do relógio da execução da CI.
+    await testPool.query(
+      "UPDATE feedback SET sent_at = $2::timestamptz WHERE id = $1",
+      [feedbackId, "2026-10-25T12:00:00.000Z"],
+    );
     const globalFeedbackId = await feedbacks.create(
       professorId,
       {
