@@ -54,6 +54,9 @@ jobs:
       - name: Instalar navegadores e dependencias
         run: npx playwright install --with-deps chrome msedge
       - name: Testes Playwright Chrome e Edge
+        env:
+          # Login de demonstracao habilitado exclusivamente no runner isolado.
+          NODE_ENV: development
         run: npm run test:e2e
       - name: Salvar evidencias em falhas
         if: always()
