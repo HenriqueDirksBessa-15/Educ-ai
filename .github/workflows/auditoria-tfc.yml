@@ -47,7 +47,7 @@ jobs:
         run: npm run build && npm run typecheck
       - name: Testes unitarios e de componentes
         run: npm run test:unit
-      - name: Integracao PostgreSQL (14 cenarios)
+      - name: Integracao PostgreSQL (18 cenarios)
         run: npm run test:integration
       - name: Preparar banco para testes de navegador
         run: npm run db:migrate && npm run db:seed
@@ -64,3 +64,15 @@ jobs:
             test-results/
             playwright-report/
           if-no-files-found: ignore
+
+  production_read_only:
+    name: Saude do banco de producao (somente leitura)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consultar readiness do EduCAI sem gravar dados
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
+            https://educai.dev.br/api/health/ready -o /tmp/educai-ready.json
+          jq -e '.status == "ready" and .database == "available"' /tmp/educai-ready.json
+          echo "Readiness de producao OK; SELECT 1 respondido pelo backend."
