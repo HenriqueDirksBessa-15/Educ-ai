@@ -1,0 +1,66 @@
+name: Auditoria TFC - testes em nuvem
+on:
+  push:
+    branches:
+      - audit/cloud-tests-2026-11-02
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: educai
+          POSTGRES_USER: educai
+          POSTGRES_PASSWORD: educai_local
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U educai -d educai"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CI: "true"
+      NODE_ENV: test
+      DATABASE_URL: postgresql://educai:educai_local@localhost:5432/educai
+      WEB_ORIGIN: http://localhost:5173
+      TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ENABLE_DEV_AUTH: "true"
+      VITE_ENABLE_DEV_AUTH: "true"
+      BACKGROUND_WORKERS_ENABLED: "false"
+      RUN_OPENAI_INTEGRATION: "false"
+      RUN_GCS_INTEGRATION: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Validacao de tipos e build
+        run: npm run typecheck && npm run build
+      - name: Testes unitarios e de componentes
+        run: npm run test:unit
+      - name: Integracao PostgreSQL (14 cenarios)
+        run: npm run test:integration
+      - name: Preparar banco para testes de navegador
+        run: npm run db:migrate && npm run db:seed
+      - name: Instalar navegadores e dependencias
+        run: npx playwright install --with-deps chrome msedge
+      - name: Testes Playwright Chrome e Edge
+        run: npm run test:e2e
+      - name: Salvar evidencias em falhas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-playwright
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
