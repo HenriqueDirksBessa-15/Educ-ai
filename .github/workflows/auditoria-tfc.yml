@@ -44,7 +44,7 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
       - name: Validacao de tipos e build
-        run: npm run typecheck && npm run build
+        run: npm run build && npm run typecheck
       - name: Testes unitarios e de componentes
         run: npm run test:unit
       - name: Integracao PostgreSQL (14 cenarios)
